@@ -311,3 +311,11 @@ func (a *App) envSidebar(c ui.C) {
 		}
 	})
 }
+
+// envReady reports whether envMain has an editor to show; while it is false
+// the shell keeps the workbench in the Environments section. envMain
+// declares the environment editor in the main area. Owned by the env PR.
+func (a *App) envReady() bool { return false }
+
+// envMain declares the environment editor in the main area while the
+func (a *App) envMain(c ui.C) {}

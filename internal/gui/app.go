@@ -395,8 +395,14 @@ func (a *App) sidebar(c ui.C) {
 	ui.Divider(c).Vertical()
 }
 
-// workbench is the tab bar over the request editor and the response.
+// workbench is the tab bar over the request editor and the response. While
+// the Environments section is selected, the env PR's editor may take the
+// whole area instead.
 func (a *App) workbench(c ui.C, theme *ui.Theme) {
+	if a.Section == SectionEnvironments && a.envReady() {
+		ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() { a.envMain(c) })
+		return
+	}
 	ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() {
 		a.tabBar(c)
 		t := a.Active()

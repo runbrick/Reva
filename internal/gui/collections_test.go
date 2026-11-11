@@ -271,6 +271,9 @@ func TestCollectionsNewRequestDuplicateRenameAndDelete(t *testing.T) {
 	collectionsReplace(h, h.App.S.Collections.Name, "Get payment")
 	h.click(h.App.S.Collections.Rename)
 	h.pump()
+	if h.App.Active().Request.Name != "Get payment" {
+		t.Fatal("open editor retained the old request name")
+	}
 	collectionsContext(h, "Get payment", h.App.S.Collections.Duplicate)
 	copyName := fmt.Sprintf(h.App.S.Collections.CopyName, "Get payment")
 	copy := h.App.Active().Request

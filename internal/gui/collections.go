@@ -475,6 +475,14 @@ func (a *App) applyCollectionEdit() {
 	if a.collectionError(err) {
 		return
 	}
+	if s.dialog == collectionRename && n.id != "" && !n.branch {
+		// Keep an open editor from undoing the rename on its next save.
+		for _, tab := range a.tabs {
+			if tab.CollectionID == n.collectionID && tab.Request.ID == n.id {
+				tab.Request.Name = name
+			}
+		}
+	}
 	s.dialogOpen = false
 	a.refreshCollections()
 }

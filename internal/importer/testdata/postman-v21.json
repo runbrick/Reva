@@ -1,0 +1,64 @@
+{
+  "info": {
+    "_postman_id": "not-reused",
+    "name": "示例 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "baseUrl", "value": "https://example.test"},
+    {"key": "token", "value": "{{secret}}", "disabled": true},
+    {"key": "limit", "value": 10}
+  ],
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+  "event": [{"listen": "test", "script": {"exec": ["ignored();"]}}],
+  "item": [
+    {
+      "name": "用户",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users?q=active&unused=1",
+              "query": [{"key": "q", "value": "{{search}}"}, {"key": "unused", "value": "1", "disabled": true}]
+            },
+            "header": [{"key": "Accept", "value": "application/json"}, {"key": "X-Disabled", "value": "yes", "disabled": true}]
+          }
+        },
+        {
+          "name": "Admin",
+          "auth": {"type": "basic", "basic": [{"key": "username", "value": "{{user}}"}, {"key": "password", "value": "p:a:ss"}]},
+          "item": [
+            {
+              "name": "Create user",
+              "request": {
+                "method": "POST",
+                "url": {"protocol": "https", "host": ["api", "example", "test"], "port": "{{port}}", "path": ["v1", "users"], "query": [{"key": "trace", "value": "yes"}]},
+                "body": {"mode": "raw", "raw": "{\"name\":\"{{name}}\"}", "options": {"raw": {"language": "json"}}}
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Text",
+      "request": {"method": "PATCH", "url": "{{baseUrl}}/text?q=a%20b&q=two#result", "body": {"mode": "raw", "raw": "hello {{name}}", "options": {"raw": {"language": "text"}}}, "auth": {"type": "noauth"}}
+    },
+    {
+      "name": "Login",
+      "request": {"method": "POST", "url": "{{baseUrl}}/login", "body": {"mode": "urlencoded", "urlencoded": [{"key": "username", "value": "{{user}}"}, {"key": "debug", "value": "true", "disabled": true}]}, "auth": {"type": "apikey", "apikey": [{"key": "key", "value": "api_key"}, {"key": "value", "value": "{{key}}"}, {"key": "in", "value": "query"}]}}
+    },
+    {
+      "name": "Upload",
+      "request": {"method": "POST", "url": "{{baseUrl}}/upload", "body": {"mode": "formdata", "formdata": [{"key": "note", "value": "你好", "type": "text"}, {"key": "file", "type": "file", "src": "C:\\uploads\\one.png"}, {"key": "files", "type": "file", "src": ["two.png", "three.png"], "disabled": true}]}}
+    },
+    {
+      "name": "Binary",
+      "request": {"method": "PUT", "url": {"protocol": "https", "host": "example.test", "path": "/binary"}, "body": {"mode": "file", "file": {"src": "/tmp/body.bin"}}}
+    },
+    {"name": "URL only", "request": "{{baseUrl}}/ping?empty=&flag"},
+    {"name": "Empty folder", "item": []}
+  ]
+}

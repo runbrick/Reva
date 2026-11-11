@@ -14,6 +14,7 @@ import (
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -48,8 +49,26 @@ func historyRepaint(h *harness) {
 }
 
 func historyShowsEmpty(h *harness) bool {
-	// Paragraphs are painted line by line at the sidebar's current width.
+	// Paragraphs are painted line by line at the current width.
 	return h.shows(strings.FieldsFunc(h.App.S.History.Empty, func(r rune) bool { return r == '.' || r == '。' })[0])
+}
+
+// Action labels repeat across rows, the detail panel and context menu. Match
+// their role and use the last button to address the selected entry's detail.
+func historyClickAction(h *harness, label string, role gfx.Role) {
+	h.t.Helper()
+	hits := h.D.Snapshot().Hits
+	for i := len(hits) - 1; i >= 0; i-- {
+		hit := hits[i]
+		if hit.Label == label && hit.Role == role {
+			b := hit.Bounds
+			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+				h.t.Fatal(err)
+			}
+			return
+		}
+	}
+	h.t.Fatalf("no %s action %q", role, label)
 }
 
 func historyContext(t *testing.T, h *harness, label string) {
@@ -66,7 +85,7 @@ func historyContext(t *testing.T, h *harness, label string) {
 	t.Fatalf("no history row %q", label)
 }
 
-func TestHistorySendAppearsAndClickLoadsRequest(t *testing.T) {
+func TestHistorySendAppearsAndOpenReturnsToWorkbench(t *testing.T) {
 	h := newHarness(t)
 	req := model.NewRequest("sent")
 	req.Method, req.URL = model.MethodPost, "https://example.test/history-send"
@@ -83,6 +102,13 @@ func TestHistorySendAppearsAndClickLoadsRequest(t *testing.T) {
 	h.App.Active().Request = model.NewRequest("replacement")
 	h.pump()
 	h.click("POST " + req.URL)
+	if h.App.Main != PageHistory || !h.shows(h.App.S.History.Detail) || !h.shows("X-Test: original") || !h.shows(req.Body.Text) {
+		t.Fatal("selecting a row did not show its request details")
+	}
+	historyClickAction(h, h.App.S.History.Open, gfx.RoleButton)
+	if h.App.Main != PageWorkbench {
+		t.Fatal("Open did not return to workbench")
+	}
 	if !reflect.DeepEqual(h.App.Active().Request, req) {
 		t.Fatalf("opened request = %#v, want %#v", h.App.Active().Request, req)
 	}
@@ -143,12 +169,13 @@ func TestHistoryContextOpenDeleteAndExternalDelete(t *testing.T) {
 	historyOpenPage(h)
 	label := "DELETE " + entry.Request.URL
 	historyContext(t, h, label)
-	h.click(h.App.S.History.Open)
+	historyClickAction(h, h.App.S.History.Open, gfx.RoleMenuItem)
 	if !reflect.DeepEqual(h.App.Active().Request, entry.Request) {
 		t.Fatal("context Open did not load request")
 	}
+	historyOpenPage(h)
 	historyContext(t, h, label)
-	h.click(h.App.S.History.Delete)
+	historyClickAction(h, h.App.S.History.Delete, gfx.RoleMenuItem)
 	if len(h.Svc.History.List()) != 0 || historyHasRow(h, entry.Request.URL) || !historyShowsEmpty(h) {
 		t.Fatalf("context Delete did not empty history: entries=%d, hits=%q, labels=%v", len(h.Svc.History.List()), h.hitLabels(), h.D.Snapshot().Labels)
 	}
@@ -326,6 +353,162 @@ func BenchmarkHistoryRepaint(b *testing.B) {
 	for b.Loop() {
 		if err := d.Resize(1280, 800); err != nil {
 			b.Fatal(err)
+		}
+	}
+}
+
+func TestHistoryFiltersMethodStatusAndSearchTogether(t *testing.T) {
+	h := newHarness(t)
+	entries := []model.HistoryEntry{
+		historyEntry("get-ok", "https://example.test/get-ok", model.MethodGet, time.Now()),
+		historyEntry("post-ok", "https://example.test/post-ok", model.MethodPost, time.Now()),
+		historyEntry("post-redirect", "https://example.test/post-redirect", model.MethodPost, time.Now()),
+		historyEntry("post-client", "https://example.test/post-client", model.MethodPost, time.Now()),
+		historyEntry("post-server", "https://example.test/post-server", model.MethodPost, time.Now()),
+		historyEntry("post-error", "https://example.test/post-error", model.MethodPost, time.Now()),
+		historyEntry("head", "https://example.test/head", model.MethodHead, time.Now()),
+	}
+	entries[2].StatusCode = 302
+	entries[3].StatusCode = 404
+	entries[4].StatusCode = 503
+	entries[5].StatusCode, entries[5].Error = 0, "connection refused"
+	for _, entry := range entries {
+		if err := h.Svc.History.Add(entry); err != nil {
+			t.Fatal(err)
+		}
+	}
+	historyOpenPage(h)
+	h.click("POST")
+	if historyHasRow(h, entries[0].Request.URL) || historyHasRow(h, entries[6].Request.URL) {
+		t.Fatal("method chip did not filter rows")
+	}
+	text := h.App.S.History
+	for _, tc := range []struct {
+		label string
+		index int
+	}{{text.Success, 1}, {text.Redirect, 2}, {text.ClientError, 3}, {text.ServerError, 4}, {text.Error, 5}} {
+		h.click(tc.label)
+		for i, entry := range entries {
+			if historyHasRow(h, entry.Request.URL) != (i == tc.index) {
+				t.Fatalf("status %q shows wrong rows: %q", tc.label, h.hitLabels())
+			}
+		}
+	}
+	h.typeInto(text.Search, "not-present")
+	if !h.shows(text.NoMatches) {
+		t.Fatal("search did not combine with chips")
+	}
+	h.click(text.ClearSearch)
+	if !historyHasRow(h, entries[5].Request.URL) {
+		t.Fatal("clear search lost chip filters")
+	}
+	h.click(text.AllStatuses)
+	h.click(text.Other)
+	if !historyHasRow(h, entries[6].Request.URL) || historyHasRow(h, entries[1].Request.URL) {
+		t.Fatal("Other chip did not isolate uncommon methods")
+	}
+	h.click(text.AllMethods)
+	if !historyHasRow(h, entries[0].Request.URL) || !historyHasRow(h, entries[1].Request.URL) {
+		t.Fatal("All chips did not restore rows")
+	}
+}
+
+func TestHistoryResendRecordsAnotherEntry(t *testing.T) {
+	h := newHarness(t)
+	entry := historyEntry("resend", "https://example.test/resend", model.MethodPatch, time.Now())
+	entry.Request.Headers = []model.KV{{Key: "X-Resend", Value: "original"}}
+	entry.Request.Body = model.Body{Mode: model.BodyJSON, Text: `{"resend":true}`}
+	if err := h.Svc.History.Add(entry); err != nil {
+		t.Fatal(err)
+	}
+	sent := make(chan model.Request, 1)
+	h.Svc.Requests.(*fake.Requests).Fn = func(_ context.Context, request model.Request) (model.Response, error) {
+		sent <- request
+		return model.Response{StatusCode: 201, Duration: 25 * time.Millisecond}, nil
+	}
+	historyOpenPage(h)
+	h.click("PATCH " + entry.Request.URL)
+	historyClickAction(h, h.App.S.History.Resend, gfx.RoleButton)
+	h.waitFor("re-send recorded", func() bool { return len(h.Svc.History.List()) == 2 })
+	if h.App.Main != PageWorkbench {
+		t.Fatal("Re-send did not open workbench")
+	}
+	select {
+	case request := <-sent:
+		if request.URL != entry.Request.URL || request.Method != entry.Request.Method || !reflect.DeepEqual(request.Headers, entry.Request.Headers) || request.Body.Text != entry.Request.Body.Text || request.Body.Mode != entry.Request.Body.Mode {
+			t.Fatalf("re-sent wrong request: %#v", request)
+		}
+	default:
+		t.Fatal("fake request service was not called")
+	}
+	if latest := h.Svc.History.List()[0]; latest.ID == entry.ID || latest.StatusCode != 201 || latest.Duration != 25*time.Millisecond {
+		t.Fatalf("wrong new history entry: %#v", latest)
+	}
+}
+
+func TestHistorySelectedRowCopyAndDelete(t *testing.T) {
+	h := newHarness(t)
+	entry := historyEntry("copy", "https://example.test/copy?full=yes", model.MethodGet, time.Now())
+	if err := h.Svc.History.Add(entry); err != nil {
+		t.Fatal(err)
+	}
+	historyOpenPage(h)
+	h.click("GET " + entry.Request.URL)
+	h.click(h.App.S.History.CopyURL)
+	if h.D.Clipboard() != entry.Request.URL {
+		t.Fatalf("copied URL = %q", h.D.Clipboard())
+	}
+	h.click(h.App.S.History.Delete)
+	if len(h.Svc.History.List()) != 0 || !h.shows(h.App.S.History.SelectEntry) || !historyShowsEmpty(h) {
+		t.Fatal("deleting selected row left stale history or details")
+	}
+}
+
+func TestHistoryDetailsBothLanguagesThemesAndNarrowLayout(t *testing.T) {
+	for _, lang := range i18n.Langs {
+		for _, theme := range []string{"light", "dark"} {
+			for _, width := range []int{1280, 960} {
+				t.Run(fmt.Sprintf("%s/%s/%d", lang, theme, width), func(t *testing.T) {
+					svc := fake.New()
+					settings := svc.Settings.Get()
+					settings.Language, settings.Theme = string(lang), theme
+					if err := svc.Settings.Save(settings); err != nil {
+						t.Fatal(err)
+					}
+					entry := historyEntry("detail", "https://example.test/details", model.MethodPut, time.Now())
+					entry.Duration = 125 * time.Millisecond
+					entry.Error, entry.StatusCode = "connection refused", 0
+					entry.Request.Headers = []model.KV{{Key: "X-Detail", Value: "shown"}, {Key: "X-Disabled", Value: "hidden", Disabled: true}}
+					entry.Request.Body = model.Body{Mode: model.BodyRaw, Text: "request preview"}
+					if err := svc.History.Add(entry); err != nil {
+						t.Fatal(err)
+					}
+					h := newHarness(t, svc)
+					h.App.Main = PageHistory
+					if err := h.D.Resize(width, 800); err != nil {
+						t.Fatal(err)
+					}
+					h.click("PUT " + entry.Request.URL)
+					for _, label := range []string{h.App.S.History.Detail, h.App.S.History.Resend, "connection refused", "125ms"} {
+						if !h.shows(label) {
+							t.Fatalf("detail missing %q", label)
+						}
+					}
+					if h.shows("X-Disabled") {
+						t.Fatal("disabled request header shown as sent")
+					}
+					if width == 1280 && (!h.shows("X-Detail: shown") || !h.shows("request preview")) {
+						t.Fatal("request details missing")
+					}
+					// Layout checks cover this feature's full page; ignore the shell's rail
+					// because its icon labels intentionally use a narrower fixed width.
+					for _, problem := range headless.CheckLayout(h.D.Snapshot()) {
+						if problem.Bounds.X >= RailWidth && problem.Bounds.Y > TitlebarHeight {
+							t.Errorf("history layout: %+v", problem)
+						}
+					}
+				})
+			}
 		}
 	}
 }

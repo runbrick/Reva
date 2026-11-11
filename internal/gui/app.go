@@ -215,7 +215,9 @@ func (a *App) CloseTab(i int) {
 // Send starts sending t's request with the current variables. The result
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
-	req, vars := a.prepareSend(t, t.Request.Clone(), a.Vars())
+	req := t.Request.Clone()
+	req.Options = req.Options.Resolve(a.Svc.Settings.Get())
+	req, vars := a.prepareSend(t, req, a.Vars())
 	t.job = &sendJob{req: req, vars: vars}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
 }

@@ -26,13 +26,15 @@ const (
 // Send may then be called concurrently. Nonpositive limits use the defaults.
 // A nil Transport clones http.DefaultTransport (including gzip decompression).
 // A supplied *http.Transport is a template; other RoundTrippers manage TLS
-// themselves. Clients and transports are cached for each effective option set.
+// themselves. At most two transports (TLS policies) and four clients (TLS and
+// redirect policies) are cached; timeouts apply to each send's context.
 type Service struct {
 	Timeout      time.Duration
 	MaxBodyBytes int64
 	Transport    http.RoundTripper
 	mu           sync.Mutex
 	clients      map[clientOptions]*http.Client
+	transports   map[bool]http.RoundTripper
 }
 
 var _ service.RequestService = (*Service)(nil)
@@ -48,6 +50,8 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	if err := ctx.Err(); err != nil {
 		return model.Response{}, err
 	}
+	ctx, cancel := context.WithTimeout(ctx, s.timeout(req.Options))
+	defer cancel()
 	req = vars.Apply(req, variables)
 	u, err := requestURL(req.URL)
 	if err != nil {

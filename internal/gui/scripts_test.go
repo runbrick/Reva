@@ -2,10 +2,13 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reqo/internal/script"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
@@ -22,7 +25,7 @@ func TestScriptPassesAfterSend(t *testing.T) {
 	if len(tab.Tests) != 1 || !tab.Tests[0].Passed || tab.Tests[0].Name != "ok" {
 		t.Fatalf("results = %+v", tab.Tests)
 	}
-	showScriptSections(t, h)
+	h.click(fmt.Sprintf(h.App.S.Response.TestsCount, len(tab.Tests)))
 	if !h.shows("ok") || !h.shows("1/1") || !h.shows("response log") {
 		t.Fatal("missing passing result, summary or console log")
 	}
@@ -69,16 +72,13 @@ func TestPreScriptErrorAndConsoleSurviveSendReset(t *testing.T) {
 	if len(tab.Tests) != 2 || tab.Tests[0].Name != h.App.S.Scripts.PreScriptError || tab.Tests[0].Passed || !strings.Contains(tab.Tests[0].Error, "pre failed") || !tab.Tests[1].Passed {
 		t.Fatalf("results = %+v", tab.Tests)
 	}
-	showScriptSections(t, h)
+	h.click(fmt.Sprintf(h.App.S.Response.TestsCount, len(tab.Tests)))
 	if !h.shows("pre log") || !h.shows("test log") || !h.shows("pre failed") || !h.shows("1/2") {
 		t.Fatal("missing merged pre-script diagnostics")
 	}
 	// A later send with no scripts must clear diagnostics from the previous run.
 	tab.Request.PreScript, tab.Request.TestScript = "", ""
-	h.App.Send(tab)
-	if err := h.D.Resize(1280, 800); err != nil {
-		t.Fatal(err)
-	}
+	h.click("Send")
 	h.waitFor("second send", func() bool { return tab.Response != nil })
 	if len(tab.Tests) != 0 || len(h.App.scriptTab(tab).logs) != 0 {
 		t.Fatal("stale results or logs after second send")
@@ -112,35 +112,10 @@ func TestScriptStateIsPerTabAndExceptionsBecomeFailures(t *testing.T) {
 	}
 }
 
-// The foundation's pane stubs do not yet declare these feature hooks. Exercise
-// the real sections through the shared headless harness without editing panes.
-func showScriptSections(t *testing.T, h *harness) {
-	t.Helper()
-	h.D.Close()
-	// EffectState belongs to its original page, which has just been closed.
-	// Fresh states let this isolated feature page drive subsequent sends.
-	for _, tab := range h.App.tabs {
-		tab.send = ui.NewEffectKeyed[sendResult, *sendJob](h.App.run)
-	}
-	page := ui.NewPage(ui.PageConfig{Theme: &h.App.theme, View: func(c ui.C) {
-		h.App.declareSends(c)
-		ui.Column(c).Fill().Pad(16).Gap(8).Children(func() {
-			ui.Column(c).FillWidth().Height(300).Children(func() { h.App.scriptsSection(c, h.App.Active()) })
-			ui.Column(c).FillWidth().Grow(1).Children(func() { h.App.testsSection(c, h.App.Active()) })
-		})
-	}})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	h.D = d
-	t.Cleanup(d.Close)
-}
-
 func TestScriptEditorsAndSnippetsMarkDirty(t *testing.T) {
 	h := newHarness(t)
 	tab := h.App.Active()
-	showScriptSections(t, h)
+	h.click(h.App.S.Request.Scripts)
 	// The TextArea and Choice both use the localized section name; select the
 	// editable hit below the choice rather than depending on a numeric hit ID.
 	for _, hit := range h.D.Snapshot().Hits {
@@ -169,6 +144,28 @@ func TestScriptEditorsAndSnippetsMarkDirty(t *testing.T) {
 	h.click(h.App.S.Scripts.VariableSnippetLabel)
 	if !strings.Contains(tab.Request.TestScript, ".to.be.below(500)") || !strings.Contains(tab.Request.TestScript, "pm.response.json().token") {
 		t.Fatalf("missing snippets: %s", tab.Request.TestScript)
+	}
+}
+
+func TestScriptSnippetsRunAsES5InBothLanguages(t *testing.T) {
+	for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
+		t.Run(string(lang), func(t *testing.T) {
+			text := i18n.For(lang).Scripts
+			if !strings.Contains(text.Help, "ES5") {
+				t.Fatal("missing ES5 help")
+			}
+			for _, source := range []string{text.StatusSnippet, text.TimeSnippet, text.VariableSnippet} {
+				results, _, err := script.RunTests(source, model.Request{}, model.Response{StatusCode: 200, Body: []byte(`{"token":"example"}`)}, nil, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, result := range results {
+					if !result.Passed {
+						t.Fatalf("snippet failed: %+v", result)
+					}
+				}
+			}
+		})
 	}
 }
 

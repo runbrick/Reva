@@ -152,7 +152,13 @@ func TestScriptExceptionsAndSyntaxErrors(t *testing.T) {
 }
 
 func TestScriptHardTimeout(t *testing.T) {
-	for _, source := range []string{`while(true){}`, `try { while(true){} } catch(e) {}`, `pm.test("loop", function() { while(true){} });`} {
+	for _, source := range []string{
+		`while(true){}`,
+		`try { while(true){} } catch(e) {}`,
+		`try { while(true){} } catch(e) { while(true){} } finally { while(true){} }`,
+		`while(true) { try { while(true){} } catch(e) {} }`,
+		`pm.test("loop", function() { while(true){} });`,
+	} {
 		t.Run(source, func(t *testing.T) {
 			start := time.Now()
 			req := model.Request{}

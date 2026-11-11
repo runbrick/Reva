@@ -18,13 +18,27 @@ import (
 
 func envReplaceField(h *harness, label, value string) {
 	h.t.Helper()
-	h.click(label)
+	envClickField(h, label)
 	if handled, err := h.D.Shortcut('a'); err != nil || !handled {
 		h.t.Fatalf("select field text: handled=%v err=%v", handled, err)
 	}
 	if err := h.D.Type(value); err != nil {
 		h.t.Fatal(err)
 	}
+}
+
+func envClickField(h *harness, label string) {
+	h.t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == label && hit.Role == gfx.RoleTextField {
+			b := hit.Bounds
+			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+				h.t.Fatal(err)
+			}
+			return
+		}
+	}
+	h.t.Fatalf("no text field %q", label)
 }
 
 func envSelect(h *harness, name string) {
@@ -56,57 +70,102 @@ func envSend(h *harness, received <-chan model.Request) model.Request {
 	}
 }
 
+func envManage(h *harness) {
+	h.t.Helper()
+	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.Manage)
+	if h.App.Section != SectionEnvironments || h.App.Main != PageWorkbench || !h.App.envReady() {
+		h.t.Fatal("Manage environments did not open the environment page")
+	}
+}
+
+func envAction(h *harness, name, action string) {
+	h.t.Helper()
+	h.click(name)
+	found := false
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == name {
+			found = true
+			continue
+		}
+		if found && hit.Label == h.App.S.Env.Actions {
+			b := hit.Bounds
+			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+				h.t.Fatal(err)
+			}
+			h.click(action)
+			return
+		}
+	}
+	h.t.Fatalf("no actions for %q", name)
+}
+
 func TestEnvironmentCreateSelectAndSend(t *testing.T) {
 	for _, language := range []string{"zh", "en"} {
-		t.Run(language, func(t *testing.T) {
-			svc := fake.New()
-			settings := svc.Settings.Get()
-			settings.Language, settings.Theme, settings.HistoryLimit = language, "dark", 37
-			if err := svc.Settings.Save(settings); err != nil {
-				t.Fatal(err)
-			}
-			h := newHarness(t, svc)
-			received := envCaptureRequests(h)
-			h.click(h.App.S.Env.Edit)
-			if !h.shows(h.App.S.Env.SaveHint) {
-				t.Fatal("editor does not explain Save and discard")
-			}
-			h.click(h.App.S.Env.New)
-			envReplaceField(h, h.App.S.Env.Name, "Development")
-			h.click(h.App.S.Env.AddRow)
-			h.typeInto(h.App.S.Env.Key, "host")
-			h.typeInto(h.App.S.Env.Value, "https://dev.example.test")
-			if len(svc.Environments.List()) != 0 {
-				t.Fatal("New persisted before Save")
-			}
-			h.click(h.App.S.Env.Save)
-			envs := svc.Environments.List()
-			if len(envs) != 1 || envs[0].Name != "Development" || !reflect.DeepEqual(envs[0].Variables, []model.KV{{Key: "host", Value: "https://dev.example.test"}}) {
-				t.Fatalf("saved environments: %+v", envs)
-			}
-			envSelect(h, "Development")
-			settings.ActiveEnvID = envs[0].ID
-			if got := svc.Settings.Get(); got != settings {
-				t.Fatalf("selection must preserve other settings: got %+v want %+v", got, settings)
-			}
-			h.App.Active().Request.URL = "{{host}}/users"
-			h.pump()
-			if req := envSend(h, received); req.URL != "https://dev.example.test/users" {
-				t.Fatalf("sent URL %q", req.URL)
-			}
-			// Recreating the App uses the stored selection, not feature-local state.
-			reopened := newHarness(t, svc)
-			if reopened.App.env.activeID != envs[0].ID || !reopened.shows("Development") {
-				t.Fatal("environment selection was not restored")
-			}
-			envSelect(h, h.App.S.Env.NoEnvironment)
-			if got := svc.Settings.Get(); got.ActiveEnvID != "" || got.Language != language || got.HistoryLimit != 37 || got.Theme != "dark" {
-				t.Fatalf("No environment settings: %+v", got)
-			}
-			if req := envSend(h, received); req.URL != "{{host}}/users" {
-				t.Fatalf("No environment sent URL %q", req.URL)
-			}
-		})
+		for _, theme := range []string{"light", "dark"} {
+			t.Run(language+"/"+theme, func(t *testing.T) {
+				svc := fake.New()
+				settings := svc.Settings.Get()
+				settings.Language, settings.Theme, settings.HistoryLimit = language, theme, 37
+				if err := svc.Settings.Save(settings); err != nil {
+					t.Fatal(err)
+				}
+				h := newHarness(t, svc)
+				received := envCaptureRequests(h)
+				envManage(h)
+				if !h.shows(h.App.S.Env.Empty) {
+					t.Fatal("missing empty environment page")
+				}
+				h.click(h.App.S.Env.New)
+				if len(svc.Environments.List()) != 1 {
+					t.Fatal("sidebar create did not call the service")
+				}
+				envReplaceField(h, h.App.S.Env.Name, "Development")
+				h.click(h.App.S.Common.Add)
+				envClickField(h, h.App.S.Common.Key)
+				if err := h.D.Type("host"); err != nil {
+					t.Fatal(err)
+				}
+				h.typeInto(h.App.S.Common.Value, "https://dev.example.test")
+				h.typeInto(h.App.S.Env.Description, "Development host")
+				if !h.shows(h.App.S.Env.SaveHint) || !h.App.env.current().dirty() {
+					t.Fatal("editor missing save hint or dirty state")
+				}
+				before := svc.Environments.List()[0]
+				if before.Name == "Development" || len(before.Variables) != 0 {
+					t.Fatal("typing changed stored environment before Save")
+				}
+				h.click(h.App.S.Env.Save)
+				envs := svc.Environments.List()
+				want := []model.KV{{Key: "host", Value: "https://dev.example.test", Description: "Development host"}}
+				if len(envs) != 1 || envs[0].Name != "Development" || !reflect.DeepEqual(envs[0].Variables, want) || h.App.env.current().dirty() {
+					t.Fatalf("saved environments: %+v", envs)
+				}
+				h.click(h.App.S.Shell.APIs)
+				envSelect(h, "Development")
+				settings.ActiveEnvID = envs[0].ID
+				if got := svc.Settings.Get(); got != settings {
+					t.Fatalf("selection changed other settings: %+v", got)
+				}
+				h.App.Active().Request.URL = "{{host}}/users"
+				h.pump()
+				if req := envSend(h, received); req.URL != "https://dev.example.test/users" {
+					t.Fatalf("sent URL %q", req.URL)
+				}
+				reopened := newHarness(t, svc)
+				if reopened.App.env.activeID != envs[0].ID || !reopened.shows("Development") {
+					t.Fatal("selection was not restored")
+				}
+				envSelect(h, h.App.S.Env.NoEnvironment)
+				settings.ActiveEnvID = ""
+				if got := svc.Settings.Get(); got != settings {
+					t.Fatalf("No environment settings: %+v", got)
+				}
+				if req := envSend(h, received); req.URL != "{{host}}/users" {
+					t.Fatalf("No environment sent URL %q", req.URL)
+				}
+			})
+		}
 	}
 }
 
@@ -178,8 +237,8 @@ func TestEnvironmentUnresolvedVarsAndTooltip(t *testing.T) {
 		t.Fatalf("unresolved variables: %q", got)
 	}
 	badge := fmt.Sprintf(h.App.S.Env.Unresolved, 2)
-	if !h.shows(badge) {
-		t.Fatalf("missing unresolved-variable badge %q", badge)
+	if h.shows(badge) {
+		t.Fatal("warning should be a compact dot, not a text badge")
 	}
 	for _, hit := range h.D.Snapshot().Hits {
 		if hit.Label == badge {
@@ -198,94 +257,144 @@ func TestEnvironmentUnresolvedVarsAndTooltip(t *testing.T) {
 	t.Fatal("warning badge cannot be hovered")
 }
 
-func TestEnvironmentEditorDiscardRenameDuplicateAndDelete(t *testing.T) {
+func TestEnvironmentSidebarRenameDuplicateDeleteAndSetActive(t *testing.T) {
 	h := newHarness(t)
-	original := model.Environment{Version: model.SchemaVersion, ID: "original", Name: "Original", Variables: []model.KV{{Key: "host", Value: "original"}}}
+	original := model.Environment{Version: model.SchemaVersion, ID: "original", Name: "Original", Variables: []model.KV{{Key: "host", Value: "original", Description: "Original host"}}}
 	if err := h.Svc.Environments.Save(original); err != nil {
 		t.Fatal(err)
 	}
-	settings := h.Svc.Settings.Get()
-	settings.ActiveEnvID = original.ID
-	if err := h.Svc.Settings.Save(settings); err != nil {
-		t.Fatal(err)
-	}
 	h.pump()
-	h.click(h.App.S.Env.Edit)
-	envReplaceField(h, h.App.S.Env.Value, "discarded")
-	h.click(h.App.S.Env.Duplicate)
-	envReplaceField(h, h.App.S.Env.Name, "Discarded copy")
-	h.click(h.App.S.Env.Delete)
-	h.click(h.App.S.Env.Delete)
-	h.click(h.App.S.Env.New)
-	h.click(h.App.S.Env.Close)
-	if got := h.Svc.Environments.List(); !reflect.DeepEqual(got, []model.Environment{original}) {
-		t.Fatalf("closing changed stored environments: %+v", got)
-	}
-	if h.Svc.Settings.Get() != settings {
-		t.Fatal("closing changed active environment settings")
-	}
-	h.click(h.App.S.Env.Edit)
-	h.click(h.App.S.Env.Rename)
+	envManage(h)
+	envAction(h, original.Name, h.App.S.Env.Rename)
 	envReplaceField(h, h.App.S.Env.Name, "Renamed")
-	h.click(h.App.S.Env.Duplicate)
-	envReplaceField(h, h.App.S.Env.Name, "Copy")
-	envReplaceField(h, h.App.S.Env.Value, "copy value")
-	h.click(h.App.S.Env.Enabled)
 	h.click(h.App.S.Env.Save)
 	stored, _ := h.Svc.Environments.Get(original.ID)
-	if stored.Name != "Renamed" || stored.Variables[0].Value != "original" || stored.Variables[0].Disabled {
-		t.Fatalf("renamed original was changed by its copy: %+v", stored)
+	if stored.Name != "Renamed" {
+		t.Fatalf("rename did not persist: %+v", stored)
 	}
+	envAction(h, "Renamed", h.App.S.Env.Duplicate)
 	envs := h.Svc.Environments.List()
-	if len(envs) != 2 || envs[0].Name != "Copy" || envs[0].ID == original.ID || envs[0].Variables[0].Value != "copy value" || !envs[0].Variables[0].Disabled {
-		t.Fatalf("duplicate not saved independently: %+v", envs)
+	if len(envs) != 2 {
+		t.Fatalf("duplicate not persisted: %+v", envs)
 	}
-	h.click(h.App.S.Env.Edit)
-	h.click(h.App.S.Env.Delete)
+	copy := h.App.env.current()
+	if copy.id == original.ID || copy.name != fmt.Sprintf(h.App.S.Env.CopyName, "Renamed") {
+		t.Fatal("duplicate did not get a new identity and name")
+	}
+	envReplaceField(h, h.App.S.Common.Value, "copy value")
 	h.click(h.App.S.Env.Save)
-	if _, ok := h.Svc.Environments.Get(original.ID); ok {
-		t.Fatal("Delete did not remove active environment")
+	stored, _ = h.Svc.Environments.Get(original.ID)
+	if stored.Variables[0].Value != "original" || stored.Variables[0].Description != "Original host" {
+		t.Fatal("duplicate aliases original variables")
 	}
-	settings.ActiveEnvID = ""
-	if got := h.Svc.Settings.Get(); got != settings {
-		t.Fatalf("deleting active environment did not clear only selection: %+v", got)
+	envAction(h, copy.name, h.App.S.Env.SetActive)
+	if h.Svc.Settings.Get().ActiveEnvID != copy.id {
+		t.Fatal("Set active did not persist")
+	}
+	envAction(h, copy.name, h.App.S.Env.Delete)
+	if !h.App.env.deleteOpen || !h.shows(copy.name) {
+		t.Fatalf("delete missing confirmation: %+v", h.D.Snapshot().Labels)
+	}
+	h.click(h.App.S.Env.Cancel)
+	if len(h.Svc.Environments.List()) != 2 {
+		t.Fatal("cancel deleted the environment")
+	}
+	envAction(h, copy.name, h.App.S.Env.Delete)
+	h.click(h.App.S.Env.Delete)
+	if _, ok := h.Svc.Environments.Get(copy.id); ok || h.Svc.Settings.Get().ActiveEnvID != "" {
+		t.Fatal("confirmed delete did not clear active environment")
+	}
+	if h.App.env.current().id != original.ID {
+		t.Fatal("deleting selected environment did not choose remaining row")
 	}
 }
 
-func TestEnvironmentEditorEscapeDiscardsAndRowsKeepIdentity(t *testing.T) {
+func TestEnvironmentPageDiscardShortcutAndRowIdentity(t *testing.T) {
 	h := newHarness(t)
 	env := model.Environment{ID: "dev", Name: "Development", Variables: []model.KV{{Key: "first", Value: "one"}, {Key: "second", Value: "two"}}}
 	if err := h.Svc.Environments.Save(env); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.Env.Edit)
+	h.pump()
+	envManage(h)
 	var secondValueID gfx.ID
 	for _, hit := range h.D.Snapshot().Hits {
-		if hit.Label == h.App.S.Env.Value {
+		if hit.Label == h.App.S.Common.Value {
 			secondValueID = hit.ID
 		}
 	}
-	h.click(h.App.S.Env.DeleteRow)
+	h.click(h.App.S.Common.Delete)
 	for _, hit := range h.D.Snapshot().Hits {
-		if hit.Label == h.App.S.Env.Value && hit.ID != secondValueID {
-			t.Fatal("deleting an earlier row changed surviving field identity")
+		if hit.Label == h.App.S.Common.Value && hit.ID != secondValueID {
+			t.Fatal("deleting first row changed surviving field identity")
 		}
 	}
-	envReplaceField(h, h.App.S.Env.Value, "updated")
-	if err := h.D.Key(gfx.KeyEscape, 0); err != nil {
-		t.Fatal(err)
-	}
+	envReplaceField(h, h.App.S.Common.Value, "discarded")
+	h.click(h.App.S.Env.Discard)
 	stored, _ := h.Svc.Environments.Get(env.ID)
-	if !reflect.DeepEqual(stored, env) {
-		t.Fatalf("Escape persisted variable edits: %+v", stored)
+	if !reflect.DeepEqual(stored, env) || h.App.env.current().dirty() || len(h.App.env.current().variables) != 2 {
+		t.Fatal("Discard did not restore service snapshot")
 	}
-	h.click(h.App.S.Env.Edit)
-	h.click(h.App.S.Env.DeleteRow)
-	h.click(h.App.S.Env.AddRow)
+	envReplaceField(h, h.App.S.Common.Value, "saved by shortcut")
+	handled, err := h.D.ShortcutChord(ui.Primary, 's')
+	if err != nil || !handled {
+		t.Fatalf("Primary+S: handled=%v err=%v", handled, err)
+	}
+	stored, _ = h.Svc.Environments.Get(env.ID)
+	if stored.Variables[0].Value != "saved by shortcut" || h.App.env.current().dirty() {
+		t.Fatal("Primary+S did not save current environment")
+	}
+	h.click(h.App.S.Common.Key) // first row's enabled checkbox
 	h.click(h.App.S.Env.Save)
 	stored, _ = h.Svc.Environments.Get(env.ID)
-	if len(stored.Variables) != 2 || stored.Variables[0].Key != "second" || stored.Variables[1].Disabled {
-		t.Fatalf("row delete/add not saved: %+v", stored)
+	if !stored.Variables[0].Disabled {
+		t.Fatal("enabled toggle was not saved")
+	}
+}
+
+func TestEnvironmentDraftsSurviveRowAndSectionSwitches(t *testing.T) {
+	h := newHarness(t)
+	for _, env := range []model.Environment{{ID: "a", Name: "A", Variables: []model.KV{{Key: "host", Value: "one"}}}, {ID: "b", Name: "B"}} {
+		if err := h.Svc.Environments.Save(env); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.pump()
+	envManage(h)
+	envReplaceField(h, h.App.S.Common.Value, "draft")
+	h.click("B")
+	envReplaceField(h, h.App.S.Env.Name, "B draft")
+	h.click(h.App.S.Shell.APIs)
+	envManage(h)
+	h.click("A")
+	if h.App.env.current().variables[0].Value != "draft" {
+		t.Fatal("row or section switch lost draft")
+	}
+	h.click(h.App.S.Env.Save)
+	stored, _ := h.Svc.Environments.Get("b")
+	if stored.Name != "B" {
+		t.Fatal("saving A persisted another environment's draft")
+	}
+	h.click("B")
+	if h.App.env.current().name != "B draft" {
+		t.Fatal("saving A lost B draft")
+	}
+}
+
+func TestEnvironmentSidebarKeyboardContextMenu(t *testing.T) {
+	h := newHarness(t)
+	if err := h.Svc.Environments.Save(model.Environment{ID: "dev", Name: "Development"}); err != nil {
+		t.Fatal(err)
+	}
+	h.pump()
+	envManage(h)
+	h.click("Development")
+	if err := h.D.Key(gfx.KeyF10, gfx.ModifierShift); err != nil {
+		t.Fatal(err)
+	}
+	h.click(h.App.S.Env.SetActive)
+	if h.Svc.Settings.Get().ActiveEnvID != "dev" {
+		t.Fatal("context menu did not set active environment")
 	}
 }
 
@@ -306,11 +415,11 @@ func TestEnvironmentSaveFailureKeepsDraftForRetry(t *testing.T) {
 	failing := &envFailSave{EnvironmentService: svc.Environments, fail: true}
 	svc.Environments = failing
 	h := newHarness(t, svc)
-	h.click(h.App.S.Env.Edit)
+	envManage(h)
 	h.click(h.App.S.Env.New)
 	envReplaceField(h, h.App.S.Env.Name, "Retry")
 	h.click(h.App.S.Env.Save)
-	if !h.shows("write failed") || !h.App.env.open || len(svc.Environments.List()) != 0 {
+	if !h.shows("write failed") || h.App.env.current() == nil || !h.App.env.current().dirty() {
 		t.Fatal("failed Save lost draft or hid error")
 	}
 	failing.fail = false
@@ -322,11 +431,11 @@ func TestEnvironmentSaveFailureKeepsDraftForRetry(t *testing.T) {
 
 func TestEnvironmentNameRequiredBeforeSaving(t *testing.T) {
 	h := newHarness(t)
-	h.click(h.App.S.Env.Edit)
+	envManage(h)
 	h.click(h.App.S.Env.New)
 	envReplaceField(h, h.App.S.Env.Name, "  ")
 	h.click(h.App.S.Env.Save)
-	if !h.shows(h.App.S.Env.NameRequired) || len(h.Svc.Environments.List()) != 0 {
+	if !h.shows(h.App.S.Env.NameRequired) || h.Svc.Environments.List()[0].Name != h.App.S.Env.NewEnvironment {
 		t.Fatal("blank name was saved or validation was hidden")
 	}
 	envReplaceField(h, h.App.S.Env.Name, "  Development  ")
@@ -372,27 +481,32 @@ func (s *envFailDelete) Delete(id string) error {
 	return s.EnvironmentService.Delete(id)
 }
 
-func TestEnvironmentDeleteFailureCanRetryRemainingDeletions(t *testing.T) {
+func TestEnvironmentDeleteFailureKeepsConfirmationAndCanRetry(t *testing.T) {
 	svc := fake.New()
-	for _, env := range []model.Environment{{ID: "a", Name: "A"}, {ID: "b", Name: "B"}} {
-		if err := svc.Environments.Save(env); err != nil {
-			t.Fatal(err)
-		}
+	if err := svc.Environments.Save(model.Environment{ID: "a", Name: "A"}); err != nil {
+		t.Fatal(err)
 	}
-	failing := &envFailDelete{EnvironmentService: svc.Environments, failID: "b"}
+	settings := svc.Settings.Get()
+	settings.ActiveEnvID = "a"
+	if err := svc.Settings.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	failing := &envFailDelete{EnvironmentService: svc.Environments, failID: "a"}
 	svc.Environments = failing
 	h := newHarness(t, svc)
-	h.click(h.App.S.Env.Edit)
+	envManage(h)
+	envAction(h, "A", h.App.S.Env.Delete)
 	h.click(h.App.S.Env.Delete)
-	h.click(h.App.S.Env.Delete)
-	h.click(h.App.S.Env.Save)
-	if !h.shows("delete failed") || len(svc.Environments.List()) != 1 {
-		t.Fatal("delete failure did not preserve remaining deletion")
+	if !h.shows("delete failed") || !h.App.env.deleteOpen || len(svc.Environments.List()) != 1 || svc.Settings.Get() != settings {
+		t.Fatal("failed delete lost environment or active selection")
 	}
 	failing.failID = ""
-	h.click(h.App.S.Env.Save)
-	if h.App.env.open || len(svc.Environments.List()) != 0 {
-		t.Fatal("retry repeated completed deletions or lost remaining ones")
+	h.click(h.App.S.Env.Delete)
+	if h.App.env.deleteOpen || len(svc.Environments.List()) != 0 || svc.Settings.Get().ActiveEnvID != "" {
+		t.Fatal("delete retry did not finish")
+	}
+	if !h.shows(h.App.S.Env.Empty) {
+		t.Fatal("last deletion did not show empty state")
 	}
 }
 

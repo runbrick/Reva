@@ -24,6 +24,24 @@ func responsePaint(h *harness) {
 	}
 }
 
+// Request and response sections can share a translated label. The response
+// pane is declared after the request editor, so its exact match is the last hit.
+func responseClickTab(h *harness, label string) ui.Rect {
+	h.t.Helper()
+	hits := h.D.Snapshot().Hits
+	for i := len(hits) - 1; i >= 0; i-- {
+		if hits[i].Label == label {
+			bounds := hits[i].Bounds
+			if err := h.D.Click(bounds.X+bounds.Width/2, bounds.Y+bounds.Height/2); err != nil {
+				h.t.Fatal(err)
+			}
+			return bounds
+		}
+	}
+	h.t.Fatalf("no response tab named %q on screen; have %q", label, h.hitLabels())
+	return ui.Rect{}
+}
+
 func responseHarness(t *testing.T, response model.Response, sendErr error) *harness {
 	t.Helper()
 	svc := fake.New()
@@ -98,11 +116,18 @@ func TestResponsePrettyRawAndHeaders(t *testing.T) {
 	if !h.shows(body) {
 		t.Fatal("Raw did not show compact response")
 	}
-	h.click("Headers")
-	if !h.shows("X-Trace") || !h.shows("trace-123") {
+	headersTab := responseClickTab(h, h.App.S.Response.Headers)
+	var foundName, foundValue bool
+	for _, label := range h.D.Snapshot().Labels {
+		if label.Bounds.Y >= headersTab.Y+headersTab.Height {
+			foundName = foundName || label.Value == "X-Trace"
+			foundValue = foundValue || label.Value == "trace-123"
+		}
+	}
+	if !foundName || !foundValue {
 		t.Fatal("Headers did not show name and value")
 	}
-	h.click("Body")
+	responseClickTab(h, h.App.S.Response.Body)
 	if !h.shows(body) {
 		t.Fatal("switching sections lost Raw selection")
 	}
@@ -157,8 +182,8 @@ func TestResponsePrettyCacheAcrossPaintsAndTabs(t *testing.T) {
 	// this fixture to detect any formatting of the same pointer on repaint.
 	first.Response.Body = []byte(`{"changed":true}`)
 	responsePaint(h)
-	h.click("Headers")
-	h.click("Body")
+	responseClickTab(h, h.App.S.Response.Headers)
+	responseClickTab(h, h.App.S.Response.Body)
 	h.App.NewTab().Response = &model.Response{Body: []byte(`{"second":true}`)}
 	responsePaint(h)
 	h.App.active = 0

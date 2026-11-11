@@ -525,6 +525,10 @@ func TestCollectionsFooterNewRequestAndLanguages(t *testing.T) {
 			if !h.shows(h.App.S.Collections.Title) || !h.shows(h.App.S.Collections.Journey) {
 				t.Fatal("localized sidebar or footer missing")
 			}
+			h.click(h.App.S.Shell.Collections)
+			if h.App.Section != SectionCollections || !h.shows(h.App.S.Collections.Overview) {
+				t.Fatal("collections rail did not open overview")
+			}
 			before := len(h.App.Tabs())
 			h.click(h.App.S.Collections.NewRequest)
 			h.pump()
@@ -573,8 +577,7 @@ func TestCollectionsOverviewVariablesSaveCancelAndExport(t *testing.T) {
 	col.Variables = []model.KV{{Key: "host", Value: "before"}}
 	_ = svc.Collections.Save(col)
 	h := newHarness(t, svc)
-	h.App.SelectSection(SectionCollections)
-	collectionsPaint(h)
+	h.click(h.App.S.Shell.Collections)
 	if !h.shows(fmt.Sprintf(h.App.S.Collections.RequestCount, 0)) {
 		t.Fatal("missing request count")
 	}
@@ -625,8 +628,13 @@ func TestCollectionsLayoutBothThemesAndLanguages(t *testing.T) {
 				settings.Language, settings.Theme = lang, theme
 				h.App.ApplySettings(settings)
 				h.App.sideSplit.Pos = 220
+				collectionsPaint(h)
 				check := func(section Section) {
-					h.App.SelectSection(section)
+					label := h.App.S.Shell.APIs
+					if section == SectionCollections {
+						label = h.App.S.Shell.Collections
+					}
+					h.click(label)
 					collectionsPaint(h)
 					for _, issue := range headless.CheckLayout(h.D.Snapshot()) {
 						if issue.Bounds.X >= RailWidth && issue.Bounds.X < RailWidth+220 && issue.Bounds.Y > 48 {

@@ -371,6 +371,28 @@ func TestRequestLoadedParamsAndIncompleteQueryEscape(t *testing.T) {
 	}
 }
 
+func TestRequestOpenIntoExistingTabPreservesParams(t *testing.T) {
+	h := newHarness(t)
+	original := h.App.Active()
+	req := model.NewRequest("imported-query")
+	req.URL = "https://example.test/users"
+	req.Params = []model.KV{{Key: "q", Value: "active"}}
+	h.App.OpenRequest(req, "")
+	requestRepaint(h)
+	if h.App.Active() != original || len(h.App.Tabs()) != 1 {
+		t.Fatal("request did not reuse the existing empty tab")
+	}
+	if !reflect.DeepEqual(original.Request.Params, req.Params) {
+		t.Fatalf("opening request discarded params: %#v", original.Request.Params)
+	}
+	if original.Request.URL != "https://example.test/users?q=active" {
+		t.Fatalf("opening request did not rebuild query: %q", original.Request.URL)
+	}
+	if original.Dirty {
+		t.Fatal("opening request marked it dirty")
+	}
+}
+
 func BenchmarkRequestPanePaint(b *testing.B) {
 	a := New(fake.New())
 	a.Active().Request.URL = "https://example.test/search"

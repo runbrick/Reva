@@ -1,44 +1,35 @@
 package i18n
 
-// Settings holds the strings of the settings dialog. Owned by that feature's PR.
+// Settings holds every label and description on the settings page.
 type Settings struct {
-	Title         string
-	Theme         string
-	Light         string
-	Dark          string
-	Language      string
-	Chinese       string
-	English       string
-	HistoryLimit  string
-	DataDirectory string
-	OpenFolder    string
-	Close         string
+	Title, Appearance, Requests, History, Data      string
+	Theme, ThemeDescription, Light, Dark, System    string
+	Language, LanguageDescription, Chinese, English string
+	Timeout, TimeoutDescription                     string
+	FollowRedirects, FollowRedirectsDescription     string
+	VerifyTLS, VerifyTLSDescription, TLSWarning     string
+	HistoryLimit, HistoryDescription                string
+	DataDirectory, OpenFolder, About, Close         string
 }
 
 var settingsZh = Settings{
-	Title:         "设置",
-	Theme:         "主题",
-	Light:         "浅色",
-	Dark:          "深色",
-	Language:      "语言",
-	Chinese:       "中文",
-	English:       "English",
-	HistoryLimit:  "历史记录上限",
-	DataDirectory: "数据目录",
-	OpenFolder:    "打开文件夹",
-	Close:         "关闭",
+	Title: "设置", Appearance: "外观", Requests: "请求", History: "历史记录", Data: "数据",
+	Theme: "主题", ThemeDescription: "选择应用外观，或跟随系统设置。", Light: "浅色", Dark: "深色", System: "跟随系统",
+	Language: "语言", LanguageDescription: "选择界面显示语言。", Chinese: "中文", English: "English",
+	Timeout: "默认超时（秒）", TimeoutDescription: "未单独设置时，请求等待响应的最长时间。",
+	FollowRedirects: "跟随重定向", FollowRedirectsDescription: "自动跟随服务器返回的重定向。",
+	VerifyTLS: "验证 TLS 证书", VerifyTLSDescription: "验证 HTTPS 服务器的证书。", TLSWarning: "证书验证已关闭，HTTPS 连接可能不安全。",
+	HistoryLimit: "历史记录上限", HistoryDescription: "保留的最近请求数量。",
+	DataDirectory: "数据目录", OpenFolder: "打开文件夹", About: "关于", Close: "关闭",
 }
 
 var settingsEn = Settings{
-	Title:         "Settings",
-	Theme:         "Theme",
-	Light:         "Light",
-	Dark:          "Dark",
-	Language:      "Language",
-	Chinese:       "中文",
-	English:       "English",
-	HistoryLimit:  "History limit",
-	DataDirectory: "Data directory",
-	OpenFolder:    "Open folder",
-	Close:         "Close",
+	Title: "Settings", Appearance: "Appearance", Requests: "Requests", History: "History", Data: "Data",
+	Theme: "Theme", ThemeDescription: "Choose an appearance or follow your system.", Light: "Light", Dark: "Dark", System: "Follow system",
+	Language: "Language", LanguageDescription: "Choose the interface language.", Chinese: "中文", English: "English",
+	Timeout: "Default timeout (seconds)", TimeoutDescription: "Maximum wait for requests without their own timeout.",
+	FollowRedirects: "Follow redirects", FollowRedirectsDescription: "Automatically follow server redirects.",
+	VerifyTLS: "Verify TLS certificates", VerifyTLSDescription: "Validate the HTTPS server certificate.", TLSWarning: "Certificate verification is off. HTTPS connections may be unsafe.",
+	HistoryLimit: "History limit", HistoryDescription: "Number of recent requests to keep.",
+	DataDirectory: "Data directory", OpenFolder: "Open folder", About: "About", Close: "Close",
 }

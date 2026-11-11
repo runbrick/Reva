@@ -1,15 +1,20 @@
 package gui
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -72,7 +77,7 @@ func collectionsContext(h *harness, name, action string) {
 		if err := h.D.ClickButton(b.X+b.Width/2, b.Y+b.Height/2, gfx.PointerButtonSecondary); err != nil {
 			h.t.Fatal(err)
 		}
-		h.click(action)
+		collectionsOption(h, action)
 		h.pump()
 		return
 	}
@@ -81,6 +86,7 @@ func collectionsContext(h *harness, name, action string) {
 
 func collectionsCreate(h *harness, name string) model.Collection {
 	h.t.Helper()
+	h.click(h.App.S.Collections.Add)
 	h.click(h.App.S.Collections.NewCollection)
 	h.typeInto(h.App.S.Collections.Name, name)
 	h.click(h.App.S.Collections.Create)
@@ -404,5 +410,318 @@ func BenchmarkCollectionsPanePaint(b *testing.B) {
 		if err := d.Resize(260, 700); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func collectionsRowHit(h *harness, name string) gfx.Hit {
+	h.t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == name && !hit.Expandable && !hit.Container {
+			return hit
+		}
+	}
+	h.t.Fatalf("missing row %q; have %q", name, h.hitLabels())
+	return gfx.Hit{}
+}
+
+func collectionsDrag(h *harness, from, to string) {
+	h.t.Helper()
+	source, target := collectionsRowHit(h, from).Bounds, collectionsRowHit(h, to).Bounds
+	x, y := source.X+source.Width/3, source.Y+source.Height/2
+	tx, ty := target.X+target.Width/3, target.Y+target.Height/2
+	if err := h.D.Press(x, y, gfx.PointerButtonPrimary); err != nil {
+		h.t.Fatal(err)
+	}
+	for _, step := range []float32{0.5, 1} {
+		if err := h.D.Move(x+(tx-x)*step, y+(ty-y)*step); err != nil {
+			h.t.Fatal(err)
+		}
+	}
+	if err := h.D.Release(tx, ty, gfx.PointerButtonPrimary); err != nil {
+		h.t.Fatal(err)
+	}
+	h.pump()
+}
+
+func TestCollectionsActiveRowAndEllipsisRename(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, "", r)
+	h := newHarness(t, svc)
+	h.click(r.Name)
+	h.pump()
+	if !collectionsRowHit(h, r.Name).Selected {
+		t.Fatal("active request has no selected row highlight")
+	}
+	h.click(fmt.Sprintf(h.App.S.Collections.Actions, r.Name))
+	h.click(h.App.S.Collections.Rename)
+	collectionsReplace(h, h.App.S.Collections.Name, "All invoices")
+	h.click(h.App.S.Collections.Rename)
+	h.pump()
+	stored, _ := svc.Collections.Get(col.ID)
+	if model.FindItem(stored.Items, r.ID).Name != "All invoices" || h.App.Active().Request.Name != "All invoices" {
+		t.Fatal("ellipsis rename did not persist")
+	}
+	if !collectionsRowHit(h, "All invoices").Selected {
+		t.Fatal("rename lost the active highlight")
+	}
+}
+
+func TestCollectionsDragRequestBetweenFoldersAndCollections(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	first, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	second, _ := svc.Collections.AddFolder(col.ID, "", "Receipts")
+	other, _ := svc.Collections.Create("Archive")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, first.ID, r)
+	h := newHarness(t, svc)
+	h.click(r.Name)
+	collectionsDrag(h, r.Name, "Receipts")
+	stored, _ := svc.Collections.Get(col.ID)
+	if len(model.FindItem(stored.Items, first.ID).Items) != 0 || model.FindItem(model.FindItem(stored.Items, second.ID).Items, r.ID) == nil {
+		t.Fatal("drag did not move request between folders")
+	}
+	collectionsDrag(h, r.Name, "Archive")
+	stored, _ = svc.Collections.Get(col.ID)
+	destination, _ := svc.Collections.Get(other.ID)
+	if model.FindItem(stored.Items, r.ID) != nil || model.FindItem(destination.Items, r.ID) == nil {
+		t.Fatal("drag did not move request between collections")
+	}
+	if h.App.Active().CollectionID != other.ID {
+		t.Fatal("moving request left open editor in original collection")
+	}
+}
+
+func TestCollectionsRejectFolderDropIntoChild(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	parent, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	child, _ := svc.Collections.AddFolder(col.ID, parent.ID, "Archived")
+	h := newHarness(t, svc)
+	collectionsDrag(h, "Invoices", "Archived")
+	stored, _ := svc.Collections.Get(col.ID)
+	if len(stored.Items) != 1 || stored.Items[0].ID != parent.ID || len(stored.Items[0].Items) != 1 || stored.Items[0].Items[0].ID != child.ID {
+		t.Fatal("invalid drop changed folder hierarchy")
+	}
+	collectionsDrag(h, "Invoices", "Invoices")
+	stored, _ = svc.Collections.Get(col.ID)
+	if len(stored.Items) != 1 || stored.Items[0].ID != parent.ID {
+		t.Fatal("folder dropped into itself")
+	}
+}
+
+func TestCollectionsFooterNewRequestAndLanguages(t *testing.T) {
+	for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
+		t.Run(string(lang), func(t *testing.T) {
+			h := newHarness(t)
+			settings := h.Svc.Settings.Get()
+			settings.Language = string(lang)
+			h.App.ApplySettings(settings)
+			collectionsPaint(h)
+			if !h.shows(h.App.S.Collections.Title) || !h.shows(h.App.S.Collections.Journey) {
+				t.Fatal("localized sidebar or footer missing")
+			}
+			h.click(h.App.S.Shell.Collections)
+			if h.App.Section != SectionCollections || !h.shows(h.App.S.Collections.Overview) {
+				t.Fatal("collections rail did not open overview")
+			}
+			before := len(h.App.Tabs())
+			h.click(h.App.S.Collections.NewRequest)
+			h.pump()
+			if len(h.App.Tabs()) != before+1 || h.App.Main != PageWorkbench || h.App.Section != SectionAPIs {
+				t.Fatal("footer did not open a new workbench tab")
+			}
+			_, _ = h.Svc.Collections.Create("Payments")
+			collectionsPaint(h)
+			if !h.shows(h.App.S.Collections.Journey) {
+				t.Fatal("short tree hid the footer")
+			}
+		})
+	}
+}
+
+func TestCollectionsFilterKeepsMatchingParents(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
+	_, _ = svc.Collections.AddFolder(col.ID, "", "Unrelated")
+	h := newHarness(t, svc)
+	collectionsDrag(h, "Invoices", "Invoices")
+	h.typeInto(h.App.S.Collections.Filter, "LIST")
+	h.pump()
+	if !h.shows("Payments") || !h.shows("Invoices") || !h.shows(r.Name) || h.shows("Unrelated") {
+		t.Fatalf("filter failed to preserve matching request ancestry: %+v", h.App.collections.visible)
+	}
+	collectionsReplace(h, h.App.S.Collections.Filter, "missing")
+	h.pump()
+	if !h.shows(h.App.S.Collections.NoMatches) {
+		t.Fatal("missing no matches feedback")
+	}
+	collectionsReplace(h, h.App.S.Collections.Filter, "")
+	h.pump()
+	if !h.shows("Unrelated") {
+		t.Fatal("clearing filter did not restore tree")
+	}
+}
+
+func TestCollectionsOverviewVariablesSaveCancelAndExport(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	col.Variables = []model.KV{{Key: "host", Value: "before"}}
+	_ = svc.Collections.Save(col)
+	h := newHarness(t, svc)
+	h.click(h.App.S.Shell.Collections)
+	if !h.shows(fmt.Sprintf(h.App.S.Collections.RequestCount, 0)) {
+		t.Fatal("missing request count")
+	}
+	h.click(h.App.S.Collections.Variables)
+	collectionsReplace(h, h.App.S.Common.Value, "after")
+	h.click(h.App.S.Collections.Cancel)
+	h.pump()
+	stored, _ := svc.Collections.Get(col.ID)
+	if stored.Variables[0].Value != "before" {
+		t.Fatal("cancel persisted variables")
+	}
+	h.click(h.App.S.Collections.Variables)
+	collectionsReplace(h, h.App.S.Common.Value, "after")
+	collectionsOption(h, h.App.S.Collections.Save)
+	h.pump()
+	stored, _ = svc.Collections.Get(col.ID)
+	if stored.Variables[0].Value != "after" || !h.shows(h.App.S.Collections.VariablesSaved) {
+		t.Fatal("overview did not save edited variables")
+	}
+	path := filepath.Join(t.TempDir(), "collection.json")
+	if err := h.D.QueueSaveFile(path, nil); err != nil {
+		t.Fatal(err)
+	}
+	h.click(h.App.S.Collections.Export)
+	h.pump()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var exported model.Collection
+	if err = json.Unmarshal(data, &exported); err != nil {
+		t.Fatal(err)
+	}
+	if exported.ID != col.ID || exported.Variables[0].Value != "after" {
+		t.Fatal("exported collection does not contain saved variables")
+	}
+	if !h.shows(h.App.S.Collections.Exported) {
+		t.Fatal("export feedback missing")
+	}
+}
+
+func TestCollectionsLayoutBothThemesAndLanguages(t *testing.T) {
+	for _, lang := range []string{"zh", "en"} {
+		for _, theme := range []string{"light", "dark"} {
+			t.Run(lang+"/"+theme, func(t *testing.T) {
+				h := newHarness(t)
+				settings := h.Svc.Settings.Get()
+				settings.Language, settings.Theme = lang, theme
+				h.App.ApplySettings(settings)
+				h.App.sideSplit.Pos = 220
+				collectionsPaint(h)
+				check := func(section Section) {
+					label := h.App.S.Shell.APIs
+					if section == SectionCollections {
+						label = h.App.S.Shell.Collections
+					}
+					h.click(label)
+					collectionsPaint(h)
+					for _, issue := range headless.CheckLayout(h.D.Snapshot()) {
+						if issue.Bounds.X >= RailWidth && issue.Bounds.X < RailWidth+220 && issue.Bounds.Y > 48 {
+							t.Errorf("section %d: %s: %q (%s)", section, issue.Kind, issue.Text, issue.Detail)
+						}
+					}
+				}
+				check(SectionAPIs)
+				check(SectionCollections)
+				col, _ := h.Svc.Collections.Create("Payments")
+				folder, _ := h.Svc.Collections.AddFolder(col.ID, "", "Invoices")
+				r := model.NewRequest("invoice")
+				r.Name = "List invoices"
+				_, _ = h.Svc.Collections.SaveRequest(col.ID, folder.ID, r)
+				check(SectionAPIs)
+				check(SectionCollections)
+			})
+		}
+	}
+}
+
+func TestCollectionsAddMenuUsesSelectedFolder(t *testing.T) {
+	h := newHarness(t)
+	col := collectionsCreate(h, "Payments")
+	h.click("Payments")
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, h.App.S.Collections.NewFolder)
+	h.typeInto(h.App.S.Collections.Name, "Invoices")
+	h.click(h.App.S.Collections.Create)
+	h.pump()
+	h.click("Invoices")
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, h.App.S.Collections.NewRequest)
+	h.pump()
+	stored, _ := h.Svc.Collections.Get(col.ID)
+	if len(stored.Items) != 1 || len(stored.Items[0].Items) != 1 || stored.Items[0].Items[0].ID != h.App.Active().Request.ID {
+		t.Fatal("creation menu ignored selected folder")
+	}
+}
+
+func TestCollectionsDragFolderPreservesChildrenAndOpenTab(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	other, _ := svc.Collections.Create("Archive")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
+	h := newHarness(t, svc)
+	h.click(r.Name)
+	collectionsDrag(h, "Invoices", "Archive")
+	source, _ := svc.Collections.Get(col.ID)
+	target, _ := svc.Collections.Get(other.ID)
+	if model.FindItem(source.Items, folder.ID) != nil || model.FindItem(target.Items, r.ID) == nil || h.App.Active().CollectionID != other.ID {
+		t.Fatal("folder move lost children or open editor ownership")
+	}
+}
+
+type collectionsFailingMove struct {
+	service.CollectionService
+	sourceID string
+}
+
+func (s *collectionsFailingMove) Save(col model.Collection) error {
+	if col.ID == s.sourceID {
+		return errors.New("disk unavailable")
+	}
+	return s.CollectionService.Save(col)
+}
+
+func TestCollectionsFailedCrossCollectionMoveKeepsOriginal(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	other, _ := svc.Collections.Create("Archive")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, "", r)
+	svc.Collections = &collectionsFailingMove{CollectionService: svc.Collections, sourceID: col.ID}
+	h := newHarness(t, svc)
+	h.click(r.Name)
+	collectionsDrag(h, r.Name, "Archive")
+	source, _ := svc.Collections.Get(col.ID)
+	target, _ := svc.Collections.Get(other.ID)
+	if model.FindItem(source.Items, r.ID) == nil || model.FindItem(target.Items, r.ID) != nil || h.App.Active().CollectionID != col.ID {
+		t.Fatal("failed move lost or duplicated original request")
+	}
+	if !h.shows("disk unavailable") {
+		t.Fatal("failed move did not report error")
 	}
 }

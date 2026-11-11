@@ -82,6 +82,12 @@ const (
 // Sections lists the rail items in display order.
 var Sections = []Section{SectionAPIs, SectionCollections, SectionEnvironments, SectionSettings}
 
+// railParts names each rail item's hit identity.
+var railParts = map[Section]string{
+	SectionAPIs: "apis", SectionCollections: "collections",
+	SectionEnvironments: "environments", SectionSettings: "settings",
+}
+
 // MainPage is what the titlebar navigation selects: the main area's content.
 type MainPage int
 
@@ -215,7 +221,9 @@ func (a *App) CloseTab(i int) {
 // Send starts sending t's request with the current variables. The result
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
-	req, vars := a.prepareSend(t, t.Request.Clone(), a.Vars())
+	req := t.Request.Clone()
+	req.Options = req.Options.Resolve(a.Svc.Settings.Get())
+	req, vars := a.prepareSend(t, req, a.Vars())
 	t.job = &sendJob{req: req, vars: vars}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
 }
@@ -316,16 +324,18 @@ func (a *App) rail(c ui.C) {
 			if active {
 				fg = theme.Primary
 			}
-			kc := c.KeyInt(int(s))
-			item := ui.Column(kc).Width(56).PadY(Space2).Gap(Space1).Items(ui.Center).
-				Radius(theme.Metrics.RadiusSurface).Hit(ui.ID(kc.Part("rail")), label).
+			// The hit's identity is named by its section's word; a Key set
+			// before ui.ID would be replaced by a Part, giving every item one ID.
+			id := ui.ID(c.Part(railParts[s]))
+			item := ui.Column(c.KeyInt(int(s))).Width(RailWidth-2*Space1).PadY(Space2).Gap(Space1).Items(ui.Center).
+				Radius(theme.Metrics.RadiusSurface).Hit(id, label).
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
 			if active {
 				item.Background(a.palette.RailActive)
 			}
 			item.Children(func() {
 				ui.Icon(c, icon).Size(22, 22).Color(fg)
-				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS).Color(fg)
+				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS - 2).Color(fg)
 			})
 			if item.Clicked() {
 				a.SelectSection(s)

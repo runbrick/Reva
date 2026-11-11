@@ -127,7 +127,9 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 		discarded, err = io.Copy(io.Discard, resp.Body)
 		size += discarded
 	}
-	duration := time.Since(start)
+	// A local round trip can complete within one Windows clock tick. Preserve
+	// a positive measurement even when the clock cannot resolve the interval.
+	duration := max(time.Since(start), time.Nanosecond)
 	result := model.Response{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,

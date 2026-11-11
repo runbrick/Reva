@@ -19,13 +19,16 @@ package gui
 
 import (
 	"context"
+	"runtime"
 	"time"
 
+	"github.com/runbrick/reqo/internal/gui/icons"
 	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/storage"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -66,25 +69,53 @@ type sendResult struct {
 	err  error
 }
 
-type sideTab int
+// Section is what the left rail selects: the list shown in the sidebar.
+type Section int
 
 const (
-	sideCollections sideTab = iota
-	sideHistory
+	SectionAPIs         Section = iota // collections tree, the default
+	SectionCollections                 // collection management overview
+	SectionEnvironments                // environment list and editor
+	SectionSettings                    // settings page
 )
+
+// Sections lists the rail items in display order.
+var Sections = []Section{SectionAPIs, SectionCollections, SectionEnvironments, SectionSettings}
+
+// MainPage is what the titlebar navigation selects: the main area's content.
+type MainPage int
+
+const (
+	PageWorkbench MainPage = iota // sidebar + request tabs + editor + response
+	PageHistory                   // full-width history
+	PageSettings                  // full-width settings
+)
+
+// Pages lists the titlebar navigation items in display order.
+var Pages = []MainPage{PageWorkbench, PageHistory, PageSettings}
 
 // App is the whole application's UI state.
 type App struct {
 	Svc service.Services
 	// S is the active string table; replace it to switch language.
-	S     *i18n.Strings
-	theme ui.Theme
+	S       *i18n.Strings
+	theme   ui.Theme
+	palette Palette
+	// themeName is the stored theme choice ("light", "dark" or "system").
+	themeName string
+	// Platform is the OS the window runs on ("darwin", "windows", "linux");
+	// tests set it to check each platform's titlebar.
+	Platform string
 
 	tabs   []*Tab
 	active int
 	nextID int
 
-	sideTab   sideTab
+	// Section is the rail selection, Main the titlebar selection. Feature
+	// code may set them (e.g. a settings shortcut sets Main = PageSettings).
+	Section Section
+	Main    MainPage
+
 	sideSplit ui.SplitterState
 	mainSplit ui.SplitterState
 	toaster   ui.Toaster
@@ -99,32 +130,56 @@ type App struct {
 	settings    settingsState
 	tabBarState tabsState
 	scripts     scriptsState
+	titlebar    titlebarState
+	search      searchState
 }
 
 // New builds the App around svc, applying the stored settings.
 func New(svc service.Services) *App {
-	a := &App{Svc: svc}
-	a.sideSplit = ui.SplitterState{Pos: 260}
+	a := &App{Svc: svc, Platform: runtime.GOOS}
+	a.sideSplit = ui.SplitterState{Pos: SidebarWidth}
 	a.mainSplit = ui.SplitterState{Ratio: 0.5}
 	a.ApplySettings(svc.Settings.Get())
 	a.NewTab()
 	return a
 }
 
-// ApplySettings switches language and theme to those in s.
+// ApplySettings switches language and theme to those in s. Theme "system"
+// follows the OS appearance (re-read every paint by syncTheme).
 func (a *App) ApplySettings(s model.Settings) {
 	a.S = i18n.For(i18n.Lang(s.Language))
-	if s.Theme == "dark" {
-		a.theme = ui.DarkTheme()
+	a.themeName = s.Theme
+	a.syncTheme()
+}
+
+// Dark reports whether the App currently paints with the dark theme.
+func (a *App) Dark() bool {
+	switch a.themeName {
+	case "dark":
+		return true
+	case "system":
+		return app.SystemAppearance() == app.AppearanceDark
+	}
+	return false
+}
+
+func (a *App) syncTheme() {
+	if a.Dark() {
+		a.theme, a.palette = darkTheme()
+		app.SetNativeAppearance(app.AppearanceDark)
 	} else {
-		a.theme = ui.LightTheme()
+		a.theme, a.palette = lightTheme()
+		app.SetNativeAppearance(app.AppearanceLight)
 	}
 }
 
-// Config returns the window configuration for the App's page.
+// Config returns the window configuration for the App's page: a custom
+// titlebar the app paints itself (titlebar.go), on every platform.
 func (a *App) Config() app.Config {
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	return page.Config(app.Config{Title: a.S.Common.AppName, Width: 1280, Height: 800})
+	return page.Config(a.windowConfig(app.Config{
+		Title: a.S.Common.AppName, Width: 1440, Height: 900, MinWidth: 960, MinHeight: 600,
+	}))
 }
 
 // Active returns the tab being edited.
@@ -211,60 +266,146 @@ func (a *App) declareSends(c ui.C) {
 	}
 }
 
-// Page declares the whole window.
+// Page declares the whole window:
+//
+//	+----------------------------------------------------------------+
+//	| titlebar: window controls, logo, page nav, search, env, user   |  titlebar.go
+//	+------+-----------------+---------------------------------------+
+//	| rail | sidebar (list)  | main: tabs / request / response       |
+//	|      |                 |   or the History / Settings page      |
+//	+------+-----------------+---------------------------------------+
 func (a *App) Page(c ui.C) {
+	if a.themeName == "system" {
+		a.syncTheme()
+	}
 	a.declareSends(c)
 	theme := c.Theme()
-	ui.Column(c).Fill().Background(theme.Background).Children(func() {
-		a.topBar(c)
-		ui.Divider(c)
+	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
+		a.titlebarStrip(c)
 		ui.Row(c).FillWidth().Grow(1).Children(func() {
-			ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(theme.Card).Children(func() {
-				a.sidebar(c)
-			})
-			ui.Splitter(c, &a.sideSplit).Mins(200, 480).Label("sidebar")
-			ui.Column(c).Grow(1).FillHeight().Children(func() {
-				a.tabBar(c)
-				t := a.Active()
-				ui.Column(c).FillWidth().Height(a.mainSplit.Pos).Children(func() {
-					a.requestPane(c.KeyInt(t.ID), t)
+			a.rail(c)
+			switch a.Main {
+			case PageHistory:
+				ui.Column(c).Grow(1).FillHeight().Children(func() { a.historyPage(c) })
+			case PageSettings:
+				ui.Column(c).Grow(1).FillHeight().Children(func() { a.settingsPage(c) })
+			default:
+				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
+					a.sidebar(c)
 				})
-				ui.Splitter(c, &a.mainSplit).Mins(160, 160).Label("request/response")
-				ui.Column(c).FillWidth().Grow(1).Children(func() {
-					a.responsePane(c.KeyInt(t.ID), t)
-				})
-			})
+				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
+				a.workbench(c, theme)
+			}
 		})
 	})
 	a.dialogs(c)
+	a.searchPalette(c)
 	ui.Toasts(c, &a.toaster)
 }
 
-func (a *App) topBar(c ui.C) {
-	ui.Row(c).FillWidth().PadX(16).PadY(8).Gap(8).Items(ui.Center).Children(func() {
-		ui.Text(c, a.S.Common.AppName).FontSize(16).Bold()
-		ui.Spacer(c)
-		a.envSelector(c)
-		a.importButton(c)
-		a.settingsButton(c)
+// rail is the left icon navigation. It selects Section, and on the
+// Settings item the Settings page.
+func (a *App) rail(c ui.C) {
+	theme := c.Theme()
+	ui.Column(c).Width(RailWidth).FillHeight().Background(a.palette.Rail).PadY(Space3).Gap(Space2).
+		Items(ui.Center).FocusGroup(ui.FocusVertical).Label(a.S.Shell.RailLabel).Children(func() {
+		for _, s := range Sections {
+			icon, label := a.sectionIcon(s), a.sectionLabel(s)
+			active := a.Main == PageWorkbench && a.Section == s || s == SectionSettings && a.Main == PageSettings
+			fg := theme.MutedForeground
+			if active {
+				fg = theme.Primary
+			}
+			kc := c.KeyInt(int(s))
+			item := ui.Column(kc).Width(56).PadY(Space2).Gap(Space1).Items(ui.Center).
+				Radius(theme.Metrics.RadiusSurface).Hit(ui.ID(kc.Part("rail")), label).
+				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
+			if active {
+				item.Background(a.palette.RailActive)
+			}
+			item.Children(func() {
+				ui.Icon(c, icon).Size(22, 22).Color(fg)
+				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS).Color(fg)
+			})
+			if item.Clicked() {
+				a.SelectSection(s)
+			}
+		}
 	})
+	ui.Divider(c).Vertical()
 }
 
-func (a *App) sidebar(c ui.C) {
-	labels := func(s sideTab) string {
-		if s == sideHistory {
-			return a.S.History.Title
-		}
-		return a.S.Collections.Title
+// pageLabel names a titlebar navigation item.
+func (a *App) pageLabel(p MainPage) string {
+	switch p {
+	case PageHistory:
+		return a.S.Shell.History
+	case PageSettings:
+		return a.S.Shell.Settings
 	}
-	ui.Column(c).Fill().Pad(8).Gap(8).Children(func() {
-		ui.Tabs(c, &a.sideTab, []sideTab{sideCollections, sideHistory}, labels).FillWidth()
+	return a.S.Shell.Workbench
+}
+
+// SelectSection shows section s: the Settings item opens the Settings page,
+// the others the workbench with that section's list in the sidebar.
+func (a *App) SelectSection(s Section) {
+	if s == SectionSettings {
+		a.Main = PageSettings
+		return
+	}
+	a.Section, a.Main = s, PageWorkbench
+}
+
+func (a *App) sectionLabel(s Section) string {
+	switch s {
+	case SectionCollections:
+		return a.S.Shell.Collections
+	case SectionEnvironments:
+		return a.S.Shell.Environments
+	case SectionSettings:
+		return a.S.Shell.Settings
+	}
+	return a.S.Shell.APIs
+}
+
+func (a *App) sectionIcon(s Section) gfx.Icon {
+	switch s {
+	case SectionCollections:
+		return icons.Package
+	case SectionEnvironments:
+		return icons.Globe
+	case SectionSettings:
+		return icons.Settings
+	}
+	return icons.Layers
+}
+
+// sidebar shows the selected section's list.
+func (a *App) sidebar(c ui.C) {
+	ui.Column(c).Fill().Children(func() {
+		switch a.Section {
+		case SectionEnvironments:
+			a.envSidebar(c)
+		case SectionCollections:
+			a.collectionsOverview(c)
+		default:
+			a.collectionsPane(c)
+		}
+	})
+	ui.Divider(c).Vertical()
+}
+
+// workbench is the tab bar over the request editor and the response.
+func (a *App) workbench(c ui.C, theme *ui.Theme) {
+	ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() {
+		a.tabBar(c)
+		t := a.Active()
+		ui.Column(c).FillWidth().Height(a.mainSplit.Pos).Children(func() {
+			a.requestPane(c.KeyInt(t.ID), t)
+		})
+		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
 		ui.Column(c).FillWidth().Grow(1).Children(func() {
-			if a.sideTab == sideHistory {
-				a.historyPane(c)
-			} else {
-				a.collectionsPane(c)
-			}
+			a.responsePane(c.KeyInt(t.ID), t)
 		})
 	})
 }

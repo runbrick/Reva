@@ -33,9 +33,11 @@ var Methods = []Method{MethodGet, MethodPost, MethodPut, MethodPatch, MethodDele
 // KV is one row of a key/value table (query params, headers, url-encoded
 // form fields, variables). Disabled rows are kept but not sent.
 type KV struct {
-	Key      string `json:"key"`
-	Value    string `json:"value"`
-	Disabled bool   `json:"disabled,omitempty"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
+	// Description is the user's note for the row; it is never sent.
+	Description string `json:"description,omitempty"`
+	Disabled    bool   `json:"disabled,omitempty"`
 }
 
 // BodyMode selects how Request.Body is encoded.
@@ -122,6 +124,52 @@ type Request struct {
 	// and after the response arrives.
 	PreScript  string `json:"preScript,omitempty"`
 	TestScript string `json:"testScript,omitempty"`
+	// Options are this request's transport settings.
+	Options RequestOptions `json:"options,omitzero"`
+}
+
+// Toggle is a per-request on/off override of a global setting.
+type Toggle string
+
+const (
+	ToggleInherit Toggle = ""    // use the global setting
+	ToggleOn      Toggle = "on"  // force on
+	ToggleOff     Toggle = "off" // force off
+)
+
+// RequestOptions are a request's transport settings. Zero values inherit the
+// global Settings. The GUI resolves them (Resolve) before handing the request
+// to the RequestService, which then always sees TimeoutMs > 0 and explicit
+// toggles; a zero value reaching the service means the safe default.
+type RequestOptions struct {
+	// TimeoutMs bounds the whole send; 0 inherits Settings.RequestTimeoutSec.
+	TimeoutMs       int    `json:"timeoutMs,omitempty"`
+	FollowRedirects Toggle `json:"followRedirects,omitempty"`
+	VerifyTLS       Toggle `json:"verifyTls,omitempty"`
+}
+
+// Resolve returns o with every inherited value replaced by the one s gives.
+func (o RequestOptions) Resolve(s Settings) RequestOptions {
+	if o.TimeoutMs <= 0 {
+		sec := s.RequestTimeoutSec
+		if sec <= 0 {
+			sec = 60
+		}
+		o.TimeoutMs = sec * 1000
+	}
+	if o.FollowRedirects == ToggleInherit {
+		o.FollowRedirects = ToggleOn
+		if s.NoFollowRedirects {
+			o.FollowRedirects = ToggleOff
+		}
+	}
+	if o.VerifyTLS == ToggleInherit {
+		o.VerifyTLS = ToggleOn
+		if s.InsecureTLS {
+			o.VerifyTLS = ToggleOff
+		}
+	}
+	return o
 }
 
 // NewRequest returns an empty GET request with the given id.
@@ -153,6 +201,44 @@ type Response struct {
 	Duration  time.Duration `json:"duration"`
 	// URL is the final URL after variable substitution and redirects.
 	URL string `json:"url"`
+	// Cookies are the Set-Cookie values the response carried, parsed.
+	Cookies []Cookie `json:"cookies,omitempty"`
+	// Timeline is how Duration was spent, in order. Phases the transport
+	// skipped (a reused connection has no DNS, connect or TLS) are absent.
+	Timeline []Phase `json:"timeline,omitempty"`
+}
+
+// Cookie is one Set-Cookie of a response.
+type Cookie struct {
+	Name     string    `json:"name"`
+	Value    string    `json:"value"`
+	Domain   string    `json:"domain,omitempty"`
+	Path     string    `json:"path,omitempty"`
+	Expires  time.Time `json:"expires,omitzero"`
+	MaxAge   int       `json:"maxAge,omitempty"`
+	HTTPOnly bool      `json:"httpOnly,omitempty"`
+	Secure   bool      `json:"secure,omitempty"`
+	SameSite string    `json:"sameSite,omitempty"`
+}
+
+// PhaseKind names a step of sending a request.
+type PhaseKind string
+
+const (
+	PhaseDNS      PhaseKind = "dns"      // name lookup
+	PhaseConnect  PhaseKind = "connect"  // TCP connect
+	PhaseTLS      PhaseKind = "tls"      // TLS handshake
+	PhaseSend     PhaseKind = "send"     // writing the request
+	PhaseWait     PhaseKind = "wait"     // waiting for the first response byte
+	PhaseDownload PhaseKind = "download" // reading the body
+)
+
+// Phase is how long one step of a send took, and when it started relative
+// to the start of the send.
+type Phase struct {
+	Kind     PhaseKind     `json:"kind"`
+	Start    time.Duration `json:"start"`
+	Duration time.Duration `json:"duration"`
 }
 
 // Header returns the first value of the named response header, case-insensitively.
@@ -212,13 +298,19 @@ type Environment struct {
 // Settings are the user's preferences.
 type Settings struct {
 	Version      int    `json:"version"`
-	Theme        string `json:"theme"`    // "light" or "dark"
+	Theme        string `json:"theme"`    // "light", "dark" or "system"
 	Language     string `json:"language"` // "zh" or "en"
 	ActiveEnvID  string `json:"activeEnvId,omitempty"`
 	HistoryLimit int    `json:"historyLimit"`
+	// RequestTimeoutSec is the default send timeout; 0 means 60.
+	RequestTimeoutSec int `json:"requestTimeoutSec,omitempty"`
+	// NoFollowRedirects and InsecureTLS are the global transport defaults;
+	// their zero values are the safe ones (follow redirects, verify TLS).
+	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
+	InsecureTLS       bool `json:"insecureTls,omitempty"`
 }
 
 // DefaultSettings returns the settings used before the user changes any.
 func DefaultSettings() Settings {
-	return Settings{Version: SchemaVersion, Theme: "light", Language: "zh", HistoryLimit: 200}
+	return Settings{Version: SchemaVersion, Theme: "light", Language: "zh", HistoryLimit: 200, RequestTimeoutSec: 60}
 }

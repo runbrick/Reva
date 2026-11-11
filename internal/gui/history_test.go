@@ -32,6 +32,14 @@ func historyHasRow(h *harness, url string) bool {
 	return false
 }
 
+// historyOpenPage shows the History page. The titlebar PR adds the visible
+// navigation item; until then the tests select the page directly.
+func historyOpenPage(h *harness) {
+	h.t.Helper()
+	h.App.Main = PageHistory
+	historyRepaint(h)
+}
+
 func historyRepaint(h *harness) {
 	h.t.Helper()
 	if err := h.D.Resize(1280, 800); err != nil {
@@ -68,7 +76,7 @@ func TestHistorySendAppearsAndClickLoadsRequest(t *testing.T) {
 	h.pump()
 	h.click("Send")
 	h.waitFor("send recorded", func() bool { return len(h.Svc.History.List()) == 1 })
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	if !historyHasRow(h, req.URL) || !h.shows("200") || !h.shows(h.App.S.History.Today) {
 		t.Fatal("completed send, status or day missing from History")
 	}
@@ -102,7 +110,7 @@ func TestHistorySearchFiltersURLAndMethod(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			h.click(h.App.S.History.Title)
+			historyOpenPage(h)
 			h.typeInto(h.App.S.History.Search, tc.query)
 			if historyHasRow(h, tc.absent) || tc.want != "" && !historyHasRow(h, tc.want) {
 				t.Fatalf("search %q has wrong rows: %q", tc.query, h.hitLabels())
@@ -132,7 +140,7 @@ func TestHistoryContextOpenDeleteAndExternalDelete(t *testing.T) {
 	if err := h.Svc.History.Add(entry); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	label := "DELETE " + entry.Request.URL
 	historyContext(t, h, label)
 	h.click(h.App.S.History.Open)
@@ -167,7 +175,7 @@ func TestHistoryClearRequiresConfirmation(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	h.click(h.App.S.History.Clear)
 	if !h.shows(h.App.S.History.ConfirmTitle) || len(h.Svc.History.List()) != 3 {
 		t.Fatal("Clear must ask before deleting")
@@ -195,7 +203,7 @@ func TestHistoryEmptyStateInBothLanguages(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			h.click(h.App.S.History.Title)
+			historyOpenPage(h)
 			if !historyShowsEmpty(h) || h.shows(h.App.S.History.NoMatches) {
 				t.Fatalf("empty History has wrong message: %v", h.D.Snapshot().Labels)
 			}
@@ -221,7 +229,7 @@ func TestHistoryGroupsDatesAndShowsTransportError(t *testing.T) {
 	h.App.Active().Request.URL = "https://example.test/failed"
 	h.click("Send")
 	h.waitFor("failed send recorded", func() bool { return len(h.Svc.History.List()) == 3 })
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	for _, text := range []string{h.App.S.History.Today, h.App.S.History.Yesterday, old.Format(h.App.S.History.DateFormat), h.App.S.History.Error} {
 		if !h.shows(text) {
 			t.Fatalf("history is missing %q", text)
@@ -238,7 +246,7 @@ func TestHistoryEnterSubmitsAndSkipsHeaders(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	h.click("POST " + second.Request.URL)
 	if err := h.D.Key(gfx.KeyDown, 0); err != nil {
 		t.Fatal(err)
@@ -260,7 +268,7 @@ func TestHistoryRefreshesWhenCappedListGetsNewEntry(t *testing.T) {
 	if err := svc.History.Add(old); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	if err := svc.History.Add(newest); err != nil {
 		t.Fatal(err)
 	}
@@ -277,7 +285,7 @@ func TestHistoryLongListCanOpenOldestRequest(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	h.click(h.App.S.History.Title)
+	historyOpenPage(h)
 	if !historyHasRow(h, "https://example.test/long/199") || historyHasRow(h, "https://example.test/long/0") {
 		t.Fatal("long history should initially show the newest requests")
 	}
@@ -301,7 +309,7 @@ func BenchmarkHistoryRepaint(b *testing.B) {
 		}
 	}
 	a := New(svc)
-	a.sideTab = sideHistory
+	a.Main = PageHistory
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
 	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {

@@ -486,3 +486,7 @@ func (a *App) applyCollectionEdit() {
 	s.dialogOpen = false
 	a.refreshCollections()
 }
+
+// collectionsOverview is the sidebar of the Collections rail section
+// (manage collections). Until the collections PR builds it, it is the tree.
+func (a *App) collectionsOverview(c ui.C) { a.collectionsPane(c) }

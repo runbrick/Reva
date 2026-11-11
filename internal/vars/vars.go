@@ -81,7 +81,8 @@ func contains(list []string, s string) bool {
 func ExpandKVs(kvs []model.KV, vars []model.KV) []model.KV {
 	out := make([]model.KV, len(kvs))
 	for i, kv := range kvs {
-		out[i] = model.KV{Key: Expand(kv.Key, vars), Value: Expand(kv.Value, vars), Disabled: kv.Disabled}
+		kv.Key, kv.Value = Expand(kv.Key, vars), Expand(kv.Value, vars)
+		out[i] = kv
 	}
 	return out
 }

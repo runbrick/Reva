@@ -300,3 +300,14 @@ func (a *App) saveEnvironments() {
 	}
 	s.open, s.drafts, s.deleted, s.err = false, nil, nil, ""
 }
+
+// envSidebar is the sidebar list of the Environments rail section. Until
+// the env PR builds it, it offers the editor dialog.
+func (a *App) envSidebar(c ui.C) {
+	ui.Column(c).Fill().Pad(Space4).Gap(Space3).Children(func() {
+		ui.Text(c, a.S.Env.Title).Bold()
+		if ui.Button(c, a.S.Env.Edit).Outline().Clicked() {
+			c.After(a.openEnvironments)
+		}
+	})
+}

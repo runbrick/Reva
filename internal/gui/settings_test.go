@@ -41,14 +41,14 @@ func TestSettingsThemeAppliesAndSavesImmediately(t *testing.T) {
 	h := newHarness(t)
 	h.click(h.App.S.Settings.Title)
 	h.click(h.App.S.Settings.Dark)
-	if h.App.theme.Background != ui.DarkTheme().Background {
+	if !h.App.Dark() {
 		t.Fatal("dark theme did not apply immediately")
 	}
 	if got := h.Svc.Settings.Get().Theme; got != "dark" {
 		t.Fatalf("saved theme = %q, want dark", got)
 	}
 	h.click(h.App.S.Settings.Light)
-	if h.App.theme.Background != ui.LightTheme().Background || h.Svc.Settings.Get().Theme != "light" {
+	if h.App.Dark() || h.Svc.Settings.Get().Theme != "light" {
 		t.Fatal("light theme did not apply and save immediately")
 	}
 }
@@ -135,7 +135,7 @@ func TestSettingsSaveErrorShowsToastAndKeepsPreferences(t *testing.T) {
 			t.Fatal("save failure did not show an error toast")
 		}
 		if h.Svc.Settings.Get() != model.DefaultSettings() || h.App.S.Lang != i18n.Zh ||
-			h.App.theme.Background != ui.LightTheme().Background {
+			h.App.Dark() {
 			t.Fatal("failed save changed the active or persisted settings")
 		}
 	}

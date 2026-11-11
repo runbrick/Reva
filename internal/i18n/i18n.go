@@ -32,6 +32,9 @@ type Strings struct {
 	Settings    Settings
 	Tabs        Tabs
 	Scripts     Scripts
+	Shell       Shell
+	Titlebar    Titlebar
+	Search      Search
 }
 
 // For returns the string table for lang, falling back to Chinese.
@@ -54,6 +57,9 @@ var zh = Strings{
 	Settings:    settingsZh,
 	Tabs:        tabsZh,
 	Scripts:     scriptsZh,
+	Shell:       shellZh,
+	Titlebar:    titlebarZh,
+	Search:      searchZh,
 }
 
 var en = Strings{
@@ -68,4 +74,7 @@ var en = Strings{
 	Settings:    settingsEn,
 	Tabs:        tabsEn,
 	Scripts:     scriptsEn,
+	Shell:       shellEn,
+	Titlebar:    titlebarEn,
+	Search:      searchEn,
 }

@@ -55,18 +55,19 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	// The editor mirrors URL query entries in Params, while importers may
 	// populate Params alone. Match each row against one original occurrence
 	// so neither shape duplicates entries or loses intentional repetitions.
-	remaining := make(map[model.KV]int)
+	type pair struct{ key, value string }
+	remaining := make(map[pair]int)
 	for key, values := range query {
 		for _, value := range values {
-			remaining[model.KV{Key: key, Value: value}]++
+			remaining[pair{key, value}]++
 		}
 	}
 	for _, row := range req.Params {
 		if row.Disabled {
 			continue
 		}
-		if remaining[row] > 0 {
-			remaining[row]--
+		if p := (pair{row.Key, row.Value}); remaining[p] > 0 {
+			remaining[p]--
 		} else {
 			query.Add(row.Key, row.Value)
 		}

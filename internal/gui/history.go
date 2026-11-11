@@ -215,3 +215,9 @@ func (a *App) historyRow(row ui.ListRow) {
 		}
 	})
 }
+
+// historyPage is the full-width History page (titlebar navigation).
+// Until the history PR redesigns it, it shows the sidebar pane.
+func (a *App) historyPage(c ui.C) {
+	ui.Column(c).Fill().Pad(Space6).Children(func() { a.historyPane(c) })
+}

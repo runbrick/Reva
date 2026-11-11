@@ -151,3 +151,12 @@ func revealSettingsFolder(ctx context.Context, dir string) (struct{}, error) {
 	}
 	return struct{}{}, err
 }
+
+// settingsPage is the full-width Settings page (rail item and titlebar
+// navigation). Until the settings PR builds it, it offers the dialog.
+func (a *App) settingsPage(c ui.C) {
+	ui.Column(c).Fill().Pad(Space6).Gap(Space3).Children(func() {
+		ui.Text(c, a.S.Settings.Title).FontSize(c.Theme().Metrics.FontSizeL).Bold()
+		a.settingsButton(c)
+	})
+}

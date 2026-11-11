@@ -376,10 +376,22 @@ func BenchmarkResponseRepaint(b *testing.B) {
 }
 
 func BenchmarkResponseRepaint5000Lines(b *testing.B) {
+	benchmarkResponse5000Lines(b, false)
+}
+
+func BenchmarkResponsePane5000Lines(b *testing.B) {
+	benchmarkResponse5000Lines(b, true)
+}
+
+func benchmarkResponse5000Lines(b *testing.B, paneOnly bool) {
 	a := New(fake.New())
 	// Brackets plus 4,998 array values make exactly 5,000 Pretty lines.
 	a.Active().Response = &model.Response{Status: "200 OK", StatusCode: 200, Body: []byte("[" + strings.Repeat("1,", 4997) + "0]")}
-	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
+	view := a.Page
+	if paneOnly {
+		view = func(c ui.C) { a.responsePane(c, a.Active()) }
+	}
+	page := ui.NewPage(ui.PageConfig{View: view, Theme: &a.theme})
 	config := page.Config(app.Config{Width: 1280, Height: 800})
 	driver, err := app.NewDriver(config, nil)
 	if err != nil {

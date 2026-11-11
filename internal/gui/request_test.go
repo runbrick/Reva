@@ -3,7 +3,10 @@ package gui
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
+
 	"strings"
 	"testing"
 
@@ -12,6 +15,7 @@ import (
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
+
 	"github.com/vivaui/viva/ui"
 )
 
@@ -390,6 +394,262 @@ func TestRequestOpenIntoExistingTabPreservesParams(t *testing.T) {
 	}
 	if original.Dirty {
 		t.Fatal("opening request marked it dirty")
+	}
+}
+
+func TestRequestParamDescriptionNeverEntersURL(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	h.typeInto("URL", "https://example.test/search?q=coffee")
+	tab := h.App.Active()
+	tab.Dirty = false
+	requestType(h, "Description", "Product category", false)
+	if !tab.Dirty || tab.Request.Params[0].Description != "Product category" {
+		t.Fatalf("description edit = %#v, dirty %v", tab.Request.Params, tab.Dirty)
+	}
+	if tab.Request.URL != "https://example.test/search?q=coffee" {
+		t.Fatalf("description leaked into URL: %s", tab.Request.URL)
+	}
+	requestType(h, "URL", "https://example.test/search?q=tea", true)
+	if tab.Request.Params[0].Description != "Product category" {
+		t.Fatal("editing query value discarded its description")
+	}
+}
+
+func TestRequestBulkEditRoundTrip(t *testing.T) {
+	for _, headers := range []bool{false, true} {
+		t.Run(map[bool]string{false: "params", true: "headers"}[headers], func(t *testing.T) {
+			h := newHarness(t)
+			tab := h.App.Active()
+			rows := &tab.Request.Params
+			if headers {
+				rows = &tab.Request.Headers
+			}
+			*rows = []model.KV{{Key: "first", Value: "one", Description: "retained note"}, {Key: "disabled", Value: "two: words", Disabled: true}}
+			requestEnglish(h)
+			if headers {
+				h.click("Headers")
+			}
+			h.click("Bulk edit")
+			if got := requestField(h, "Bulk parameters", 0).Value; got != "first: one\n// disabled: two: words" {
+				t.Fatalf("bulk text = %q", got)
+			}
+			tab.Dirty = false
+			requestType(h, "Bulk parameters", "first: updated\n// disabled: two: words\nthird: three", true)
+			h.click("Table edit")
+			want := []model.KV{{Key: "first", Value: "updated", Description: "retained note"}, {Key: "disabled", Value: "two: words", Disabled: true}, {Key: "third", Value: "three"}}
+			if !reflect.DeepEqual(*rows, want) || !tab.Dirty {
+				t.Fatalf("bulk round trip = %#v, dirty %v", *rows, tab.Dirty)
+			}
+			if !headers && (strings.Contains(tab.Request.URL, "disabled") || !strings.Contains(tab.Request.URL, "first=updated&third=three")) {
+				t.Fatalf("bulk URL = %s", tab.Request.URL)
+			}
+			requestType(h, "Description", "updated note", true)
+			if (*rows)[0].Description != "updated note" {
+				t.Fatal("table not editable after bulk edit")
+			}
+		})
+	}
+}
+
+func TestRequestSendMenuCopyResolvedCURL(t *testing.T) {
+	h := newHarness(t)
+	col, err := h.Svc.Collections.Create("cURL variables")
+	if err != nil {
+		t.Fatal(err)
+	}
+	col.Variables = []model.KV{{Key: "host", Value: "example.test"}, {Key: "trace", Value: "header-value"}}
+	if err := h.Svc.Collections.Save(col); err != nil {
+		t.Fatal(err)
+	}
+	tab := h.App.Active()
+	tab.CollectionID = col.ID
+	tab.Request.Method = model.MethodPost
+	tab.Request.URL = "https://{{host}}/items"
+	tab.Request.Headers = []model.KV{{Key: "X-Test", Value: "{{trace}}"}, {Key: "X-Disabled", Value: "hidden", Disabled: true}}
+	tab.Request.Body = model.Body{Mode: model.BodyJSON, Text: `{"message":"it's ready"}`}
+	tab.Request.Auth = model.Auth{Type: model.AuthBearer, Token: "secret"}
+	requestEnglish(h)
+	h.click("Send options")
+	h.click("Copy as cURL")
+	command := h.D.Clipboard()
+	for _, part := range []string{"curl -X 'POST'", "'https://example.test/items'", "'X-Test: header-value'", "'Content-Type: application/json'", "'Authorization: Bearer secret'", "--data-raw", `it'"'"'s ready`} {
+		if !strings.Contains(command, part) {
+			t.Fatalf("command %q missing %q", command, part)
+		}
+	}
+	if strings.Contains(command, "X-Disabled") || tab.Sending {
+		t.Fatalf("copy sent request or included disabled row: %s", command)
+	}
+	if tab.Request.Headers[0].Value != "{{trace}}" || tab.Request.URL != "https://{{host}}/items" {
+		t.Fatal("copy mutated the stored request")
+	}
+}
+
+func TestRequestSendMenuSaveOpensCollectionsDialog(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	h.click("Send options")
+	h.click("Save")
+	if !h.App.collections.saveOpen || !h.shows(h.App.S.Collections.SaveRequest) {
+		t.Fatal("Send menu Save did not open collections dialog")
+	}
+}
+
+func TestRequestSendAndDownloadSavesCompletedBody(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	path := filepath.Join(t.TempDir(), "response.bin")
+	if err := h.D.QueueSaveFile(path, nil); err != nil {
+		t.Fatal(err)
+	}
+	body := []byte{0, 1, 2, 255}
+	h.Svc.Requests.(*fake.Requests).Fn = func(context.Context, model.Request) (model.Response, error) {
+		return model.Response{StatusCode: 200, Body: body}, nil
+	}
+	h.click("Send options")
+	h.click("Send and download")
+	h.waitFor("downloaded response", func() bool { data, err := os.ReadFile(path); return err == nil && reflect.DeepEqual(data, body) })
+}
+
+func TestRequestDownloadCancelAndFailures(t *testing.T) {
+	for _, scenario := range []string{"cancel", "picker error", "write error"} {
+		t.Run(scenario, func(t *testing.T) {
+			h := newHarness(t)
+			requestEnglish(h)
+			path := filepath.Join(t.TempDir(), "missing", "response.bin")
+			var pickerError error
+			switch scenario {
+			case "cancel":
+				path, pickerError = "", app.ErrCanceled
+			case "picker error":
+				path, pickerError = "", errors.New("picker failed")
+			}
+			if err := h.D.QueueSaveFile(path, pickerError); err != nil {
+				t.Fatal(err)
+			}
+			h.click("Send options")
+			h.click("Send and download")
+			if scenario != "write error" {
+				if h.App.Active().Sending || len(h.Svc.History.List()) > 0 {
+					t.Fatal("dismissed picker sent a request")
+				}
+				if scenario == "picker error" && !h.shows("picker failed") {
+					t.Fatal("picker failure not shown")
+				}
+				return
+			}
+			h.waitFor("download write failure", func() bool { return h.shows(h.App.S.Common.Error) })
+		})
+	}
+}
+
+func requestClickNth(h *harness, label string, index int) {
+	h.t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label != label {
+			continue
+		}
+		if index > 0 {
+			index--
+			continue
+		}
+		if err := h.D.Click(hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2); err != nil {
+			h.t.Fatal(err)
+		}
+		return
+	}
+	h.t.Fatalf("missing control %s", label)
+}
+
+func TestRequestOptionsStoreOverridesAndInherit(t *testing.T) {
+	h := newHarness(t)
+	settings := h.Svc.Settings.Get()
+	settings.RequestTimeoutSec = 12
+	if err := h.Svc.Settings.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	requestEnglish(h)
+	h.click("Request settings")
+	if !h.shows("12000") {
+		t.Fatal("inherited timeout missing")
+	}
+	tab := h.App.Active()
+	tab.Dirty = false
+	h.typeInto("Timeout (ms)", "2500")
+	if tab.Request.Options.TimeoutMs != 2500 || !tab.Dirty {
+		t.Fatalf("timeout = %#v, dirty %v", tab.Request.Options, tab.Dirty)
+	}
+	tab.Dirty = false
+	requestClickNth(h, "Off", 0)
+	if tab.Request.Options.FollowRedirects != model.ToggleOff || !tab.Dirty {
+		t.Fatal("redirect override did not persist")
+	}
+	tab.Dirty = false
+	requestClickNth(h, "On", 1)
+	if tab.Request.Options.VerifyTLS != model.ToggleOn || !tab.Dirty {
+		t.Fatal("TLS override did not persist")
+	}
+	requestClickNth(h, "Inherit", 0)
+	requestClickNth(h, "Inherit", 1)
+	requestType(h, "Timeout (ms)", "", true)
+	if err := h.D.Key(gfx.KeyBackspace, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.Options != (model.RequestOptions{}) {
+		t.Fatalf("inherit options = %#v", tab.Request.Options)
+	}
+	requestType(h, "Timeout (ms)", "invalid", true)
+	if tab.Request.Options.TimeoutMs != 0 {
+		t.Fatal("invalid timeout overwrote inherited value")
+	}
+}
+
+func TestRequestEnabledHeaderCount(t *testing.T) {
+	h := newHarness(t)
+	h.App.Active().Request.Headers = []model.KV{{Key: "Accept", Value: "application/json"}, {Key: "X-Trace", Value: "1"}, {Key: "X-Off", Disabled: true}}
+	requestEnglish(h)
+	assertHeaderCount := func(want string) {
+		t.Helper()
+		for _, hit := range h.D.Snapshot().Hits {
+			if hit.Role == gfx.RoleTab && hit.Label == want {
+				return
+			}
+		}
+		t.Fatalf("header badge %q missing; have %q", want, h.hitLabels())
+	}
+	assertHeaderCount("Headers 2")
+	h.click("Headers")
+	requestClickNth(h, h.App.S.Common.Key, 0)
+	assertHeaderCount("Headers 1")
+}
+
+func TestRequestEditorBothLanguagesAndThemes(t *testing.T) {
+	for _, theme := range []string{"light", "dark"} {
+		for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
+			t.Run(theme+"/"+string(lang), func(t *testing.T) {
+				h := newHarness(t)
+				h.App.ApplySettings(model.Settings{Theme: theme, Language: string(lang)})
+				requestRepaint(h)
+				s := h.App.S.Request
+				for _, text := range []string{s.Params, s.Headers, s.Body, s.Settings, s.ParamName, s.Description, s.AddParam} {
+					if !h.shows(text) {
+						t.Fatalf("missing %s", text)
+					}
+				}
+				h.click(s.SendMenu)
+				if !h.shows(s.SendDownload) || !h.shows(s.CopyCURL) || !h.shows(s.Save) {
+					t.Fatal("localized menu missing")
+				}
+				if err := h.D.Key(gfx.KeyEscape, 0); err != nil {
+					t.Fatal(err)
+				}
+				h.click(s.Settings)
+				if !h.shows(s.Timeout) || !h.shows(s.FollowRedirects) || !h.shows(s.VerifyTLS) {
+					t.Fatal("localized options missing")
+				}
+			})
+		}
 	}
 }
 

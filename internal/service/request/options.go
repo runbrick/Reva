@@ -10,12 +10,11 @@ import (
 )
 
 type clientOptions struct {
-	timeout     time.Duration
 	noRedirects bool
 	insecureTLS bool
 }
 
-func (s *Service) client(options model.RequestOptions) *http.Client {
+func (s *Service) timeout(options model.RequestOptions) time.Duration {
 	timeout := s.Timeout
 	if timeout <= 0 {
 		timeout = DefaultTimeout
@@ -24,28 +23,38 @@ func (s *Service) client(options model.RequestOptions) *http.Client {
 		// Saturate rather than overflowing into a nonpositive (unbounded) timeout.
 		timeout = time.Duration(min(int64(options.TimeoutMs), int64((1<<63-1)/time.Millisecond))) * time.Millisecond
 	}
-	key := clientOptions{timeout, options.FollowRedirects == model.ToggleOff, options.VerifyTLS == model.ToggleOff}
+	return timeout
+}
+
+func (s *Service) client(options model.RequestOptions) *http.Client {
+	key := clientOptions{options.FollowRedirects == model.ToggleOff, options.VerifyTLS == model.ToggleOff}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if client := s.clients[key]; client != nil {
 		return client
 	}
-	transport := s.Transport
+	transport := s.transports[key.insecureTLS]
 	if transport == nil {
-		transport = http.DefaultTransport
-	}
-	if template, ok := transport.(*http.Transport); ok {
-		cloned := template.Clone()
-		if cloned.TLSClientConfig == nil {
-			cloned.TLSClientConfig = &tls.Config{}
-		} else {
-			cloned.TLSClientConfig = cloned.TLSClientConfig.Clone()
+		transport = s.Transport
+		if transport == nil {
+			transport = http.DefaultTransport
 		}
-		cloned.TLSClientConfig.InsecureSkipVerify = key.insecureTLS
-		transport = cloned
+		if template, ok := transport.(*http.Transport); ok {
+			cloned := template.Clone()
+			if cloned.TLSClientConfig == nil {
+				cloned.TLSClientConfig = &tls.Config{}
+			} else {
+				cloned.TLSClientConfig = cloned.TLSClientConfig.Clone()
+			}
+			cloned.TLSClientConfig.InsecureSkipVerify = key.insecureTLS
+			transport = cloned
+		}
+		if s.transports == nil {
+			s.transports = make(map[bool]http.RoundTripper)
+		}
+		s.transports[key.insecureTLS] = transport
 	}
 	client := &http.Client{
-		Timeout:   timeout,
 		Transport: transport,
 		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
 			if key.noRedirects {

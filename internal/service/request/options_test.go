@@ -202,7 +202,7 @@ func TestSendOptionSetsReuseSeparateTransports(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, r.RemoteAddr) }))
 	defer server.Close()
 	svc := New()
-	options := []model.RequestOptions{{}, {FollowRedirects: model.ToggleOff}}
+	options := []model.RequestOptions{{}, {VerifyTLS: model.ToggleOff}}
 	addresses := make([]string, 2)
 	for iteration := range 3 {
 		for i, option := range options {
@@ -224,7 +224,14 @@ func TestSendOptionSetsReuseSeparateTransports(t *testing.T) {
 	var wg sync.WaitGroup
 	for i := range 12 {
 		wg.Go(func() {
-			_, err := svc.Send(context.Background(), model.Request{URL: server.URL, Options: model.RequestOptions{TimeoutMs: 2000 + i%2}}, nil)
+			option := model.RequestOptions{TimeoutMs: 2000 + i}
+			if i%2 == 0 {
+				option.VerifyTLS = model.ToggleOff
+			}
+			if i/2%2 == 0 {
+				option.FollowRedirects = model.ToggleOff
+			}
+			_, err := svc.Send(context.Background(), model.Request{URL: server.URL, Options: option}, nil)
 			if err != nil {
 				t.Error(err)
 			}
@@ -233,6 +240,44 @@ func TestSendOptionSetsReuseSeparateTransports(t *testing.T) {
 	wg.Wait()
 	if len(svc.clients) != 4 {
 		t.Fatalf("cache size after concurrent sends=%d, want 4", len(svc.clients))
+	}
+}
+
+func TestSendDifferentTimeoutsKeepCachesBounded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, r.RemoteAddr)
+	}))
+	defer server.Close()
+	svc := New()
+	addresses := make(map[bool]string)
+	for i := range 50 {
+		option := model.RequestOptions{TimeoutMs: 2000 + i}
+		insecure := i%2 == 0
+		if insecure {
+			option.VerifyTLS = model.ToggleOff
+		}
+		if i/2%2 == 0 {
+			option.FollowRedirects = model.ToggleOff
+		}
+		resp, err := svc.Send(context.Background(), model.Request{URL: server.URL, Options: option}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if previous, ok := addresses[insecure]; ok && previous != string(resp.Body) {
+			t.Errorf("TLS policy %v did not reuse connection across timeouts and redirect policies", insecure)
+		}
+		addresses[insecure] = string(resp.Body)
+		if len(svc.transports) > 2 || len(svc.clients) > 4 {
+			t.Fatalf("send %d: transports=%d clients=%d", i, len(svc.transports), len(svc.clients))
+		}
+	}
+	if len(svc.transports) != 2 || len(svc.clients) != 4 {
+		t.Fatalf("transports=%d clients=%d, want 2 and 4", len(svc.transports), len(svc.clients))
+	}
+	for key, client := range svc.clients {
+		if client.Transport != svc.transports[key.insecureTLS] || client.Timeout != 0 {
+			t.Errorf("client %+v does not share its TLS transport or has a client timeout", key)
+		}
 	}
 }
 

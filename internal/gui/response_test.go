@@ -211,6 +211,10 @@ func TestResponseTruncationAndDisplayLimit(t *testing.T) {
 	if v.rawLimited || !v.prettyLimited || len(v.pretty) > responseDisplayLimit {
 		t.Fatal("formatted expansion did not obey the display cap")
 	}
+	v.prepare(&model.Response{Body: []byte("[" + strings.Repeat("0,", responseDisplayLimit/2) + "0]")})
+	if !v.rawLimited || !v.prettyLimited || !strings.HasPrefix(v.pretty, "[\n  0,") {
+		t.Fatal("large JSON did not retain Pretty formatting within the cap")
+	}
 }
 
 func TestResponseTestsCountAndCacheCleanup(t *testing.T) {

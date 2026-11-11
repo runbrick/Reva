@@ -55,9 +55,10 @@ func (v *responseView) prepare(r *model.Response) {
 	}
 	v.raw = string(body)
 	v.pretty, v.prettyLimited = v.raw, v.rawLimited
-	// A partial body cannot be parsed reliably. Avoid formatting bodies above
-	// the display limit and preserve their raw prefix instead.
-	if !v.rawLimited && format.IsJSON(r.Header("Content-Type"), r.Body) {
+	// Format the received body before limiting its display, so a large valid
+	// JSON response still shows an indented prefix in Pretty mode. Invalid or
+	// incomplete JSON falls back to the original text.
+	if format.IsJSON(r.Header("Content-Type"), r.Body) {
 		if pretty, err := format.PrettyJSON(r.Body); err == nil {
 			v.pretty, v.prettyLimited = responseDisplayText(pretty)
 		}

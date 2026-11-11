@@ -34,6 +34,7 @@ type requestTabState struct {
 	section                        requestSection
 	params, headers, encoded, form kvTableState
 	url                            string
+	requestID                      string
 }
 
 func (a *App) requestTab(t *Tab) *requestTabState {
@@ -41,8 +42,10 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 		a.request.tabs = make(map[int]*requestTabState)
 	}
 	s := a.request.tabs[t.ID]
-	if s == nil {
-		s = &requestTabState{url: t.Request.URL}
+	// OpenRequest can replace the request in an existing empty tab. Its query
+	// rows need the same initialization as a request opened in a new tab.
+	if s == nil || s.requestID != t.Request.ID {
+		s = &requestTabState{url: t.Request.URL, requestID: t.Request.ID}
 		a.request.tabs[t.ID] = s
 		if len(t.Request.Params) == 0 {
 			requestParamsFromURL(&t.Request)

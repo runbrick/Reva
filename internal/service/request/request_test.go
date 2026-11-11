@@ -154,6 +154,79 @@ func TestSendParamsHeadersAndScheme(t *testing.T) {
 	}
 }
 
+func TestSendParamsMultisetMerge(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		rows  []model.KV
+		want  url.Values
+	}{
+		{
+			name: "synced URL and params", query: "limit=10",
+			rows: []model.KV{{Key: "limit", Value: "10"}},
+			want: url.Values{"limit": {"10"}},
+		},
+		{
+			name: "params without URL query",
+			rows: []model.KV{{Key: "limit", Value: "10"}, {Key: "page", Value: "2"}},
+			want: url.Values{"limit": {"10"}, "page": {"2"}},
+		},
+		{
+			name: "partial overlap", query: "limit=10&keep=yes",
+			rows: []model.KV{{Key: "limit", Value: "10"}, {Key: "page", Value: "2"}},
+			want: url.Values{"limit": {"10"}, "keep": {"yes"}, "page": {"2"}},
+		},
+		{
+			name: "repeated key with distinct values", query: "a=1&a=2",
+			rows: []model.KV{{Key: "a", Value: "1"}, {Key: "a", Value: "2"}, {Key: "a", Value: "3"}},
+			want: url.Values{"a": {"1", "2", "3"}},
+		},
+		{
+			name: "rows exceed identical URL occurrences", query: "a=1&a=1",
+			rows: []model.KV{{Key: "a", Value: "1"}, {Key: "a", Value: "1"}, {Key: "a", Value: "1"}},
+			want: url.Values{"a": {"1", "1", "1"}},
+		},
+		{
+			name: "URL exceeds identical row occurrences", query: "a=1&a=1&a=1",
+			rows: []model.KV{{Key: "a", Value: "1"}, {Key: "a", Value: "1"}},
+			want: url.Values{"a": {"1", "1", "1"}},
+		},
+		{
+			name: "identical params without URL query",
+			rows: []model.KV{{Key: "a", Value: "1"}, {Key: "a", Value: "1"}},
+			want: url.Values{"a": {"1", "1"}},
+		},
+		{
+			name: "disabled rows neither add nor consume", query: "a=1",
+			rows: []model.KV{{Key: "a", Value: "1", Disabled: true}, {Key: "a", Value: "1"}, {Key: "off", Value: "no", Disabled: true}},
+			want: url.Values{"a": {"1"}},
+		},
+		{
+			name: "comparison after expansion and URL decoding", query: "{{key}}={{value}}&space=a%20b",
+			rows: []model.KV{{Key: "{{key}}", Value: "{{value}}"}, {Key: "space", Value: "a b"}},
+			want: url.Values{"expanded": {"10"}, "space": {"a b"}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.URL.Query(); !reflect.DeepEqual(got, tt.want) {
+					t.Errorf("query = %v, want %v", got, tt.want)
+				}
+			}))
+			defer server.Close()
+			req := model.Request{URL: server.URL, Params: tt.rows}
+			if tt.query != "" {
+				req.URL += "?" + tt.query
+			}
+			variables := []model.KV{{Key: "key", Value: "expanded"}, {Key: "value", Value: "10"}}
+			if _, err := request.New().Send(context.Background(), req, variables); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestSendAuthAndHeaderOverrides(t *testing.T) {
 	tests := []struct {
 		name   string

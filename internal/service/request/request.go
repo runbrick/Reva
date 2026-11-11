@@ -52,8 +52,22 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	if err != nil {
 		return model.Response{}, fmt.Errorf("invalid URL query: %w", err)
 	}
+	// The editor mirrors URL query entries in Params, while importers may
+	// populate Params alone. Match each row against one original occurrence
+	// so neither shape duplicates entries or loses intentional repetitions.
+	remaining := make(map[model.KV]int)
+	for key, values := range query {
+		for _, value := range values {
+			remaining[model.KV{Key: key, Value: value}]++
+		}
+	}
 	for _, row := range req.Params {
-		if !row.Disabled {
+		if row.Disabled {
+			continue
+		}
+		if remaining[row] > 0 {
+			remaining[row]--
+		} else {
 			query.Add(row.Key, row.Value)
 		}
 	}

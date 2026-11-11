@@ -137,7 +137,7 @@ func TestCollectionsSaveRequestAndSaveAgainInPlace(t *testing.T) {
 	collectionsReplace(h, h.App.S.Collections.Name, "List invoices")
 	h.click(h.App.S.Collections.Folder)
 	collectionsOption(h, "Invoices")
-	h.click(h.App.S.Collections.Save)
+	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	stored, _ := h.Svc.Collections.Get(col.ID)
 	if tab.CollectionID != col.ID || tab.Request.Name != "List invoices" || tab.Dirty || h.App.collections.saveOpen {
@@ -165,7 +165,7 @@ func TestCollectionsSaveCreatesCollectionInline(t *testing.T) {
 	h.App.RequestSave(tab)
 	collectionsPaint(h)
 	h.typeInto(h.App.S.Collections.CollectionName, "Monitoring")
-	h.click(h.App.S.Collections.Save)
+	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	cols := h.Svc.Collections.List()
 	if len(cols) != 1 || cols[0].Name != "Monitoring" || len(cols[0].Items) != 1 || cols[0].Items[0].Name != "Health check" || tab.CollectionID != cols[0].ID || tab.Dirty {
@@ -339,13 +339,13 @@ func TestCollectionsSaveErrorRetainsDialogAndDirtyRequest(t *testing.T) {
 	h.App.RequestSave(tab)
 	collectionsPaint(h)
 	h.typeInto(h.App.S.Collections.CollectionName, "Payments")
-	h.click(h.App.S.Collections.Save)
+	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	if !h.App.collections.saveOpen || !tab.Dirty || tab.CollectionID != "" || !h.shows(h.App.S.Common.Error) || !h.shows("disk unavailable") {
 		t.Fatal("failed save lost edits or did not report error")
 	}
 	failing.fail = false
-	h.click(h.App.S.Collections.Save)
+	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	if len(h.Svc.Collections.List()) != 1 || h.App.collections.saveOpen || tab.Dirty {
 		t.Fatal("retry failed or created an extra collection")

@@ -313,27 +313,12 @@ func (a *App) collectionsPane(c ui.C) {
 			from, to := s.visible[move.From], s.visible[move.To]
 			c.After(func() { a.moveCollectionItem(from, to) })
 		}
-		// A compact footer stays pinned below the scrolling tree, including short trees.
-		a.collectionsFooter(c)
 	})
 }
 
 func (a *App) newCollectionTab() {
 	a.NewTab()
 	a.Main, a.Section = PageWorkbench, SectionAPIs
-}
-
-func (a *App) collectionsFooter(c ui.C) {
-	theme, text := c.Theme(), a.S.Collections
-	ui.Column(c).FillWidth().Shrink(0).PadY(Space6).Gap(Space3).Items(ui.Center).Children(func() {
-		ui.Row(c).Size(80, 80).Radius(40).Background(theme.Accent).Center().Children(func() {
-			ui.Icon(c, icons.Rocket).Size(56, 56).Color(theme.Primary.WithAlpha(0.6))
-		})
-		ui.Paragraph(c, text.Journey, 0).FillWidth().FontSize(theme.Metrics.FontSizeS).Muted()
-		if ui.Button(c, text.NewRequest).Outline().Color(theme.Primary).Clicked() {
-			c.After(a.newCollectionTab)
-		}
-	})
 }
 
 // Only an inside drop is accepted; collection roots cannot themselves be moved.
@@ -774,7 +759,6 @@ func (a *App) collectionsOverview(c ui.C) {
 		})
 		if len(a.collections.collectionIDs) == 0 {
 			ui.Paragraph(c, text.Empty, 0).FillWidth().Muted()
-			a.collectionsFooter(c)
 		}
 	})
 }

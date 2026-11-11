@@ -1,15 +1,57 @@
 package gui
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 )
+
+func TestMain(m *testing.M) {
+	// App construction reads and pins appearance before a Driver exists.
+	// Keep those calls headless too: macOS otherwise waits for a native event loop.
+	app.UseRunner(headless.Run)
+	os.Exit(m.Run())
+}
+
+func TestAppConstructionAppliesThemeBeforeDriver(t *testing.T) {
+	for _, mode := range []string{"light", "dark", "system"} {
+		t.Run(mode, func(t *testing.T) {
+			if got := app.SystemAppearance(); got != app.AppearanceUnknown {
+				t.Fatalf("appearance before construction = %v, want headless unknown", got)
+			}
+			svc := fake.New()
+			settings := model.DefaultSettings()
+			settings.Theme = mode
+			if err := svc.Settings.Save(settings); err != nil {
+				t.Fatal(err)
+			}
+			a := New(svc)
+			if a.Dark() != (mode == "dark") {
+				t.Fatalf("theme before first paint = dark %t, stored choice %q", a.Dark(), mode)
+			}
+			d, err := app.NewDriver(a.Config(), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(d.Close)
+			want := app.AppearanceLight
+			if mode == "dark" {
+				want = app.AppearanceDark
+			}
+			if got := d.NativeAppearance(); got != want {
+				t.Fatalf("native appearance on first paint = %v, want %v", got, want)
+			}
+		})
+	}
+}
 
 // harness drives an App headlessly through app.Driver. Every feature test
 // in this package uses it. Add helpers in your own *_test.go file; change

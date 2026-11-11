@@ -8,7 +8,7 @@ type Collections struct {
 	Rename, Delete, DeleteTitle, DeletePrompt   string
 	Open, Duplicate, CopyName, Create           string
 	InlineCollection, CollectionName            string
-	Add, Actions, Filter, NoMatches, Journey    string
+	Add, Actions, Filter, NoMatches             string
 	Overview, RequestCount, Variables, Export   string
 	VariablesSaved, Exported                    string
 }
@@ -20,7 +20,7 @@ var collectionsZh = Collections{
 	Rename: "重命名", Delete: "删除", DeleteTitle: "确认删除", DeletePrompt: "删除“%s”及其所有内容？",
 	Open: "打开", Duplicate: "创建副本", CopyName: "%s 副本", Create: "创建",
 	InlineCollection: "创建新集合", CollectionName: "集合名称",
-	Add: "添加集合项", Actions: "%s 的操作", Filter: "筛选集合与请求", NoMatches: "没有匹配的请求", Journey: "开始你的 API 探索之旅",
+	Add: "添加集合项", Actions: "%s 的操作", Filter: "筛选集合与请求", NoMatches: "没有匹配的请求",
 	Overview: "集合管理", RequestCount: "%d 个请求", Variables: "集合变量", Export: "导出集合",
 	VariablesSaved: "集合变量已保存", Exported: "集合已导出",
 }
@@ -32,7 +32,7 @@ var collectionsEn = Collections{
 	Rename: "Rename", Delete: "Delete", DeleteTitle: "Confirm deletion", DeletePrompt: "Delete “%s” and all its contents?",
 	Open: "Open", Duplicate: "Duplicate", CopyName: "%s copy", Create: "Create",
 	InlineCollection: "Create a new collection", CollectionName: "Collection name",
-	Add: "Create collection item", Actions: "Actions for %s", Filter: "Filter collections and requests", NoMatches: "No matching requests", Journey: "Start your API exploration journey",
+	Add: "Create collection item", Actions: "Actions for %s", Filter: "Filter collections and requests", NoMatches: "No matching requests",
 	Overview: "Manage collections", RequestCount: "%d requests", Variables: "Collection variables", Export: "Export collection",
 	VariablesSaved: "Collection variables saved", Exported: "Collection exported",
 }

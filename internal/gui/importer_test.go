@@ -28,7 +28,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 			h.typeInto(h.App.S.Import.Input, `curl 'https://example.test/users?q=active' -H 'Authorization: Bearer {{token}}' -d '{"name":"你好"}'`)
 			h.click(h.App.S.Import.Submit)
 			r := h.App.Active().Request
-			if r.URL != "https://example.test/users" || r.Method != model.MethodPost || r.Body.Mode != model.BodyJSON || r.Body.Text != `{"name":"你好"}` || len(r.Params) != 1 || len(r.Headers) != 1 || r.Headers[0].Key != "Authorization" {
+			if r.URL != "https://example.test/users?q=active" || r.Method != model.MethodPost || r.Body.Mode != model.BodyJSON || r.Body.Text != `{"name":"你好"}` || len(r.Params) != 1 || len(r.Headers) != 1 || r.Headers[0].Key != "Authorization" {
 				t.Fatalf("imported request = %#v", r)
 			}
 			if h.App.importer.open || h.App.Active().CollectionID != "" {

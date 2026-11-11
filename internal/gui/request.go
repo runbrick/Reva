@@ -450,26 +450,9 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
 		ui.Row(c).Grow(1).Height(height).Items(ui.Center).Border(1, theme.Input).
 			Radius(theme.Metrics.RadiusControl).Background(theme.Background).Children(func() {
-			method := ui.SelectBase(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
+			method := ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
 				Width(Space6*4 + Space4).Height(height).Radius(0)
 			method.DrawOver(a.request.methodPaint)
-			if popup, open := method.Popup(); open {
-				popup.Border(1, theme.Border).Radius(theme.Metrics.RadiusControl).Background(theme.Popover).
-					Draw(func(d *ui.DrawContext) {
-						for i, option := range model.Methods {
-							r := method.Part(i)
-							if r.Width <= 0 || r.Height <= 0 {
-								continue
-							}
-							if option == t.Request.Method {
-								d.Canvas.Rounded(r, d.Theme.Metrics.RadiusControl, d.Theme.Accent)
-							}
-							r.X += Space3
-							r.Width -= Space6
-							d.Canvas.Label(string(option), r, gfx.TextStyle{Size: d.Theme.Metrics.FontSizeM, Color: d.Fade(a.palette.MethodColor(option))})
-						}
-					})
-			}
 			if method.Changed() {
 				t.Dirty = true
 			}

@@ -9,6 +9,7 @@ import (
 
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
@@ -352,6 +353,73 @@ func TestRequestMethodAndPrimaryEnterFromBody(t *testing.T) {
 		}
 	default:
 		t.Fatal("shortcut did not send")
+	}
+}
+
+func TestRequestMethodPopupCoversEditor(t *testing.T) {
+	for _, theme := range []string{"light", "dark"} {
+		for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
+			t.Run(theme+"/"+string(lang), func(t *testing.T) {
+				h := newHarness(t)
+				h.App.ApplySettings(model.Settings{Theme: theme, Language: string(lang)})
+				requestRepaint(h)
+				h.click(h.App.S.Request.Method)
+				if err := h.D.Advance(300 * time.Millisecond); err != nil {
+					t.Fatal(err)
+				}
+				snapshot := h.D.Snapshot()
+				var panel gfx.Hit
+				for _, hit := range snapshot.Hits {
+					if hit.Role == gfx.RoleListBox && hit.Label == h.App.S.Request.Method {
+						panel = hit
+						break
+					}
+				}
+				if panel.Bounds.Width <= 0 || panel.Bounds.Height <= 0 {
+					t.Fatal("method list is missing")
+				}
+				covered := false
+				for _, primitive := range snapshot.Primitives {
+					bounds := primitive.Bounds
+					if primitive.Kind == app.RectanglePrimitive && primitive.Color == h.App.theme.Popover &&
+						primitive.Color.Alpha == 1 && primitive.Layer >= panel.Layer &&
+						bounds.X <= panel.Bounds.X+Space2 && bounds.Y <= panel.Bounds.Y+Space2 &&
+						bounds.X+bounds.Width >= panel.Bounds.X+panel.Bounds.Width-Space2 &&
+						bounds.Y+bounds.Height >= panel.Bounds.Y+panel.Bounds.Height-Space2 {
+						covered = true
+						break
+					}
+				}
+				if !covered {
+					t.Fatal("method list has no opaque background on its overlay layer")
+				}
+				for _, method := range model.Methods {
+					painted := false
+					for _, label := range snapshot.Labels {
+						if label.Value == string(method) && label.Layer >= panel.Layer {
+							painted = true
+							break
+						}
+					}
+					if !painted {
+						t.Fatalf("method %s is missing from the overlay", method)
+					}
+				}
+				h.click("POST")
+				if h.App.Active().Request.Method != model.MethodPost || !h.App.Active().Dirty {
+					t.Fatal("method selection did not update request")
+				}
+				h.click(h.App.S.Request.Method)
+				if err := h.D.Key(gfx.KeyEscape, 0); err != nil {
+					t.Fatal(err)
+				}
+				for _, hit := range h.D.Snapshot().Hits {
+					if hit.Role == gfx.RoleListBox && hit.Label == h.App.S.Request.Method {
+						t.Fatal("Escape did not dismiss method list")
+					}
+				}
+			})
+		}
 	}
 }
 

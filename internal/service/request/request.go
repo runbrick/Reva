@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/runbrick/reqo/internal/model"
@@ -23,11 +24,15 @@ const (
 
 // Service implements service.RequestService. Configure its fields before use;
 // Send may then be called concurrently. Nonpositive limits use the defaults.
-// A nil Transport uses http.DefaultTransport (including gzip decompression).
+// A nil Transport clones http.DefaultTransport (including gzip decompression).
+// A supplied *http.Transport is a template; other RoundTrippers manage TLS
+// themselves. Clients and transports are cached for each effective option set.
 type Service struct {
 	Timeout      time.Duration
 	MaxBodyBytes int64
 	Transport    http.RoundTripper
+	mu           sync.Mutex
+	clients      map[clientOptions]*http.Client
 }
 
 var _ service.RequestService = (*Service)(nil)
@@ -111,30 +116,22 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 		httpReq.Host = values[0]
 	}
 
-	timeout := s.Timeout
-	if timeout <= 0 {
-		timeout = DefaultTimeout
-	}
 	limit := s.MaxBodyBytes
 	if limit <= 0 {
 		limit = DefaultMaxBodyBytes
 	}
-	client := http.Client{
-		Timeout:   timeout,
-		Transport: s.Transport,
-		CheckRedirect: func(_ *http.Request, via []*http.Request) error {
-			if len(via) > 10 {
-				return fmt.Errorf("stopped after 10 redirects")
-			}
-			return nil
-		},
-	}
+	// Copy only the client value to attach this send's tracing wrapper. The
+	// cached underlying transport and its connection pool are always reused.
+	client := *s.client(req.Options)
 	start := time.Now()
+	trace := &sendTrace{base: client.Transport, start: start}
+	client.Transport = trace
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return model.Response{}, fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
+	downloadStart := time.Now()
 	kept, err := io.ReadAll(io.LimitReader(resp.Body, limit))
 	size := int64(len(kept))
 	if err == nil {
@@ -144,7 +141,8 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	}
 	// A local round trip can complete within one Windows clock tick. Preserve
 	// a positive measurement even when the clock cannot resolve the interval.
-	duration := max(time.Since(start), time.Nanosecond)
+	end := time.Now()
+	duration := max(end.Sub(start), time.Nanosecond)
 	result := model.Response{
 		StatusCode: resp.StatusCode,
 		Status:     resp.Status,
@@ -155,6 +153,8 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 		Truncated:  size > int64(len(kept)),
 		Duration:   duration,
 		URL:        resp.Request.URL.String(),
+		Cookies:    responseCookies(resp),
+		Timeline:   trace.timeline(downloadStart, end),
 	}
 	if err != nil {
 		return result, fmt.Errorf("read response body: %w", err)

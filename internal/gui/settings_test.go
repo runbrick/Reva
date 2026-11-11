@@ -186,8 +186,7 @@ func TestSettingsReopeningShowsCurrentValues(t *testing.T) {
 	h.click("Dark")
 	h.click("History limit")
 	h.click("500")
-	h.App.SelectSection(SectionAPIs)
-	settingsRepaint(t, h)
+	h.click(h.App.S.Shell.APIs)
 	if h.shows("Data directory") {
 		t.Fatal("navigating to APIs did not leave settings")
 	}
@@ -197,8 +196,7 @@ func TestSettingsReopeningShowsCurrentValues(t *testing.T) {
 	settingsAssertLimit(t, h, "500")
 
 	// Read the service again when opening, including changes from another feature.
-	h.App.SelectSection(SectionAPIs)
-	settingsRepaint(t, h)
+	h.click(h.App.S.Shell.APIs)
 	s := h.Svc.Settings.Get()
 	s.Theme, s.HistoryLimit = "light", 1000
 	if err := h.Svc.Settings.Save(s); err != nil {
@@ -314,8 +312,7 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 				}
 				h := newHarness(t, svc)
 				// The rail enters the same page without the titlebar action.
-				h.App.SelectSection(SectionSettings)
-				settingsRepaint(t, h)
+				settingsClickRail(t, h, h.App.S.Settings.Title)
 				for _, label := range []string{h.App.S.Settings.Appearance, h.App.S.Settings.Requests,
 					h.App.S.Settings.History, h.App.S.Settings.Data} {
 					if !h.shows(label) {
@@ -372,6 +369,20 @@ func settingsAssertLayout(t *testing.T, h *harness) {
 			t.Errorf("settings layout: %+v", problem)
 		}
 	}
+}
+
+func settingsClickRail(t *testing.T, h *harness, label string) {
+	t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == label && hit.Bounds.X < RailWidth {
+			b := hit.Bounds
+			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("no rail item named %q", label)
 }
 
 type settingsSaveFailure struct{ *fake.Settings }

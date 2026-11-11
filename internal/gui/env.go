@@ -317,5 +317,5 @@ func (a *App) envSidebar(c ui.C) {
 // declares the environment editor in the main area. Owned by the env PR.
 func (a *App) envReady() bool { return false }
 
-// envMain declares the environment editor in the main area while the
+// envMain declares the environment editor in the main area.
 func (a *App) envMain(c ui.C) {}

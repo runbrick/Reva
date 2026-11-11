@@ -127,7 +127,7 @@ func TestEnvironmentCreateSelectAndSend(t *testing.T) {
 					t.Fatal(err)
 				}
 				h.typeInto(h.App.S.Common.Value, "https://dev.example.test")
-				h.typeInto(h.App.S.Env.Description, "Development host")
+				h.typeInto(h.App.S.Request.Description, "Development host")
 				if !h.shows(h.App.S.Env.SaveHint) || !h.App.env.current().dirty() {
 					t.Fatal("editor missing save hint or dirty state")
 				}

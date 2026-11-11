@@ -357,17 +357,6 @@ func (a *App) envMain(c ui.C) {
 			ui.Wrap(c, a.S.Env.SaveHint).Muted().FontSize(theme.Metrics.FontSizeS)
 			ui.Scroll(c).FillWidth().Grow(1).Gap(Space3).Children(func() {
 				a.kvTable(c, &d.table, &d.variables)
-				// The shared table in this branch has no description column yet. Keep
-				// descriptions editable without changing the request PR's owned file.
-				if len(d.variables) > 0 {
-					ui.Text(c, a.S.Env.Description).Bold()
-					for i := range d.variables {
-						ui.Row(c.KeyInt(i)).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
-							ui.Text(c, d.variables[i].Key).Muted().Grow(1).Ellipsis()
-							ui.TextField(c, &d.variables[i].Description, a.S.Env.Description, "").Grow(2)
-						})
-					}
-				}
 			})
 			if s.err != "" {
 				ui.Wrap(c, s.err).Color(theme.Danger)

@@ -21,6 +21,15 @@ func collectionsPaint(h *harness) {
 	}
 }
 
+func collectionsTreeHasItem(h *harness, itemID string) bool {
+	for _, node := range h.App.collections.visible {
+		if node.id == itemID {
+			return true
+		}
+	}
+	return false
+}
+
 func collectionsOption(h *harness, name string) {
 	h.t.Helper()
 	var selected *gfx.Hit
@@ -194,14 +203,14 @@ func TestCollectionsTreeOpensRequestAndTogglesFolders(t *testing.T) {
 				t.Fatal(err)
 			}
 			h.pump()
-			if h.shows("List invoices") {
+			if collectionsTreeHasItem(h, r.ID) {
 				t.Fatal("collapsed folder still shows request")
 			}
 			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
 				t.Fatal(err)
 			}
 			h.pump()
-			if !h.shows("List invoices") {
+			if !collectionsTreeHasItem(h, r.ID) {
 				t.Fatal("expanded folder did not restore request")
 			}
 			return
@@ -277,7 +286,7 @@ func TestCollectionsNewRequestDuplicateRenameAndDelete(t *testing.T) {
 	collectionsContext(h, "Get payment", h.App.S.Collections.Duplicate)
 	copyName := fmt.Sprintf(h.App.S.Collections.CopyName, "Get payment")
 	copy := h.App.Active().Request
-	if copy.ID == r.ID || copy.Name != copyName || !h.shows(copyName) {
+	if copy.ID == r.ID || copy.Name != copyName || !collectionsTreeHasItem(h, copy.ID) {
 		t.Fatal("duplicate was not stored with a new ID")
 	}
 	stored, _ := h.Svc.Collections.Get(col.ID)
@@ -287,7 +296,7 @@ func TestCollectionsNewRequestDuplicateRenameAndDelete(t *testing.T) {
 	collectionsContext(h, copyName, h.App.S.Collections.Delete)
 	h.click(h.App.S.Collections.Delete)
 	h.pump()
-	if h.shows(copyName) || !h.shows("Get payment") {
+	if collectionsTreeHasItem(h, copy.ID) || !collectionsTreeHasItem(h, r.ID) {
 		t.Fatal("request deletion affected wrong row")
 	}
 }

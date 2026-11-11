@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reqo/internal/service/request"
 	"github.com/runbrick/reqo/internal/service/store"
 	"github.com/runbrick/reqo/internal/storage"
 )
@@ -24,5 +25,6 @@ func services() (service.Services, error) {
 	svc.Collections = disk.Collections()
 	svc.Environments = disk.Environments()
 	svc.Settings = disk.Settings()
+	svc.Requests = request.New()
 	return svc, nil
 }

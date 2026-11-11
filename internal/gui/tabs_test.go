@@ -2,6 +2,7 @@ package gui
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -417,6 +418,333 @@ func TestTabsContextCloseOthersConfirmsEachDirtyTab(t *testing.T) {
 	h.click(h.App.S.Tabs.Discard)
 	if len(h.App.Tabs()) != 1 || h.App.Active() != keep {
 		t.Fatal("context close should leave the retained tab active")
+	}
+}
+
+func tabsHit(t *testing.T, h *harness, label string) gfx.Hit {
+	t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == label {
+			return hit
+		}
+	}
+	t.Fatalf("no control %q", label)
+	return gfx.Hit{}
+}
+
+func tabsCloseHit(t *testing.T, h *harness, tab gfx.Hit) gfx.Hit {
+	t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Tabs.Close && hit.Bounds.X >= tab.Bounds.X && hit.Bounds.X+hit.Bounds.Width <= tab.Bounds.X+tab.Bounds.Width {
+			return hit
+		}
+	}
+	t.Fatal("no close control inside tab")
+	return gfx.Hit{}
+}
+
+func tabsCloseVisible(h *harness, close gfx.Hit) bool {
+	for _, p := range h.D.Snapshot().Primitives {
+		// The close icon is a vector; count visible vector paint inside its control.
+		if p.Kind == app.TrianglePrimitive && p.Color.Alpha > 0 &&
+			p.Points[0].X >= close.Bounds.X && p.Points[0].Y >= close.Bounds.Y &&
+			p.Points[0].X < close.Bounds.X+close.Bounds.Width && p.Points[0].Y < close.Bounds.Y+close.Bounds.Height {
+			return true
+		}
+	}
+	return false
+}
+
+func TestTabsHoverRevealsCloseAndReplacesDirtyDot(t *testing.T) {
+	for _, dirty := range []bool{false, true} {
+		t.Run(fmt.Sprint(dirty), func(t *testing.T) {
+			h := newHarness(t)
+			first := h.App.Active()
+			first.Request.Name, first.Dirty = "Hover me", dirty
+			h.App.NewTab()
+			repaintTabs(t, h)
+			tab := tabsHit(t, h, first.Request.Name)
+			close := tabsCloseHit(t, h, tab)
+			if tabsCloseVisible(h, close) {
+				t.Fatal("inactive tab close visible before hover")
+			}
+			if err := h.D.Move(tab.Bounds.X+tab.Bounds.Width/2, tab.Bounds.Y+tab.Bounds.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if !tabsCloseVisible(h, close) {
+				t.Fatal("hover did not reveal the close icon")
+			}
+			if dirty {
+				for _, label := range h.D.Snapshot().Labels {
+					if label.Value == h.App.S.Tabs.DirtySymbol && label.Color.Alpha > 0 {
+						t.Fatal("dirty dot still visible over close icon")
+					}
+				}
+			}
+			// Moving onto the close control must keep its parent's hover look.
+			if err := h.D.Move(close.Bounds.X+close.Bounds.Width/2, close.Bounds.Y+close.Bounds.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if !tabsCloseVisible(h, close) {
+				t.Fatal("close icon vanished when pointer entered it")
+			}
+			if err := h.D.Click(close.Bounds.X+close.Bounds.Width/2, close.Bounds.Y+close.Bounds.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			if dirty && !h.shows(h.App.S.Tabs.ConfirmTitle) {
+				t.Fatal("hover close bypassed dirty confirmation")
+			}
+			if !dirty && len(h.App.Tabs()) != 1 {
+				t.Fatal("hover close did not close tab")
+			}
+		})
+	}
+}
+
+func TestTabsDragReordersAndKeepsActiveRequest(t *testing.T) {
+	for _, activeIndex := range []int{0, 1, 2} {
+		t.Run(fmt.Sprint(activeIndex), func(t *testing.T) {
+			h := newHarness(t)
+			first := h.App.Active()
+			first.Request.Name = "First"
+			middle := h.App.NewTab()
+			middle.Request.Name = "Middle"
+			last := h.App.NewTab()
+			last.Request.Name = "Last"
+			h.App.active = activeIndex
+			active := h.App.Active()
+			repaintTabs(t, h)
+			drag := func(from, to string) {
+				t.Helper()
+				start, target := tabsHit(t, h, from).Bounds, tabsHit(t, h, to).Bounds
+				if err := h.D.Press(start.X+start.Width/2, start.Y+start.Height/2, gfx.PointerButtonPrimary); err != nil {
+					t.Fatal(err)
+				}
+				if err := h.D.Move(target.X+target.Width/2, target.Y+target.Height/2); err != nil {
+					t.Fatal(err)
+				}
+				if !h.App.tabBarState.drag.Dragging() {
+					t.Fatal("pointer move did not start drag")
+				}
+				if h.App.tabBarState.drag.Target() != tabsHit(t, h, to).ID {
+					t.Fatalf("drag target=%v want=%v source=%v start=%+v target=%+v", h.App.tabBarState.drag.Target(), tabsHit(t, h, to).ID, h.App.tabBarState.drag.Source(), start, target)
+				}
+				if err := h.D.Release(target.X+target.Width/2, target.Y+target.Height/2, gfx.PointerButtonPrimary); err != nil {
+					t.Fatal(err)
+				}
+			}
+			drag(first.Request.Name, last.Request.Name)
+			if h.App.Tabs()[0] != middle || h.App.Tabs()[1] != last || h.App.Tabs()[2] != first || h.App.Active() != active {
+				t.Fatal("drag right changed active request or order")
+			}
+			drag(first.Request.Name, middle.Request.Name)
+			if h.App.Tabs()[0] != first || h.App.Tabs()[1] != middle || h.App.Tabs()[2] != last || h.App.Active() != active {
+				t.Fatal("drag left changed active request or order")
+			}
+		})
+	}
+}
+
+func TestTabsReopenClosedRestoresIndependentRequest(t *testing.T) {
+	h := newHarness(t)
+	closed := h.App.Active()
+	closed.Request.Name, closed.Request.URL = "Restore me", "https://restore.test/"
+	closed.Request.Headers = []model.KV{{Key: "X-Original", Value: "original"}}
+	closed.CollectionID, closed.Dirty = "saved-collection", true
+	closed.Response = &model.Response{StatusCode: 200}
+	repaintTabs(t, h)
+	if _, err := h.D.ShortcutChord(ui.Primary, 'w'); err != nil {
+		t.Fatal(err)
+	}
+	h.click(h.App.S.Tabs.Discard)
+	closed.Request.Headers[0].Value = "changed after close"
+	if _, err := h.D.ShortcutChord(ui.Primary|ui.Shift, 't'); err != nil {
+		t.Fatal(err)
+	}
+	got := h.App.Active()
+	if len(h.App.Tabs()) != 2 || got == closed || got.Request.ID != closed.Request.ID || got.Request.URL != closed.Request.URL ||
+		got.CollectionID != "saved-collection" || !got.Dirty || got.Request.Headers[0].Value != "original" || got.Response != nil || got.Sending {
+		t.Fatalf("reopened request lost data or reused execution state: %+v", got)
+	}
+	assertTabsEditorURL(t, h, got.Request.URL)
+}
+
+func TestTabsReopenKeepsLastTenInReverseOrder(t *testing.T) {
+	h := newHarness(t)
+	for i := range 12 {
+		tab := h.App.Active()
+		tab.Request.Name = fmt.Sprintf("Closed %d", i)
+		h.App.closeRequestTabs(tab.ID, false)
+	}
+	repaintTabs(t, h)
+	for i := 11; i >= 2; i-- {
+		if _, err := h.D.ShortcutChord(ui.Primary|ui.Shift, 't'); err != nil {
+			t.Fatal(err)
+		}
+		if h.App.Active().Request.Name != fmt.Sprintf("Closed %d", i) {
+			t.Fatal("closed tabs restored out of order")
+		}
+	}
+	count := len(h.App.Tabs())
+	if _, err := h.D.ShortcutChord(ui.Primary|ui.Shift, 't'); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.App.Tabs()) != count {
+		t.Fatal("reopen retained more than ten closed requests")
+	}
+}
+
+func TestTabsOpenRequestFromHistoryReturnsToWorkbench(t *testing.T) {
+	for _, existing := range []bool{false, true} {
+		t.Run(fmt.Sprint(existing), func(t *testing.T) {
+			h := newHarness(t)
+			req := model.NewRequest("history-request")
+			req.URL = "https://history.test/"
+			if existing {
+				h.App.OpenRequest(req, "collection")
+				h.App.NewTab()
+			}
+			h.App.Main = PageHistory
+			repaintTabs(t, h)
+			h.App.OpenRequest(req, "collection")
+			repaintTabs(t, h)
+			if h.App.Main != PageWorkbench || h.App.Active().Request.ID != req.ID {
+				t.Fatal("opening from history did not activate the workbench request")
+			}
+			assertTabsEditorURL(t, h, req.URL)
+		})
+	}
+}
+
+func TestTabsCloseRightKeepsLeftAndConfirmsDirty(t *testing.T) {
+	h := newHarness(t)
+	left := h.App.Active()
+	left.Request.Name, left.Dirty = "Left dirty", true
+	keep := h.App.NewTab()
+	keep.Request.Name = "Keep"
+	right := h.App.NewTab()
+	right.Request.Name = "Right clean"
+	dirty := h.App.NewTab()
+	dirty.Request.Name, dirty.Dirty = "Right dirty", true
+	h.App.active = 1
+	repaintTabs(t, h)
+	openTabsContext(t, h, keep.Request.Name)
+	h.click(h.App.S.Tabs.CloseRight)
+	if len(h.App.Tabs()) != 3 || h.App.Tabs()[0] != left || h.App.Tabs()[1] != keep || !h.shows(h.App.S.Tabs.ConfirmTitle) {
+		t.Fatal("close right removed left tabs or skipped dirty confirmation")
+	}
+	h.click(h.App.S.Tabs.Cancel)
+	if h.App.requestTabIndex(dirty.ID) < 0 {
+		t.Fatal("cancel removed dirty right tab")
+	}
+	openTabsContext(t, h, keep.Request.Name)
+	h.click(h.App.S.Tabs.CloseRight)
+	h.click(h.App.S.Tabs.Discard)
+	if len(h.App.Tabs()) != 2 || h.App.Tabs()[0] != left || h.App.Active() != keep {
+		t.Fatal("discard did not close only tabs to the right")
+	}
+}
+
+func TestTabsOverflowMenuActivatesChosenTab(t *testing.T) {
+	h := newHarness(t)
+	first := h.App.Active()
+	first.Request.Name = "First hidden tab"
+	for i := range 7 {
+		h.App.NewTab().Request.Name = fmt.Sprintf("Overflow %d", i)
+	}
+	repaintTabs(t, h)
+	repaintTabs(t, h)
+	h.click(h.App.S.Tabs.AllTabs)
+	clickTabsContextItem(t, h, first.Request.Name)
+	if h.App.Active() != first || h.App.tabBarState.menu {
+		t.Fatal("overflow menu did not select chosen tab and close")
+	}
+	if tabsHit(t, h, first.Request.Name).Bounds.X < SidebarWidth+RailWidth {
+		t.Fatal("menu selection did not reveal hidden tab")
+	}
+}
+
+func TestTabsContextCloseSavedConfirmsEditsAndKeepsUnsaved(t *testing.T) {
+	h := newHarness(t)
+	unsaved := h.App.Active()
+	unsaved.Request.Name, unsaved.Dirty = "Unsaved", true
+	saved := h.App.NewTab()
+	saved.Request.Name, saved.CollectionID = "Saved", "collection"
+	edited := h.App.NewTab()
+	edited.Request.Name, edited.CollectionID, edited.Dirty = "Edited saved", "collection", true
+	repaintTabs(t, h)
+	openTabsContext(t, h, unsaved.Request.Name)
+	h.click(h.App.S.Tabs.CloseSaved)
+	if len(h.App.Tabs()) != 2 || h.App.requestTabIndex(unsaved.ID) < 0 || !h.shows(h.App.S.Tabs.ConfirmTitle) {
+		t.Fatal("close saved did not retain unsaved tabs and confirm saved edits")
+	}
+	h.click(h.App.S.Tabs.Discard)
+	if len(h.App.Tabs()) != 1 || h.App.Active() != unsaved {
+		t.Fatal("close saved removed unsaved tab")
+	}
+}
+
+func TestTabsContextCopiesURL(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.Name, tab.Request.URL = "Copy me", "https://copy.test/path?x=1"
+	repaintTabs(t, h)
+	openTabsContext(t, h, tab.Request.Name)
+	h.click(h.App.S.Tabs.CopyURL)
+	if h.D.Clipboard() != tab.Request.URL {
+		t.Fatal("copy URL did not write the request URL")
+	}
+}
+
+func TestTabsMiddleClickClosesAndConfirmsDirty(t *testing.T) {
+	for _, dirty := range []bool{false, true} {
+		t.Run(fmt.Sprint(dirty), func(t *testing.T) {
+			h := newHarness(t)
+			first := h.App.Active()
+			first.Request.Name, first.Dirty = "Middle close", dirty
+			last := h.App.NewTab()
+			repaintTabs(t, h)
+			b := tabsHit(t, h, first.Request.Name).Bounds
+			if err := h.D.ClickButton(b.X+b.Width/2, b.Y+b.Height/2, gfx.PointerButtonMiddle); err != nil {
+				t.Fatal(err)
+			}
+			if dirty {
+				if !h.shows(h.App.S.Tabs.ConfirmTitle) {
+					t.Fatal("middle close bypassed dirty confirmation")
+				}
+				h.click(h.App.S.Tabs.Discard)
+			}
+			if len(h.App.Tabs()) != 1 || h.App.Active() != last {
+				t.Fatal("middle click did not close only its target")
+			}
+		})
+	}
+}
+
+func TestTabsLanguagesAndThemesRender(t *testing.T) {
+	for _, language := range []string{"zh", "en"} {
+		for _, theme := range []string{"light", "dark"} {
+			t.Run(language+"/"+theme, func(t *testing.T) {
+				h := newHarness(t)
+				settings := h.Svc.Settings.Get()
+				settings.Language, settings.Theme = language, theme
+				h.App.ApplySettings(settings)
+				h.App.Active().Dirty = true
+				repaintTabs(t, h)
+				if !h.shows(h.App.S.Tabs.Title) {
+					t.Fatal("localized default tab title missing")
+				}
+				openTabsContext(t, h, h.App.S.Tabs.Title)
+				for _, label := range []string{h.App.S.Tabs.Close, h.App.S.Tabs.CloseRight, h.App.S.Tabs.CloseSaved, h.App.S.Tabs.CopyURL} {
+					tabsHit(t, h, label)
+				}
+				clickTabsContextItem(t, h, h.App.S.Tabs.Close)
+				if !h.shows(h.App.S.Tabs.ConfirmTitle) || !h.shows(h.App.S.Tabs.ConfirmDiscard) {
+					t.Fatal("localized discard dialog missing")
+				}
+				h.click(h.App.S.Tabs.Cancel)
+			})
+		}
 	}
 }
 

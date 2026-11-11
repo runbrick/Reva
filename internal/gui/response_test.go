@@ -12,6 +12,7 @@ import (
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -77,8 +78,8 @@ func TestResponseStatusColorsInBothThemes(t *testing.T) {
 			color  ui.Color
 		}{
 			{200, "200 OK", h.App.theme.Success},
-			{302, "302 Found", h.App.theme.Foreground},
-			{404, "404 Not Found", h.App.theme.Danger},
+			{302, "302 Found", h.App.palette.Options},
+			{404, "404 Not Found", h.App.palette.Warning},
 			{500, "500 Internal Server Error", h.App.theme.Danger},
 		} {
 			h.App.Active().Response = &model.Response{StatusCode: tt.code, Status: tt.status, Duration: 1234 * time.Millisecond}
@@ -108,6 +109,9 @@ func TestResponsePrettyRawAndHeaders(t *testing.T) {
 	if !h.shows(`  "z": 1,`) || !h.shows(`  "a": 2`) {
 		t.Fatal("Pretty did not show indented JSON")
 	}
+	if !h.shows("1") || !h.shows("4") {
+		t.Fatal("Pretty is missing line numbers")
+	}
 	h.click("Copy body")
 	if got := h.D.Clipboard(); got != body {
 		t.Fatalf("Copy body = %q, want full original body %q", got, body)
@@ -134,6 +138,87 @@ func TestResponsePrettyRawAndHeaders(t *testing.T) {
 	h.click("Pretty")
 	if !h.shows(`  "z": 1,`) {
 		t.Fatal("switching back to Pretty did not show indentation")
+	}
+}
+
+func TestResponseSearchCountsStepsWrapsAndReveals(t *testing.T) {
+	body := "first needle\n" + strings.Repeat("filler\n", 200) + "last needle"
+	h := responseHarness(t, model.Response{Body: []byte(body)}, nil)
+	h.click(h.App.S.Response.Search)
+	h.typeInto(h.App.S.Response.SearchHint, "needle")
+	v := h.App.response.views[h.App.Active().ID]
+	if len(v.matches) != 2 || !h.shows("1 / 2") {
+		t.Fatalf("search count = %d; labels = %v", len(v.matches), h.D.Snapshot().Labels)
+	}
+	h.click(h.App.S.Response.NextMatch)
+	responsePaint(h)
+	if v.match != 1 || !h.shows("2 / 2") || !h.shows("last needle") || v.code.view.ScrollY() <= 0 {
+		t.Fatal("Next did not select and reveal the last match")
+	}
+	h.click(h.App.S.Response.NextMatch)
+	if v.match != 0 || !h.shows("first needle") {
+		t.Fatal("Next did not wrap to first match")
+	}
+	h.click(h.App.S.Response.PreviousMatch)
+	if v.match != 1 {
+		t.Fatal("Previous did not wrap to last match")
+	}
+	h.click(h.App.S.Response.CloseSearch)
+	h.click(h.App.S.Response.CodeBody)
+	if _, err := h.D.ShortcutChord(gfx.ModifierControl, 'f'); err != nil {
+		t.Fatal(err)
+	}
+	if !v.find || !h.shows("2 / 2") {
+		t.Fatal("Ctrl+F in body did not reopen find")
+	}
+}
+
+func TestResponseCookiesAndTimelineFixtures(t *testing.T) {
+	h := responseHarness(t, model.Response{
+		Duration: 125 * time.Millisecond,
+		Cookies:  []model.Cookie{{Name: "session_id", Value: "abc123", Domain: "example.test", Path: "/api", Expires: time.Date(2027, 1, 2, 3, 4, 5, 0, time.UTC), HTTPOnly: true, Secure: true}},
+		Timeline: []model.Phase{{Kind: model.PhaseDNS, Duration: 5 * time.Millisecond}, {Kind: model.PhaseWait, Start: 5 * time.Millisecond, Duration: 120 * time.Millisecond}},
+	}, nil)
+	responseClickTab(h, h.App.S.Response.Cookies)
+	for _, value := range []string{"session_id", "abc123", "example.test", "/api", "2027-01-02T03:04:05Z", "HttpOnly", "Secure", "Yes"} {
+		if !h.shows(value) {
+			t.Errorf("Cookie tab missing %q", value)
+		}
+	}
+	responseClickTab(h, h.App.S.Response.Timeline)
+	for _, value := range []string{"DNS lookup", "5.00 ms", "Wait for response", "120.00 ms", "Total", "125 ms"} {
+		if !h.shows(value) {
+			t.Errorf("Timeline missing %q", value)
+		}
+	}
+	v := h.App.response.views[h.App.Active().ID]
+	if v.phaseShares[1]/v.phaseShares[0] != 24 {
+		t.Fatalf("bar shares are not proportional: %v", v.phaseShares)
+	}
+}
+
+func TestResponseCookiesAndTimelineEmpty(t *testing.T) {
+	h := responseHarness(t, model.Response{}, nil)
+	responseClickTab(h, h.App.S.Response.Cookies)
+	if !h.shows(h.App.S.Response.NoCookies) {
+		t.Fatal("missing cookie empty state")
+	}
+	responseClickTab(h, h.App.S.Response.Timeline)
+	if !h.shows(h.App.S.Response.NoTimeline) {
+		t.Fatal("missing timeline empty state")
+	}
+}
+
+func TestResponseHTMLPreviewAndUnsupportedPreview(t *testing.T) {
+	h := responseHarness(t, model.Response{Headers: []model.KV{{Key: "Content-Type", Value: "text/html; charset=utf-8"}}, Body: []byte(`<h1>Hello &amp; welcome</h1><p>Visible <b>text</b></p><script>secret()</script>`)}, nil)
+	h.click(h.App.S.Response.Preview)
+	if !h.shows("Hello & welcome") || !h.shows("Visible text") || h.shows("<h1>") || h.shows("secret()") {
+		t.Fatal("HTML preview did not strip tags and hidden code")
+	}
+	h.App.Active().Response = &model.Response{Body: []byte("plain")}
+	responsePaint(h)
+	if !h.shows(h.App.S.Response.PreviewUnavailable) {
+		t.Fatal("unsupported preview is missing a hint")
 	}
 }
 
@@ -280,6 +365,33 @@ func BenchmarkResponseRepaint(b *testing.B) {
 		b.Fatal(err)
 	}
 	b.Cleanup(driver.Close)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		config.Invalidator.Invalidate()
+		if err := driver.Pump(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkResponseRepaint5000Lines(b *testing.B) {
+	a := New(fake.New())
+	// Brackets plus 4,998 array values make exactly 5,000 Pretty lines.
+	a.Active().Response = &model.Response{Status: "200 OK", StatusCode: 200, Body: []byte("[" + strings.Repeat("1,", 4997) + "0]")}
+	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
+	config := page.Config(app.Config{Width: 1280, Height: 800})
+	driver, err := app.NewDriver(config, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(driver.Close)
+	for range 5 {
+		config.Invalidator.Invalidate()
+		if err := driver.Pump(); err != nil {
+			b.Fatal(err)
+		}
+	}
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {

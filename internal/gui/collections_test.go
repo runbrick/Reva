@@ -514,7 +514,7 @@ func TestCollectionsRejectFolderDropIntoChild(t *testing.T) {
 	}
 }
 
-func TestCollectionsFooterNewRequestAndLanguages(t *testing.T) {
+func TestCollectionsNewRequestMenuAndLanguages(t *testing.T) {
 	for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
 		t.Run(string(lang), func(t *testing.T) {
 			h := newHarness(t)
@@ -522,23 +522,28 @@ func TestCollectionsFooterNewRequestAndLanguages(t *testing.T) {
 			settings.Language = string(lang)
 			h.App.ApplySettings(settings)
 			collectionsPaint(h)
-			if !h.shows(h.App.S.Collections.Title) || !h.shows(h.App.S.Collections.Journey) {
-				t.Fatal("localized sidebar or footer missing")
+			if !h.shows(h.App.S.Collections.Title) || h.shows(h.App.S.Collections.NewRequest) {
+				t.Fatal("localized sidebar missing or removed footer button still visible")
 			}
 			h.click(h.App.S.Shell.Collections)
 			if h.App.Section != SectionCollections || !h.shows(h.App.S.Collections.Overview) {
 				t.Fatal("collections rail did not open overview")
 			}
+			if h.shows(h.App.S.Collections.NewRequest) {
+				t.Fatal("removed footer button still visible in empty overview")
+			}
+			h.click(h.App.S.Shell.APIs)
 			before := len(h.App.Tabs())
-			h.click(h.App.S.Collections.NewRequest)
+			h.click(h.App.S.Collections.Add)
+			collectionsOption(h, h.App.S.Collections.NewRequest)
 			h.pump()
 			if len(h.App.Tabs()) != before+1 || h.App.Main != PageWorkbench || h.App.Section != SectionAPIs {
-				t.Fatal("footer did not open a new workbench tab")
+				t.Fatal("creation menu did not open a new workbench tab")
 			}
 			_, _ = h.Svc.Collections.Create("Payments")
 			collectionsPaint(h)
-			if !h.shows(h.App.S.Collections.Journey) {
-				t.Fatal("short tree hid the footer")
+			if !h.shows("Payments") || h.shows(h.App.S.Collections.NewRequest) {
+				t.Fatal("collection tree missing or removed footer button still visible")
 			}
 		})
 	}

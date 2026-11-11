@@ -19,6 +19,33 @@ Foundation already on main (do not redesign it):
 - `internal/gui/app.go`: the App shell (layout, tabs slice, send pipeline via ui.Effect, toasts). One file per feature with stub functions whose signatures the shell calls.
 - `internal/gui/harness_test.go`: headless app.Driver test harness (newHarness, click, typeInto, shows, waitFor, pump).
 
+## Visual design (round 2)
+
+The target look is the screenshot `docs/design/target.png`: a clean, light, blue-accented
+desktop client. Layout, owned by `app.go`: custom titlebar strip on top (`titlebar.go`), a
+72 px icon rail on the left (APIs / Collections / Environments / Settings), a list sidebar,
+and the workbench (request tabs, request editor, response) or a full-width History /
+Settings page (`App.Main`).
+
+- Colors: ONLY from `c.Theme()` and `a.palette` (`internal/gui/theme.go`: Rail, Sidebar,
+  Surface, RailActive, TableHeader, method colors, Warning, Code* colors). Light and dark
+  must both look finished. No RGB literals in feature files.
+- Lengths: the `Space1..Space6` tokens (4/8/12/16/24) and `theme.Metrics` (radii, font sizes,
+  control height). Method badges: `a.MethodBadge(c, method)`; status colors:
+  `a.palette.StatusColor(theme, code)`.
+- Icons: `internal/gui/icons` (Lucide, ISC license, compiled with `go tool viva icons`):
+  `ui.Icon(c, icons.Send).Size(16, 16).Color(...)`, `ui.Button(c, label).Icon(icons.Plus)`.
+  To add an icon, download its SVG from
+  `https://cdn.jsdelivr.net/npm/lucide-static@0.460.0/icons/<name>.svg` into
+  `internal/gui/icons/svg/`, run
+  `go tool viva icons -o icons.go -pkg icons -license LICENSE-lucide.txt svg` inside
+  `internal/gui/icons`, and commit the SVG and `icons.go`. List added icons in your report:
+  `icons.go` is generated, so on a merge conflict the coordinator regenerates it from all SVGs.
+- Model fields added for round 2: `KV.Description`, `Response.Cookies`, `Response.Timeline`,
+  `Request.Options` (`RequestOptions`, resolved with `Options.Resolve(settings)`),
+  `Settings.RequestTimeoutSec / NoFollowRedirects / InsecureTLS`, `Settings.Theme` may be
+  `"system"`.
+
 ## Rules for every feature PR
 
 1. Work only in your own worktree/branch. Commit your work on that branch with clear messages. Do NOT push, do NOT merge into main, do NOT touch main.

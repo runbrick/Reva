@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Reqo</title>
+  <desc>Original Reqo icon: a request arrow inside a rounded Q.</desc>
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="#102b3f"/>
+  <circle cx="488" cy="476" r="244" fill="none" stroke="#5ee4c2" stroke-width="88"/>
+  <path d="M650 664 L784 798" fill="none" stroke="#5ee4c2" stroke-width="88" stroke-linecap="round"/>
+  <path d="M356 476 H610 M526 392 L610 476 L526 560" fill="none" stroke="#ffffff" stroke-width="56" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

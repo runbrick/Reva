@@ -82,6 +82,12 @@ const (
 // Sections lists the rail items in display order.
 var Sections = []Section{SectionAPIs, SectionCollections, SectionEnvironments, SectionSettings}
 
+// railParts names each rail item's hit identity.
+var railParts = map[Section]string{
+	SectionAPIs: "apis", SectionCollections: "collections",
+	SectionEnvironments: "environments", SectionSettings: "settings",
+}
+
 // MainPage is what the titlebar navigation selects: the main area's content.
 type MainPage int
 
@@ -318,9 +324,11 @@ func (a *App) rail(c ui.C) {
 			if active {
 				fg = theme.Primary
 			}
-			kc := c.KeyInt(int(s))
-			item := ui.Column(kc).Width(56).PadY(Space2).Gap(Space1).Items(ui.Center).
-				Radius(theme.Metrics.RadiusSurface).Hit(ui.ID(kc.Part("rail")), label).
+			// The hit's identity is named by its section's word; a Key set
+			// before ui.ID would be replaced by a Part, giving every item one ID.
+			id := ui.ID(c.Part(railParts[s]))
+			item := ui.Column(c.KeyInt(int(s))).Width(56).PadY(Space2).Gap(Space1).Items(ui.Center).
+				Radius(theme.Metrics.RadiusSurface).Hit(id, label).
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
 			if active {
 				item.Background(a.palette.RailActive)

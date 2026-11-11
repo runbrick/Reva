@@ -1,0 +1,19 @@
+[app]
+name = "Reqo"
+id = "com.runbrick.reqo"
+version = "0.1.0"
+executable = "reqo"
+package = "./cmd/reqo"
+icon = "assets/icon.png"
+
+[build]
+out = "dist"
+
+[mac]
+min_system = "12.0"
+category = "public.app-category.developer-tools"
+
+[windows]
+publisher = "Runbrick"
+scope = "user"
+url = "https://github.com/runbrick/reqo"

@@ -3,7 +3,9 @@ package gui
 import (
 	"testing"
 
+	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/headless"
 )
 
 // Each rail item must select only its own section: one click must not reach
@@ -29,6 +31,23 @@ func TestRailItemsSelectTheirOwnSection(t *testing.T) {
 				}
 				ids[hit.ID] = hit.Label
 			}
+		}
+	}
+}
+
+// English rail captions are the longest; they must fit their items.
+func TestRailCaptionsFitInEnglish(t *testing.T) {
+	svc := fake.New()
+	s := svc.Settings.Get()
+	s.Language = "en"
+	if err := svc.Settings.Save(s); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, svc)
+	h.pump()
+	for _, p := range headless.CheckLayout(h.D.Snapshot()) {
+		if p.Bounds.X < RailWidth && p.Bounds.Y > TitlebarHeight {
+			t.Errorf("rail layout: %+v", p)
 		}
 	}
 }

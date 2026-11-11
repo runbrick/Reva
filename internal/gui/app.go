@@ -327,7 +327,7 @@ func (a *App) rail(c ui.C) {
 			// The hit's identity is named by its section's word; a Key set
 			// before ui.ID would be replaced by a Part, giving every item one ID.
 			id := ui.ID(c.Part(railParts[s]))
-			item := ui.Column(c.KeyInt(int(s))).Width(56).PadY(Space2).Gap(Space1).Items(ui.Center).
+			item := ui.Column(c.KeyInt(int(s))).Width(RailWidth-2*Space1).PadY(Space2).Gap(Space1).Items(ui.Center).
 				Radius(theme.Metrics.RadiusSurface).Hit(id, label).
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
 			if active {
@@ -335,7 +335,7 @@ func (a *App) rail(c ui.C) {
 			}
 			item.Children(func() {
 				ui.Icon(c, icon).Size(22, 22).Color(fg)
-				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS).Color(fg)
+				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS - 2).Color(fg)
 			})
 			if item.Clicked() {
 				a.SelectSection(s)

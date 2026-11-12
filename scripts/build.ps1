@@ -22,17 +22,25 @@ try {
     if ($LASTEXITCODE -ne 0) { throw "Stripped baseline build failed." }
     & go tool viva build --target windows --arch $Arch -o "$outputDir/reqo.exe"
     if ($LASTEXITCODE -ne 0) { throw "Release build failed." }
-    & go tool viva package --target windows --arch $Arch --format zip --no-sign --program "$outputDir/reqo.exe" -o $outputDir
+    & go tool viva package --target windows --arch $Arch --format nsis,zip --no-sign --program "$outputDir/reqo.exe" -o $outputDir
     if ($LASTEXITCODE -ne 0) { throw "Packaging failed." }
 
     $program = Get-Item -LiteralPath "$outputDir/reqo.exe"
     if ($program.VersionInfo.ProductName -ne "Reqo" -or [string]::IsNullOrWhiteSpace($program.VersionInfo.ProductVersion)) {
         throw "The release executable is missing the expected version resources."
     }
+    $version = $program.VersionInfo.ProductVersion
+    $packages = @(
+        Get-Item -LiteralPath "$outputDir/reqo-$version-windows-$Arch-setup.exe"
+        Get-Item -LiteralPath "$outputDir/reqo-$version-windows-$Arch.zip"
+    )
+    if (@($packages | Where-Object Length -eq 0).Count -gt 0) {
+        throw "Windows packaging produced an empty artifact."
+    }
     foreach ($artifact in @(
         Get-Item -LiteralPath "$outputDir/reqo-stripped.exe"
         $program
-        Get-ChildItem -LiteralPath $outputDir -Filter "reqo-*-windows-$Arch.zip"
+        $packages
     )) {
         Write-Host ("{0}: {1:N0} bytes ({2:N2} MB)" -f $artifact.FullName, $artifact.Length, ($artifact.Length / 1000000))
     }

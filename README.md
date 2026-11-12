@@ -62,8 +62,15 @@ Run the following from the repository root on the corresponding host:
 
 | Host | Release command | Outputs |
 | --- | --- | --- |
-| Windows | `./scripts/build.ps1 -Arch amd64` in PowerShell | `dist/windows-amd64/reqo.exe` and `reqo-<version>-windows-amd64.zip` |
+| Windows | `./scripts/build.ps1 -Arch amd64` in PowerShell | `dist/windows-amd64/reqo-<version>-windows-amd64-setup.exe` (installer), `reqo.exe`, and a portable ZIP |
 | macOS | `sh ./scripts/build.sh` | `dist/darwin-<host-arch>/reqo`, `Reqo.app`, and `reqo-<version>-darwin-<host-arch>.dmg` |
+
+Windows packaging requires NSIS (`makensis`). Install it with
+`winget install --id NSIS.NSIS --exact`, then run the Windows build command.
+If NSIS is unpacked elsewhere, set `NSIS_HOME` to its `Bin` directory.
+The installer installs for the current user without administrator access and
+provides Start Menu shortcuts and an uninstaller. User data in `%AppData%\Reqo`
+is stored separately from the program.
 
 Both scripts accept `arm64` or `amd64` (on macOS, for example,
 `sh ./scripts/build.sh amd64`). macOS requires Xcode command-line tools
@@ -77,15 +84,15 @@ Viva release builds use `-trimpath`, `-s -w`, and an empty build ID. Windows
 builds also use the GUI subsystem and embed the PNG as an icon plus name,
 publisher, and version resources in the executable. The Windows script keeps
 `reqo-stripped.exe` as a bare stripped baseline and packages the resource-bearing
-`reqo.exe` into a portable ZIP. The macOS package contains `Info.plist`, an
-`.icns` generated from the PNG, and the executable; its DMG includes an
+`reqo.exe` into an NSIS installer and a portable ZIP. The macOS package contains
+`Info.plist`, an `.icns` generated from the PNG, and the executable; its DMG includes an
 Applications shortcut for drag-to-install. These commands are equivalent to
 the main packaging steps (replace the architecture as needed):
 
 ```powershell
 # Windows host
 go tool viva build --target windows --arch amd64 -o dist/reqo.exe
-go tool viva package --target windows --arch amd64 --format zip --no-sign --program dist/reqo.exe -o dist
+go tool viva package --target windows --arch amd64 --format nsis,zip --no-sign --program dist/reqo.exe -o dist
 ```
 
 ```sh
@@ -98,9 +105,8 @@ The scripts and CI create unsigned artifacts. Distribution signing is separate:
 Viva supports Windows certificates and Apple signing/notarization credentials
 (see `go tool viva help package`); omit `--no-sign` when using those credentials.
 Downloaded unsigned apps may be blocked by macOS Gatekeeper or flagged by
-Windows SmartScreen. A Windows NSIS installer is also available with
-`--format nsis` when `makensis` is installed; the portable ZIP needs no installer
-tool.
+Windows SmartScreen. The portable Windows ZIP remains available without running
+an installer.
 
 On every push and pull request, [CI](.github/workflows/ci.yml) runs Go 1.26 on
 `windows-latest` and `macos-latest`: formatting, Go vet, Viva vet, all tests,
@@ -108,13 +114,14 @@ the stripped release build, and packaging. CI disables Git's automatic CRLF
 conversion before checkout so `gofmt` sees LF on both hosts. Each build script
 prints artifact sizes without enforcing a size limit; the macOS script also
 reports the sum of all files in `Reqo.app`.
-CI uploads the ZIP or DMG as a workflow artifact.
+CI installs NSIS on Windows and uploads the installer, ZIP, or DMG as workflow
+artifacts.
 
 To publish a release, set `[app] version` in `viva.toml` and the matching
 `internal/update/update.go` `Current` constant, then push a matching `vX.Y.Z`
 tag. The [Release workflow](.github/workflows/release.yml) verifies the tag,
 runs the full test suite on Windows and macOS, packages their native artifacts,
-and publishes the ZIP, DMG, and `SHA256SUMS` to GitHub Releases. A release
+and publishes the Windows installer, ZIP, DMG, and `SHA256SUMS` to GitHub Releases. A release
 already published under that tag is never overwritten. The Settings page checks
 the latest published release only when you click **Check for updates**; it opens
 the GitHub download page for a newer version and does not replace the running app.

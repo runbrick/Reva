@@ -49,6 +49,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Viva vet failed' }
           go test ./... -count=1
           if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: choco install nsis --no-progress -y
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -61,6 +65,7 @@ jobs:
           name: reqo-${{ matrix.platform }}
           path: |
             dist/${{ matrix.platform }}/reqo-*.zip
+            dist/${{ matrix.platform }}/reqo-*-setup.exe
             dist/${{ matrix.platform }}/reqo-*.dmg
           if-no-files-found: error
 
@@ -81,9 +86,10 @@ jobs:
           set -euo pipefail
           version="${RELEASE_TAG#v}"
           mapfile -t zip < <(find release -maxdepth 1 -name "reqo-${version}-windows-amd64.zip" -type f)
+          mapfile -t installer < <(find release -maxdepth 1 -name "reqo-${version}-windows-amd64-setup.exe" -type f)
           mapfile -t dmg < <(find release -maxdepth 1 -name "reqo-${version}-darwin-amd64.dmg" -type f)
-          test "${#zip[@]}" -eq 1 && test "${#dmg[@]}" -eq 1
-          (cd release && sha256sum "${zip[0]##*/}" "${dmg[0]##*/}" > SHA256SUMS)
+          test "${#zip[@]}" -eq 1 && test "${#installer[@]}" -eq 1 && test "${#dmg[@]}" -eq 1
+          (cd release && sha256sum "${installer[0]##*/}" "${zip[0]##*/}" "${dmg[0]##*/}" > SHA256SUMS)
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

@@ -1,7 +1,7 @@
 [app]
 name = "Reqo"
 id = "com.runbrick.reqo"
-version = "0.1.0"
+version = "0.2.0"
 executable = "reqo"
 package = "./cmd/reqo"
 icon = "assets/icon.png"
@@ -16,4 +16,4 @@ category = "public.app-category.developer-tools"
 [windows]
 publisher = "Runbrick"
 scope = "user"
-url = "https://github.com/runbrick/reqo"
+url = "https://github.com/runbrick/Reva"

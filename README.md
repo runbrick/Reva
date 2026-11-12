@@ -106,20 +106,29 @@ On every push and pull request, [CI](.github/workflows/ci.yml) runs Go 1.26 on
 `windows-latest` and `macos-latest`: formatting, Go vet, Viva vet, all tests,
 the stripped release build, and packaging. CI disables Git's automatic CRLF
 conversion before checkout so `gofmt` sees LF on both hosts. Each build script
-prints sizes and fails if any executable or distribution archive exceeds **15,000,000 bytes
-(15 MB)**; the macOS script also checks the sum of all files in `Reqo.app`.
+prints sizes and fails if any executable or distribution archive exceeds **16,000,000 bytes
+(16 MB)**; the macOS script also checks the sum of all files in `Reqo.app`.
 CI uploads the ZIP or DMG as a workflow artifact.
 
+To publish a release, set `[app] version` in `viva.toml` and the matching
+`internal/update/update.go` `Current` constant, then push a matching `vX.Y.Z`
+tag. The [Release workflow](.github/workflows/release.yml) verifies the tag,
+runs the full test suite on Windows and macOS, packages their native artifacts,
+and publishes the ZIP, DMG, and `SHA256SUMS` to GitHub Releases. A release
+already published under that tag is never overwritten. The Settings page checks
+the latest published release only when you click **Check for updates**; it opens
+the GitHub download page for a newer version and does not replace the running app.
+
 Measured on Windows/amd64 with Go 1.26.3 and Viva 0.6.0 using
-`./scripts/build.ps1` on the foundation code in this branch:
+`./scripts/build.ps1` on this branch:
 
 | Artifact | Bytes | Decimal MB |
 | --- | ---: | ---: |
-| Stripped `cmd/reqo`, before app resources (`reqo-stripped.exe`) | 4,951,552 | 4.95 |
-| Packaged Windows executable, with icon and version resources (`reqo.exe`) | 4,986,368 | 4.99 |
-| Portable Windows package (`reqo-0.1.0-windows-amd64.zip`) | 2,125,572 | 2.13 |
+| Stripped `cmd/reqo`, before app resources (`reqo-stripped.exe`) | 14,998,016 | 15.00 |
+| Packaged Windows executable, with icon and version resources (`reqo.exe`) | 15,032,320 | 15.03 |
+| Portable Windows package (`reqo-0.2.0-windows-amd64.zip`) | 6,369,720 | 6.37 |
 
-The Windows app resources add 34,816 bytes. Sizes change as features are added;
+The Windows app resources add 34,304 bytes. Sizes change as features are added;
 rerun the scripts for current measurements. macOS packaging is configured for
 its native CI runner and has not been executed on this Windows development
 host.

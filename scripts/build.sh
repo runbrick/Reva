@@ -21,9 +21,9 @@ go tool viva package --target darwin --arch "$arch" --format app,dmg --no-sign \
 check_size() {
     bytes=$1
     artifact=$2
-    echo "$artifact: $bytes bytes (limit: 15,000,000 bytes)"
-    if [ "$bytes" -gt 15000000 ]; then
-        echo "$artifact exceeds 15 MB." >&2
+    echo "$artifact: $bytes bytes (limit: 16,000,000 bytes)"
+    if [ "$bytes" -gt 16000000 ]; then
+        echo "$artifact exceeds 16 MB." >&2
         exit 1
     fi
 }

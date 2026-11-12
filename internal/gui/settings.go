@@ -2,17 +2,19 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 
 	"github.com/runbrick/reqo/internal/gui/icons"
 	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reqo/internal/update"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )
 
-const settingsVersion = "0.2.0"
+const settingsVersion = update.Current
 
 // settingsState holds the page's controls and folder-reveal effect.
 type settingsState struct {
@@ -24,6 +26,11 @@ type settingsState struct {
 	dir                        string
 	dirError                   error
 	reveal                     *ui.EffectState[struct{}, string]
+	check                      func(context.Context) (update.Release, error)
+	checking                   *ui.EffectState[update.Release, string]
+	latest                     update.Release
+	checkError                 error
+	checked                    bool
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
@@ -47,6 +54,13 @@ func (a *App) settingsButton(c ui.C) {
 			if err != nil {
 				a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
 			}
+		}
+	}
+	if state.checking != nil {
+		ui.Effect(c, state.checking, update.Feed)
+		if release, err, ok := state.checking.Take(); ok {
+			state.checking = nil
+			state.latest, state.checkError, state.checked = release, err, true
 		}
 	}
 }
@@ -135,8 +149,43 @@ func (a *App) settingsPage(c ui.C) {
 					})
 					ui.Divider(c)
 					settingsRow(c, s.About, a.S.Common.AppName, func() {
-						ui.Text(c, settingsVersion).Muted()
+						ui.Text(c, "v"+settingsVersion).Muted()
+						if ui.Button(c, s.CheckUpdates).Icon(icons.RefreshCw).Outline().Disabled(state.checking != nil).Clicked() {
+							c.After(func() {
+								check := state.check
+								if check == nil {
+									check = func(ctx context.Context) (update.Release, error) { return update.Latest(ctx, nil, update.Feed) }
+								}
+								state.checked, state.checkError, state.latest = false, nil, update.Release{}
+								state.checking = ui.NewEffectKeyed[update.Release, string](func(ctx context.Context, _ string) (update.Release, error) {
+									return check(ctx)
+								})
+							})
+						}
 					})
+					if state.checking != nil {
+						ui.Text(c, s.CheckingUpdates).Muted()
+					} else if state.checked {
+						switch {
+						case errors.Is(state.checkError, update.ErrNoRelease):
+							ui.Text(c, s.NoRelease).Muted()
+						case state.checkError != nil:
+							ui.Wrap(c, s.UpdateFailed+": "+state.checkError.Error()).FillWidth().Color(theme.Danger)
+						case update.Newer(settingsVersion, state.latest.Version):
+							ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
+								ui.Text(c, s.UpdateAvailable+" v"+state.latest.Version).Color(theme.Success)
+								if ui.Button(c, s.OpenRelease).Icon(icons.ExternalLink).Outline().Clicked() {
+									c.After(func() {
+										if err := app.OpenURL(state.latest.URL); err != nil {
+											a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
+										}
+									})
+								}
+							})
+						default:
+							ui.Text(c, s.UpToDate).Muted()
+						}
+					}
 				})
 			})
 		})

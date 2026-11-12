@@ -250,6 +250,19 @@ func (a *App) collectionsPane(c ui.C) {
 						}
 					})
 				}
+				if menu.Item(text.NewGraphQL).Icon(icons.Braces).Clicked() {
+					c.After(func() {
+						if s.selected.collectionID == "" {
+							a.newGraphQLTab()
+						} else {
+							n := s.selected
+							if !n.branch {
+								n.id = n.parentID
+							}
+							a.newCollectionGraphQLRequest(n)
+						}
+					})
+				}
 			})
 		})
 		ui.TextField(c, &s.filter, text.Filter, text.Filter).Icon(icons.Search).FillWidth()
@@ -319,6 +332,11 @@ func (a *App) collectionsPane(c ui.C) {
 func (a *App) newCollectionTab() {
 	a.NewTab()
 	a.Main, a.Section = PageWorkbench, SectionAPIs
+}
+
+func (a *App) newGraphQLTab() {
+	a.newCollectionTab()
+	a.initGraphQLRequest(a.Active())
 }
 
 // Only an inside drop is accepted; collection roots cannot themselves be moved.
@@ -420,6 +438,9 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		if menu.Item(s.NewRequest).Clicked() {
 			c.After(func() { a.newCollectionRequest(n) })
 		}
+		if menu.Item(s.NewGraphQL).Icon(icons.Braces).Clicked() {
+			c.After(func() { a.newCollectionGraphQLRequest(n) })
+		}
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {
 				c.After(func() {
@@ -469,8 +490,20 @@ func (a *App) openCollectionRequest(n collectionNode) {
 }
 
 func (a *App) newCollectionRequest(n collectionNode) {
+	a.createCollectionRequest(n, false)
+}
+
+func (a *App) newCollectionGraphQLRequest(n collectionNode) {
+	a.createCollectionRequest(n, true)
+}
+
+func (a *App) createCollectionRequest(n collectionNode, graphQL bool) {
 	r := model.NewRequest(storage.NewID())
 	r.Name = a.S.Collections.NewRequest
+	if graphQL {
+		r.Name = a.S.Collections.NewGraphQL
+		initGraphQLBody(&r)
+	}
 	r, err := a.Svc.Collections.SaveRequest(n.collectionID, n.id, r)
 	if a.collectionError(err) {
 		return
@@ -478,6 +511,9 @@ func (a *App) newCollectionRequest(n collectionNode) {
 	a.collections.closed[a.collections.nodeKey(n)] = false
 	a.refreshCollections()
 	a.OpenRequest(r, n.collectionID)
+	if graphQL {
+		a.requestTab(a.Active()).section = requestBody
+	}
 	a.Main, a.Section = PageWorkbench, SectionAPIs
 }
 

@@ -51,6 +51,9 @@ type requestTabState struct {
 	write                          *ui.EffectState[struct{}, *requestDownload]
 	timeout                        string
 	timeoutValue                   int
+	graphQLBody, graphQLQuery      string
+	graphQLVariables               string
+	graphQLRaw, graphQLError       bool
 	captions                       [requestSettings + 1]requestSectionCaption
 }
 
@@ -143,7 +146,7 @@ func (a *App) requestPane(c ui.C, t *Tab) {
 			})
 		})
 	})
-	if ui.Shortcut(c, ui.Primary, "enter") && !t.Sending {
+	if ui.Shortcut(c, ui.Primary, "enter") && !t.Sending && !s.graphQLError {
 		a.Send(t)
 	}
 	if ui.Shortcut(c, ui.Primary, "s") {
@@ -199,6 +202,9 @@ func (a *App) requestBodySection(c ui.C, t *Tab, s *requestTabState) {
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
 			if pill.Changed() {
 				t.Dirty = true
+				if b.Mode != model.BodyJSON && b.ContentType == graphQLBodyTag {
+					b.ContentType = ""
+				}
 			}
 			fg, bg := theme.MutedForeground, theme.Background
 			if b.Mode == mode {
@@ -209,6 +215,9 @@ func (a *App) requestBodySection(c ui.C, t *Tab, s *requestTabState) {
 	})
 	switch b.Mode {
 	case model.BodyJSON, model.BodyRaw:
+		if b.Mode == model.BodyJSON && b.ContentType == graphQLBodyTag && a.graphQLBodySection(c, t, s) {
+			return
+		}
 		if b.Mode == model.BodyJSON {
 			if ui.Button(c, a.S.Request.Format).Icon(icons.Braces).Ghost().Small().Clicked() {
 				var out bytes.Buffer
@@ -458,7 +467,7 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				requestParamsFromURL(&t.Request)
 				s.url = t.Request.URL
 			}
-			if field.Submitted() && !t.Sending {
+			if field.Submitted() && !t.Sending && !s.graphQLError {
 				a.Send(t)
 			}
 		})
@@ -467,7 +476,7 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				if ui.Button(c, labels.Cancel).Icon(icons.X).Height(height).Clicked() {
 					a.Cancel(t)
 				}
-			} else if ui.Button(c, labels.Send).Label(labels.SendAccessible).Icon(icons.Send).Height(height).Clicked() {
+			} else if ui.Button(c, labels.Send).Label(labels.SendAccessible).Icon(icons.Send).Height(height).Disabled(s.graphQLError).Clicked() {
 				a.Send(t)
 			}
 			ui.Divider(c).Vertical().Height(Space6).Background(theme.PrimaryForeground.WithAlpha(0.3))
@@ -480,7 +489,7 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				s.menu = !s.menu
 			}
 			ui.Menu(c, more, &s.menu, func(menu *ui.MenuItems) {
-				if menu.Item(labels.SendDownload).Icon(icons.Download).Disabled(t.Sending).Clicked() {
+				if menu.Item(labels.SendDownload).Icon(icons.Download).Disabled(t.Sending || s.graphQLError).Clicked() {
 					c.After(func() {
 						path, err := app.SaveFile(app.SaveFileOptions{Title: labels.SendDownload, SuggestedName: labels.DownloadName})
 						if errors.Is(err, app.ErrCanceled) {

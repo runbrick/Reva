@@ -12,15 +12,16 @@ import (
 
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/ui"
 )
 
 func TestResponseCodeViewReadOnlySelectionAndCopy(t *testing.T) {
 	h := responseHarness(t, model.Response{Body: []byte("immutable response")}, nil)
 	h.click(h.App.S.Response.CodeBody)
-	if _, err := h.D.ShortcutChord(gfx.ModifierControl, 'a'); err != nil {
+	if _, err := h.D.ShortcutChord(ui.Primary, 'a'); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := h.D.ShortcutChord(gfx.ModifierControl, 'c'); err != nil {
+	if _, err := h.D.ShortcutChord(ui.Primary, 'c'); err != nil {
 		t.Fatal(err)
 	}
 	if got := h.D.Clipboard(); got != "immutable response" {

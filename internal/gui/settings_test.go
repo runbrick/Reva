@@ -398,7 +398,17 @@ func TestSettingsPageScrollsAtMinimumWindowSize(t *testing.T) {
 
 func settingsAssertLayout(t *testing.T, h *harness) {
 	t.Helper()
-	for _, problem := range headless.CheckLayout(h.D.Snapshot()) {
+	snapshot := h.D.Snapshot()
+	// A clipped line at the scroll boundary can be attributed to a titlebar
+	// control by CheckLayout, which searches hits using its unclipped position.
+	var pageHits []gfx.Hit
+	for _, hit := range snapshot.Hits {
+		if hit.Bounds.X >= RailWidth && hit.Bounds.Y >= TitlebarHeight {
+			pageHits = append(pageHits, hit)
+		}
+	}
+	snapshot.Hits = pageHits
+	for _, problem := range headless.CheckLayout(snapshot) {
 		// The settings feature owns the main page; the shell owns the rail and titlebar.
 		if problem.Bounds.X >= RailWidth && problem.Bounds.Y >= TitlebarHeight {
 			t.Errorf("settings layout: %+v", problem)

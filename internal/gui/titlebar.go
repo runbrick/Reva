@@ -90,13 +90,14 @@ func (a *App) titlebarNavigation(c ui.C, compact bool) {
 	ui.Row(c).FillHeight().Shrink(0).Gap(Space1).FocusGroup(ui.FocusHorizontal).
 		Label(a.S.Shell.NavLabel).Children(func() {
 		for _, p := range Pages {
+			if p == PageSettings {
+				continue
+			}
 			kc := c.KeyInt(int(p))
 			label, icon := a.pageLabel(p), icons.House
 			switch p {
 			case PageHistory:
 				icon = icons.Clock
-			case PageSettings:
-				icon = icons.Settings
 			}
 			fg := theme.MutedForeground
 			if a.Main == p {

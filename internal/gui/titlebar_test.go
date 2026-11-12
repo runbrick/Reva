@@ -42,16 +42,27 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 						}
 					}
 					// An overlap check must also ensure controls remain available.
-					for _, p := range Pages {
+					for _, p := range []MainPage{PageWorkbench, PageHistory} {
 						titlebarClick(t, h, h.App.pageLabel(p))
 						if h.App.Main != p {
 							t.Fatalf("navigation %v did not switch page", p)
 						}
 					}
+					settingsHits := 0
 					for _, hit := range h.D.Snapshot().Hits {
+						if hit.Label == h.App.pageLabel(PageSettings) && hit.Bounds.Y < TitlebarHeight {
+							settingsHits++
+						}
 						if hit.Label == "用户菜单" || hit.Label == "User menu" {
 							t.Fatal("removed avatar menu is still present")
 						}
+					}
+					if settingsHits != 1 {
+						t.Fatalf("titlebar has %d Settings entries, want only the gear", settingsHits)
+					}
+					titlebarClick(t, h, h.App.pageLabel(PageSettings))
+					if h.App.Main != PageSettings {
+						t.Fatal("Settings gear did not open the Settings page")
 					}
 				})
 			}
@@ -61,7 +72,7 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 
 func TestTitlebarNavigationShowsPages(t *testing.T) {
 	h := newHarness(t)
-	for _, p := range []MainPage{PageHistory, PageSettings, PageWorkbench} {
+	for _, p := range []MainPage{PageHistory, PageWorkbench} {
 		titlebarClick(t, h, h.App.pageLabel(p))
 		if h.App.Main != p {
 			t.Fatalf("Main = %v, want %v", h.App.Main, p)
@@ -70,8 +81,6 @@ func TestTitlebarNavigationShowsPages(t *testing.T) {
 		switch p {
 		case PageHistory:
 			text = h.App.S.History.Empty
-		case PageSettings:
-			text = h.App.S.Settings.Title
 		}
 		found := false
 		for _, label := range h.D.Snapshot().Labels {

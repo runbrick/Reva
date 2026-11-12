@@ -1,13 +1,10 @@
 package gui
 
 import (
-	"errors"
 	"fmt"
 	"runtime"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/i18n"
-	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
@@ -45,15 +42,27 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 						}
 					}
 					// An overlap check must also ensure controls remain available.
-					for _, p := range Pages {
-						titlebarClick(t, h, h.App.pageLabel(p), false)
+					for _, p := range []MainPage{PageWorkbench, PageHistory} {
+						titlebarClick(t, h, h.App.pageLabel(p))
 						if h.App.Main != p {
 							t.Fatalf("navigation %v did not switch page", p)
 						}
 					}
-					titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-					if !h.App.titlebar.menuOpen {
-						t.Fatal("avatar menu is unreachable")
+					settingsHits := 0
+					for _, hit := range h.D.Snapshot().Hits {
+						if hit.Label == h.App.pageLabel(PageSettings) && hit.Bounds.Y < TitlebarHeight {
+							settingsHits++
+						}
+						if hit.Label == "用户菜单" || hit.Label == "User menu" {
+							t.Fatal("removed avatar menu is still present")
+						}
+					}
+					if settingsHits != 1 {
+						t.Fatalf("titlebar has %d Settings entries, want only the gear", settingsHits)
+					}
+					titlebarClick(t, h, h.App.pageLabel(PageSettings))
+					if h.App.Main != PageSettings {
+						t.Fatal("Settings gear did not open the Settings page")
 					}
 				})
 			}
@@ -63,8 +72,8 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 
 func TestTitlebarNavigationShowsPages(t *testing.T) {
 	h := newHarness(t)
-	for _, p := range []MainPage{PageHistory, PageSettings, PageWorkbench} {
-		titlebarClick(t, h, h.App.pageLabel(p), false)
+	for _, p := range []MainPage{PageHistory, PageWorkbench} {
+		titlebarClick(t, h, h.App.pageLabel(p))
 		if h.App.Main != p {
 			t.Fatalf("Main = %v, want %v", h.App.Main, p)
 		}
@@ -72,8 +81,6 @@ func TestTitlebarNavigationShowsPages(t *testing.T) {
 		switch p {
 		case PageHistory:
 			text = h.App.S.History.Empty
-		case PageSettings:
-			text = h.App.S.Settings.Title
 		}
 		found := false
 		for _, label := range h.D.Snapshot().Labels {
@@ -84,78 +91,6 @@ func TestTitlebarNavigationShowsPages(t *testing.T) {
 		if !found {
 			t.Errorf("page %v did not show %q below titlebar", p, text)
 		}
-	}
-}
-
-func TestTitlebarMenuSavesThemeAndLanguage(t *testing.T) {
-	h := newHarness(t)
-	initial := h.Svc.Settings.Get()
-	for _, choice := range []struct{ value, label string }{
-		{"dark", h.App.S.Titlebar.Dark}, {"light", h.App.S.Titlebar.Light}, {"system", h.App.S.Titlebar.System},
-	} {
-		titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-		titlebarClick(t, h, choice.label, true)
-		if got := h.Svc.Settings.Get().Theme; got != choice.value {
-			t.Fatalf("saved theme = %q, want %q", got, choice.value)
-		}
-		if choice.value != "system" && h.App.Dark() != (choice.value == "dark") {
-			t.Fatalf("Dark() = %v for theme %q", h.App.Dark(), choice.value)
-		}
-		if h.App.titlebar.menuOpen {
-			t.Fatal("choosing theme left menu open")
-		}
-	}
-	titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-	titlebarClick(t, h, h.App.S.Titlebar.English, true)
-	if h.App.S.Lang != i18n.En || h.Svc.Settings.Get().Language != "en" {
-		t.Fatal("English was not saved and applied")
-	}
-	titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-	titlebarClick(t, h, h.App.S.Titlebar.Chinese, true)
-	if h.App.S.Lang != i18n.Zh || h.Svc.Settings.Get().Language != "zh" {
-		t.Fatal("Chinese was not saved and applied")
-	}
-	want := initial
-	want.Theme, want.Language = "system", "zh"
-	if got := h.Svc.Settings.Get(); got != want {
-		t.Fatalf("menu changed unrelated settings: got %+v, want %+v", got, want)
-	}
-}
-
-func TestTitlebarMenuSettingsAndAbout(t *testing.T) {
-	h := newHarness(t)
-	titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-	titlebarClick(t, h, h.App.S.Titlebar.Settings, true)
-	if h.App.Main != PageSettings {
-		t.Fatal("menu Settings did not select the Settings page")
-	}
-	titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-	titlebarClick(t, h, h.App.S.Titlebar.About, true)
-	if !h.shows(h.App.S.Titlebar.About) || !h.shows(h.App.S.Common.AppName) {
-		t.Fatal("About did not show app name toast")
-	}
-}
-
-type titlebarFailingSettings struct{ value model.Settings }
-
-func (s *titlebarFailingSettings) Get() model.Settings { return s.value }
-func (s *titlebarFailingSettings) Save(model.Settings) error {
-	return errors.New("settings cannot be saved")
-}
-
-func TestTitlebarMenuSaveFailureKeepsTheme(t *testing.T) {
-	svc := fake.New()
-	settings := svc.Settings.Get()
-	settings.Theme = "light"
-	svc.Settings = &titlebarFailingSettings{value: settings}
-	h := newHarness(t, svc)
-	titlebarClick(t, h, h.App.S.Titlebar.UserMenu, false)
-	titlebarClick(t, h, h.App.S.Titlebar.Dark, true)
-	if h.App.Dark() || h.Svc.Settings.Get().Theme != "light" {
-		t.Fatal("unsaved theme was applied")
-	}
-	if !h.shows("settings cannot be saved") {
-		t.Fatal("save error was not shown")
 	}
 }
 
@@ -187,20 +122,19 @@ func TestTitlebarWindowControlsFollowThemeAndLanguage(t *testing.T) {
 	}
 }
 
-// titlebarClick distinguishes the strip's Settings hit from the rail, page and
-// popup's identically named Settings controls.
-func titlebarClick(t *testing.T, h *harness, label string, menu bool) {
+// titlebarClick distinguishes the strip's Settings hit from the rail and page.
+func titlebarClick(t *testing.T, h *harness, label string) {
 	t.Helper()
 	for _, hit := range h.D.Snapshot().Hits {
 		r := hit.Bounds
-		if hit.Label == label && (r.Y >= TitlebarHeight) == menu && (!menu || hit.Layer > 0) && r.Width > 0 && r.Height > 0 {
+		if hit.Label == label && r.Y < TitlebarHeight && r.Width > 0 && r.Height > 0 {
 			if err := h.D.Click(r.X+r.Width/2, r.Y+r.Height/2); err != nil {
 				t.Fatal(err)
 			}
 			return
 		}
 	}
-	t.Fatalf("no titlebar hit %q (menu=%v); have %q", label, menu, h.hitLabels())
+	t.Fatalf("no titlebar hit %q; have %q", label, h.hitLabels())
 }
 
 func BenchmarkTitlebarPaint(b *testing.B) {

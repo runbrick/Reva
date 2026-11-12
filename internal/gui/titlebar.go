@@ -4,13 +4,12 @@ import (
 	"runtime"
 
 	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/model"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )
 
-// titlebarState owns the avatar menu's open state.
-type titlebarState struct{ menuOpen bool }
+// titlebarState is retained for the shell's feature state slot.
+type titlebarState struct{}
 
 // windowConfig sets the window chrome on base: a custom titlebar Reqo paints
 // itself. Owned by the titlebar PR.
@@ -70,7 +69,6 @@ func (a *App) titlebarStrip(c ui.C) {
 			a.envSelector(c)
 			a.importButton(c)
 			a.settingsButton(c)
-			a.titlebarUserMenu(c)
 		})
 	})
 }
@@ -92,13 +90,14 @@ func (a *App) titlebarNavigation(c ui.C, compact bool) {
 	ui.Row(c).FillHeight().Shrink(0).Gap(Space1).FocusGroup(ui.FocusHorizontal).
 		Label(a.S.Shell.NavLabel).Children(func() {
 		for _, p := range Pages {
+			if p == PageSettings {
+				continue
+			}
 			kc := c.KeyInt(int(p))
 			label, icon := a.pageLabel(p), icons.House
 			switch p {
 			case PageHistory:
 				icon = icons.Clock
-			case PageSettings:
-				icon = icons.Settings
 			}
 			fg := theme.MutedForeground
 			if a.Main == p {
@@ -124,61 +123,5 @@ func (a *App) titlebarNavigation(c ui.C, compact bool) {
 				a.Main = p
 			}
 		}
-	})
-}
-
-func (a *App) titlebarUserMenu(c ui.C) {
-	theme, s := c.Theme(), a.S.Titlebar
-	kc := c.Part("user-menu")
-	avatar := ui.Row(kc).Gap(Space1).Pad(Space1).Items(ui.Center).
-		Radius(theme.Metrics.RadiusControl).Hit(ui.ID(kc), s.UserMenu).
-		Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5))).
-		Children(func() {
-			ui.Row(kc).Size(32, 32).Radius(Space4).Background(theme.Accent).Center().Children(func() {
-				ui.Icon(kc, icons.User).Size(Space4, Space4).Color(theme.AccentForeground)
-			})
-			ui.Icon(kc, icons.ChevronDown).Size(Space4, Space4).Color(theme.MutedForeground)
-		})
-	if avatar.Clicked() {
-		a.titlebar.menuOpen = !a.titlebar.menuOpen
-	}
-	ui.Menu(kc, avatar, &a.titlebar.menuOpen, func(menu *ui.MenuItems) {
-		if menu.Item(s.Settings).Icon(icons.Settings).Clicked() {
-			a.Main = PageSettings
-		}
-		menu.Separator()
-		for _, choice := range [...]struct{ value, label string }{
-			{"light", s.Light}, {"dark", s.Dark}, {"system", s.System},
-		} {
-			if menu.Item(choice.label).Checked(a.themeName == choice.value).Clicked() {
-				settings := a.Svc.Settings.Get()
-				settings.Theme = choice.value
-				a.titlebarSaveSettings(c, settings)
-			}
-		}
-		menu.Separator()
-		for _, choice := range [...]struct{ value, label string }{
-			{"zh", s.Chinese}, {"en", s.English},
-		} {
-			if menu.Item(choice.label).Checked(string(a.S.Lang) == choice.value).Clicked() {
-				settings := a.Svc.Settings.Get()
-				settings.Language = choice.value
-				a.titlebarSaveSettings(c, settings)
-			}
-		}
-		menu.Separator()
-		if menu.Item(s.About).Clicked() {
-			a.Toast(s.About, a.S.Common.AppName, ui.ToastInfo)
-		}
-	})
-}
-
-func (a *App) titlebarSaveSettings(c ui.C, settings model.Settings) {
-	c.After(func() {
-		if err := a.Svc.Settings.Save(settings); err != nil {
-			a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
-			return
-		}
-		a.ApplySettings(settings)
 	})
 }

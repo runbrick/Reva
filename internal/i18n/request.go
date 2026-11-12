@@ -15,9 +15,11 @@ type Request struct {
 	ParamName, ParamValue, HeaderName, HeaderValue             string
 	Description, AddParam, AddHeader, BulkEdit, TableEdit      string
 	BulkContent, BulkHelp                                      string
+	GraphQLQuery, GraphQLVariables, GraphQLRaw, GraphQLEdit    string
 }
 
 var requestZh = Request{
+	GraphQLQuery: "GraphQL 查询", GraphQLVariables: "GraphQL 变量（JSON）", GraphQLRaw: "编辑 JSON", GraphQLEdit: "编辑 GraphQL",
 	Title: "请求", Method: "方法", Send: "Send / 发送", SendAccessible: "Send / 发送", Save: "保存", Cancel: "取消",
 	Params: "参数", Headers: "请求头", Body: "请求体", Auth: "认证", Scripts: "脚本",
 	None: "无", Raw: "原始文本", FormData: "表单数据", URLEncoded: "网址编码表单", Binary: "二进制",
@@ -34,6 +36,7 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
+	GraphQLQuery: "GraphQL query", GraphQLVariables: "GraphQL variables (JSON)", GraphQLRaw: "Edit JSON", GraphQLEdit: "Edit GraphQL",
 	Title: "Request", Method: "Method", Send: "Send", SendAccessible: "Send", Save: "Save", Cancel: "Cancel",
 	Params: "Params", Headers: "Headers", Body: "Body", Auth: "Authorization", Scripts: "Scripts",
 	None: "None", Raw: "Raw", FormData: "Form data", URLEncoded: "URL encoded", Binary: "Binary",

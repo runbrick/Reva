@@ -36,6 +36,10 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Viva vet failed' }
           go test ./... -count=1
           if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
+      - name: Install NSIS
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/install-nsis.ps1
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh
@@ -48,5 +52,6 @@ jobs:
           name: reqo-${{ matrix.platform }}
           path: |
             dist/${{ matrix.platform }}/reqo-*.zip
+            dist/${{ matrix.platform }}/reqo-*-setup.exe
             dist/${{ matrix.platform }}/reqo-*.dmg
           if-no-files-found: error

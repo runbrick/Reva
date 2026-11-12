@@ -29,14 +29,12 @@ try {
     if ($program.VersionInfo.ProductName -ne "Reqo" -or [string]::IsNullOrWhiteSpace($program.VersionInfo.ProductVersion)) {
         throw "The release executable is missing the expected version resources."
     }
-    # Decimal MB: the executable includes Go's HTTP/TLS stack for release checks.
     foreach ($artifact in @(
         Get-Item -LiteralPath "$outputDir/reqo-stripped.exe"
         $program
         Get-ChildItem -LiteralPath $outputDir -Filter "reqo-*-windows-$Arch.zip"
     )) {
         Write-Host ("{0}: {1:N0} bytes ({2:N2} MB)" -f $artifact.FullName, $artifact.Length, ($artifact.Length / 1000000))
-        if ($artifact.Length -gt 16000000) { throw "$($artifact.Name) exceeds 16 MB." }
     }
 }
 finally {

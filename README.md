@@ -106,8 +106,8 @@ On every push and pull request, [CI](.github/workflows/ci.yml) runs Go 1.26 on
 `windows-latest` and `macos-latest`: formatting, Go vet, Viva vet, all tests,
 the stripped release build, and packaging. CI disables Git's automatic CRLF
 conversion before checkout so `gofmt` sees LF on both hosts. Each build script
-prints sizes and fails if any executable or distribution archive exceeds **16,000,000 bytes
-(16 MB)**; the macOS script also checks the sum of all files in `Reqo.app`.
+prints artifact sizes without enforcing a size limit; the macOS script also
+reports the sum of all files in `Reqo.app`.
 CI uploads the ZIP or DMG as a workflow artifact.
 
 To publish a release, set `[app] version` in `viva.toml` and the matching

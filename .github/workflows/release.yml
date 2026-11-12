@@ -52,7 +52,7 @@ jobs:
       - name: Install NSIS
         if: runner.os == 'Windows'
         shell: pwsh
-        run: choco install nsis --no-progress -y
+        run: ./scripts/install-nsis.ps1
       - name: Package Windows
         if: runner.os == 'Windows'
         shell: pwsh

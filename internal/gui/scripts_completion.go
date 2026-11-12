@@ -139,6 +139,8 @@ func (v *scriptCodeEditor) drawCompletions(d *ui.DrawContext) {
 	}
 	y = max(d.Rect.Y+Space1, y)
 	v.popup = gfx.Rect{X: x, Y: y, Width: width, Height: height}
+	d.Canvas.PushLayer(1)
+	defer d.Canvas.PopLayer()
 	d.Canvas.RoundedBorder(v.popup, d.Theme.Metrics.RadiusControl, 1, d.Theme.Border, d.Theme.Popover)
 	for i, option := range v.completions {
 		row := gfx.Rect{X: x + 1, Y: y + Space1/2 + float32(i)*rowHeight, Width: width - 2, Height: rowHeight}

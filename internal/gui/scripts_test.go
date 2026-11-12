@@ -398,6 +398,53 @@ func TestScriptCompletionNavigationAndDismiss(t *testing.T) {
 	}
 }
 
+func TestScriptCompletionPaintsOpaqueAboveCode(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = "pm.\nvar underlying = 7;\nvar another = 9;"
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.SelectText(3, 3); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if len(v.completions) == 0 || v.popup.Width == 0 {
+		t.Fatalf("completion popup missing: %+v", v.popup)
+	}
+	snapshot := h.D.Snapshot()
+	backgroundLayer := uint16(0)
+	for _, primitive := range snapshot.Primitives {
+		if primitive.Color == h.App.theme.Popover && primitive.Bounds.X > v.popup.X && primitive.Bounds.Y > v.popup.Y &&
+			primitive.Bounds.X+primitive.Bounds.Width < v.popup.X+v.popup.Width && primitive.Bounds.Y+primitive.Bounds.Height < v.popup.Y+v.popup.Height {
+			if primitive.Color.Alpha != 1 {
+				t.Fatalf("popup background alpha = %v", primitive.Color.Alpha)
+			}
+			backgroundLayer = primitive.Layer
+		}
+	}
+	if backgroundLayer == 0 {
+		t.Fatal("completion has no opaque elevated background")
+	}
+	codeOverlaps := false
+	completionLabel := false
+	for _, label := range snapshot.Labels {
+		if label.Value == "var underlying = 7;" && label.Bounds.Y < v.popup.Y+v.popup.Height && label.Bounds.Y+label.Bounds.Height > v.popup.Y {
+			codeOverlaps = true
+			if label.Layer >= backgroundLayer {
+				t.Fatalf("code layer %d overlays completion background %d", label.Layer, backgroundLayer)
+			}
+		}
+		if label.Value == "request" && label.Layer != backgroundLayer {
+			t.Fatalf("completion label layer %d, background layer %d", label.Layer, backgroundLayer)
+		} else if label.Value == "request" {
+			completionLabel = true
+		}
+	}
+	if !codeOverlaps || !completionLabel {
+		t.Fatalf("expected overlapping code and completion label: code=%v label=%v", codeOverlaps, completionLabel)
+	}
+}
+
 func TestScriptEditorDragResizesAndKeepsPerScriptHeight(t *testing.T) {
 	h := newHarness(t)
 	h.click(h.App.S.Request.Scripts)

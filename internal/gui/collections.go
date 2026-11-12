@@ -250,6 +250,15 @@ func (a *App) collectionsPane(c ui.C) {
 						}
 					})
 				}
+				if menu.Item(text.NewWebSocket).Icon(icons.Activity).Clicked() {
+					c.After(func() {
+						n := s.selected
+						if !n.branch {
+							n.id = n.parentID
+						}
+						a.newWebSocket(n)
+					})
+				}
 				if menu.Item(text.NewGraphQL).Icon(icons.Braces).Clicked() {
 					c.After(func() {
 						if s.selected.collectionID == "" {
@@ -437,6 +446,9 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		}
 		if menu.Item(s.NewRequest).Clicked() {
 			c.After(func() { a.newCollectionRequest(n) })
+		}
+		if menu.Item(s.NewWebSocket).Icon(icons.Activity).Clicked() {
+			c.After(func() { a.newWebSocket(n) })
 		}
 		if menu.Item(s.NewGraphQL).Icon(icons.Braces).Clicked() {
 			c.After(func() { a.newCollectionGraphQLRequest(n) })

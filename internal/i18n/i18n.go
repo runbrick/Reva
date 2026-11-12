@@ -35,6 +35,7 @@ type Strings struct {
 	Shell       Shell
 	Titlebar    Titlebar
 	Search      Search
+	WebSocket   WebSocket
 }
 
 // For returns the string table for lang, falling back to Chinese.
@@ -60,6 +61,7 @@ var zh = Strings{
 	Shell:       shellZh,
 	Titlebar:    titlebarZh,
 	Search:      searchZh,
+	WebSocket:   websocketZh,
 }
 
 var en = Strings{
@@ -77,4 +79,5 @@ var en = Strings{
 	Shell:       shellEn,
 	Titlebar:    titlebarEn,
 	Search:      searchEn,
+	WebSocket:   websocketEn,
 }

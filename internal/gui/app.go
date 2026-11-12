@@ -138,6 +138,7 @@ type App struct {
 	scripts     scriptsState
 	titlebar    titlebarState
 	search      searchState
+	websocket   websocketState
 }
 
 // New builds the App around svc, applying the stored settings.
@@ -287,6 +288,7 @@ func (a *App) Page(c ui.C) {
 		a.syncTheme()
 	}
 	a.declareSends(c)
+	a.declareWebSockets(c)
 	theme := c.Theme()
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
@@ -416,6 +418,10 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 	ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() {
 		a.tabBar(c)
 		t := a.Active()
+		if isWebSocket(t.Request) {
+			a.websocketPane(c.KeyInt(t.ID), t)
+			return
+		}
 		ui.Column(c).FillWidth().Height(a.mainSplit.Pos).Children(func() {
 			a.requestPane(c.KeyInt(t.ID), t)
 		})

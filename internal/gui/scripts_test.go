@@ -11,6 +11,7 @@ import (
 	"github.com/runbrick/reqo/internal/script"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -144,6 +145,162 @@ func TestScriptEditorsAndSnippetsMarkDirty(t *testing.T) {
 	h.click(h.App.S.Scripts.VariableSnippetLabel)
 	if !strings.Contains(tab.Request.TestScript, ".to.be.below(500)") || !strings.Contains(tab.Request.TestScript, "pm.response.json().token") {
 		t.Fatalf("missing snippets: %s", tab.Request.TestScript)
+	}
+}
+
+func focusScriptEditor(t *testing.T, h *harness, label string) {
+	t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == label && hit.Bounds.Height > 80 {
+			if err := h.D.Click(hit.Bounds.X+60, hit.Bounds.Y+20); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing script editor %q", label)
+}
+
+func TestScriptCodeEditorEditingAndIndependentState(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("var count = 42;"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyTab, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Type("pm.variables.set('count', count);"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tab.Request.PreScript, "\n    pm.variables") || !tab.Dirty {
+		t.Fatalf("script editing or dirty flag failed: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("\nconsole.log(count);"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tab.Request.PreScript, "\nconsole.log(count);") {
+		t.Fatalf("multiline input was flattened: %q", tab.Request.PreScript)
+	}
+	if _, err := h.D.ShortcutChord(ui.Primary, 'z'); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(tab.Request.PreScript, "console.log") {
+		t.Fatal("undo did not update the saved script")
+	}
+	h.click(h.App.S.Scripts.Tests)
+	focusScriptEditor(t, h, h.App.S.Scripts.Tests)
+	if err := h.D.Type("pm.test('ok', function() {});"); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.TestScript == "" || strings.Contains(tab.Request.PreScript, "pm.test") {
+		t.Fatal("pre-request and test editors share content")
+	}
+	h.click(h.App.S.Scripts.PreRequest)
+	if !strings.HasPrefix(tab.Request.PreScript, "var count = 42;") {
+		t.Fatal("switching scripts lost edits")
+	}
+}
+
+func TestScriptCodeEditorLineNumbersAndSyntaxInThemes(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = "var count = 42; // note\n/* across\nlines */ pm.variables.set('x', true);"
+	h.click(h.App.S.Request.Scripts)
+	for _, mode := range []string{"light", "dark"} {
+		h.App.ApplySettings(model.Settings{Language: "en", Theme: mode})
+		if err := h.D.Resize(1280, 800); err != nil {
+			t.Fatal(err)
+		}
+		v := &h.App.scriptTab(tab).preEditor
+		if !v.snapshot.LineNumbers || v.view.LineCount() != 3 {
+			t.Fatalf("%s: line numbers missing: %d", mode, v.view.LineCount())
+		}
+		if !h.shows("1") || !h.shows("2") || !h.shows("3") {
+			t.Fatalf("%s: line number labels missing", mode)
+		}
+		for _, want := range []gfx.Color{h.App.palette.CodeLiteral, h.App.palette.CodeNumber, h.App.palette.CodeString, h.App.palette.CodeLineNo, h.App.palette.CodeKey} {
+			found := false
+			for _, label := range h.D.Snapshot().Labels {
+				for _, run := range label.Runs {
+					found = found || run.Color == want
+				}
+			}
+			if !found {
+				t.Errorf("%s: syntax color %+v not painted", mode, want)
+			}
+		}
+	}
+}
+
+func TestScriptCodeEditorClipboardPreservesNewlines(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	h.D.SetClipboard("var first = 1;\nvar second = 2;")
+	if _, err := h.D.ShortcutChord(ui.Primary, 'v'); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != h.D.Clipboard() {
+		t.Fatalf("paste changed line breaks: %q", tab.Request.PreScript)
+	}
+	if _, err := h.D.ShortcutChord(ui.Primary, 'a'); err != nil {
+		t.Fatal(err)
+	}
+	h.D.SetClipboard("")
+	if _, err := h.D.ShortcutChord(ui.Primary, 'c'); err != nil {
+		t.Fatal(err)
+	}
+	if h.D.Clipboard() != tab.Request.PreScript {
+		t.Fatalf("copied %q, want %q", h.D.Clipboard(), tab.Request.PreScript)
+	}
+}
+
+func TestScriptCodeEditorScrollsLongScripts(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = strings.Repeat("console.log('line');\n", 200)
+	h.click(h.App.S.Request.Scripts)
+	v := &h.App.scriptTab(tab).preEditor
+	if v.view.LineCount() != 201 {
+		t.Fatalf("line count = %d", v.view.LineCount())
+	}
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Scripts.PreRequest && hit.Bounds.Height > 80 {
+			if err := h.D.Scroll(gfx.ScrollEvent{X: hit.Bounds.X + 100, Y: hit.Bounds.Y + 30, DeltaY: 320, Precise: true}); err != nil {
+				t.Fatal(err)
+			}
+			if v.view.ScrollY() <= 0 {
+				t.Fatal("editor did not scroll")
+			}
+			return
+		}
+	}
+	t.Fatal("script editor hit not found")
+}
+
+func TestScriptLexerDoesNotHighlightTokensInsideStringsAndComments(t *testing.T) {
+	runs := lexScript("var x = 'http://example/true'; // false 12\n/* var\ntrue */ pm.test(42);")
+	if len(runs) != 3 {
+		t.Fatalf("lines = %d", len(runs))
+	}
+	for line, tokens := range runs {
+		last := 0
+		for _, token := range tokens {
+			if token.start < last || token.end <= token.start {
+				t.Fatalf("line %d: unordered or empty token: %+v", line, token)
+			}
+			last = token.end
+		}
+	}
+	if runs[0][2].kind != scriptString || runs[1][0].kind != scriptComment || runs[2][0].kind != scriptComment {
+		t.Fatalf("string and block comment tokens = %+v", runs)
 	}
 }
 

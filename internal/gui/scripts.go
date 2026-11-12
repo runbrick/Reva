@@ -18,6 +18,8 @@ type scriptsState struct {
 type scriptTabState struct {
 	testsEditor   bool
 	menuOpen      bool
+	preEditor     scriptCodeEditor
+	testEditor    scriptCodeEditor
 	preError      string
 	logs          []string
 	summary       string
@@ -125,10 +127,12 @@ func (a *App) scriptsSection(c ui.C, t *Tab) {
 		})
 		ui.Wrap(c, a.S.Scripts.Help).Muted()
 		text, label := &t.Request.PreScript, a.S.Scripts.PreRequest
+		editor := &s.preEditor
 		if s.testsEditor {
 			text, label = &t.Request.TestScript, a.S.Scripts.Tests
+			editor = &s.testEditor
 		}
-		if ui.TextArea(c, text, label, "").Mono().FillWidth().Grow(1).Height(140).Changed() {
+		if editor.declare(c, text, label, a.palette) {
 			t.Dirty = true
 		}
 	})

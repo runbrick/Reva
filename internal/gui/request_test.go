@@ -356,6 +356,47 @@ func TestRequestMethodAndPrimaryEnterFromBody(t *testing.T) {
 	}
 }
 
+func TestRequestMethodTriggerDrawsSelectedValueOnce(t *testing.T) {
+	for _, theme := range []string{"light", "dark"} {
+		for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
+			t.Run(theme+"/"+string(lang), func(t *testing.T) {
+				h := newHarness(t)
+				h.App.ApplySettings(model.Settings{Theme: theme, Language: string(lang)})
+				requestRepaint(h)
+				check := func(method model.Method) {
+					t.Helper()
+					snapshot := h.D.Snapshot()
+					var trigger gfx.Rect
+					for _, hit := range snapshot.Hits {
+						if hit.Role == gfx.RoleCombobox && hit.Label == h.App.S.Request.Method {
+							trigger = hit.Bounds
+							break
+						}
+					}
+					if trigger.Width == 0 {
+						t.Fatal("method trigger missing")
+					}
+					count := 0
+					for _, label := range snapshot.Labels {
+						if label.Value == string(method) && label.Bounds.X >= trigger.X &&
+							label.Bounds.X < trigger.X+trigger.Width && label.Bounds.Y >= trigger.Y &&
+							label.Bounds.Y < trigger.Y+trigger.Height {
+							count++
+						}
+					}
+					if count != 1 {
+						t.Fatalf("method %s painted %d times inside trigger, want 1", method, count)
+					}
+				}
+				check(model.MethodGet)
+				h.click(h.App.S.Request.Method)
+				h.click("DELETE")
+				check(model.MethodDelete)
+			})
+		}
+	}
+}
+
 func TestRequestMethodPopupCoversEditor(t *testing.T) {
 	for _, theme := range []string{"light", "dark"} {
 		for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {

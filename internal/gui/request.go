@@ -16,7 +16,6 @@ import (
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/vars"
 	"github.com/vivaui/viva/app"
-	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -37,8 +36,7 @@ var requestAPIKeyLocations = []model.APIKeyIn{model.APIKeyInHeader, model.APIKey
 
 // requestState keeps section selection and table identities separately per tab.
 type requestState struct {
-	tabs        map[int]*requestTabState
-	methodPaint func(*ui.DrawContext)
+	tabs map[int]*requestTabState
 }
 
 type requestTabState struct {
@@ -69,7 +67,6 @@ type requestDownload struct {
 func (a *App) requestTab(t *Tab) *requestTabState {
 	if a.request.tabs == nil {
 		a.request.tabs = make(map[int]*requestTabState)
-		a.request.methodPaint = a.drawRequestMethod
 	}
 	s := a.request.tabs[t.ID]
 	// OpenRequest can replace the request in an existing empty tab. Its query
@@ -442,8 +439,6 @@ func requestURLFromParams(req *model.Request) {
 	req.URL = base + fragment
 }
 
-// The method remains a Select, including its keyboard and menu behavior. Only
-// its trigger is painted into the shared URL border.
 func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 	theme, labels := c.Theme(), &a.S.Request
 	height := theme.Metrics.ControlHeight + Space2
@@ -452,7 +447,6 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 			Radius(theme.Metrics.RadiusControl).Background(theme.Background).Children(func() {
 			method := ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
 				Width(Space6*4 + Space4).Height(height).Radius(0)
-			method.DrawOver(a.request.methodPaint)
 			if method.Changed() {
 				t.Dirty = true
 			}
@@ -741,26 +735,4 @@ func requestCURL(req model.Request) string {
 		}
 	}
 	return out.String()
-}
-
-func (a *App) drawRequestMethod(d *ui.DrawContext) {
-	rect := d.Rect
-	rect.X += 1
-	rect.Y += 1
-	rect.Width -= 2
-	rect.Height -= 2
-	fill := d.Theme.Background
-	if d.State.Hovered {
-		fill = d.Theme.Hover
-	}
-	d.Canvas.Rounded(rect, d.Theme.Metrics.RadiusControl, fill)
-	text := rect
-	text.X += Space3
-	text.Width -= Space6 + Space3
-	method := a.Active().Request.Method
-	d.Canvas.Label(string(method), text, gfx.TextStyle{Size: d.Theme.Metrics.FontSizeM, Weight: gfx.WeightSemibold, Color: d.Fade(a.palette.MethodColor(method))})
-	d.Canvas.DrawIcon(icons.ChevronDown, ui.Rect{X: rect.X + rect.Width - Space6, Y: rect.Y + (rect.Height-Space4)/2, Width: Space4, Height: Space4}, d.Theme.MutedForeground)
-	if d.State.Focused {
-		d.Canvas.RoundedOutline(rect, d.Theme.Metrics.RadiusControl, 1, d.Theme.Ring)
-	}
 }

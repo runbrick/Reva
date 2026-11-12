@@ -411,11 +411,22 @@ func TestSettingsPageScrollsAtMinimumWindowSize(t *testing.T) {
 	if !h.shows(settingsVersion) {
 		t.Fatal("About is not reachable by scrolling at the minimum window size")
 	}
-	h.click(h.App.S.Settings.OpenFolder)
-	h.waitFor("folder reveal in a small window", func() bool {
-		_, ok := h.D.LastRevealedPath()
-		return ok && h.App.settings.reveal == nil
-	})
+	for i := 0; i < 10; i++ {
+		for _, hit := range h.D.Snapshot().Hits {
+			if hit.Label == h.App.S.Settings.OpenFolder {
+				h.click(h.App.S.Settings.OpenFolder)
+				h.waitFor("folder reveal in a small window", func() bool {
+					_, ok := h.D.LastRevealedPath()
+					return ok && h.App.settings.reveal == nil
+				})
+				return
+			}
+		}
+		if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 500, DeltaY: -240, Precise: true}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Fatal("Open folder is not reachable by scrolling at the minimum window size")
 }
 
 func settingsAssertLayout(t *testing.T, h *harness) {

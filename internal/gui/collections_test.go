@@ -525,14 +525,6 @@ func TestCollectionsNewRequestMenuAndLanguages(t *testing.T) {
 			if !h.shows(h.App.S.Collections.Title) || h.shows(h.App.S.Collections.NewRequest) {
 				t.Fatal("localized sidebar missing or removed footer button still visible")
 			}
-			h.click(h.App.S.Shell.Collections)
-			if h.App.Section != SectionCollections || !h.shows(h.App.S.Collections.Overview) {
-				t.Fatal("collections rail did not open overview")
-			}
-			if h.shows(h.App.S.Collections.NewRequest) {
-				t.Fatal("removed footer button still visible in empty overview")
-			}
-			h.click(h.App.S.Shell.APIs)
 			before := len(h.App.Tabs())
 			h.click(h.App.S.Collections.Add)
 			collectionsOption(h, h.App.S.Collections.NewRequest)
@@ -576,17 +568,13 @@ func TestCollectionsFilterKeepsMatchingParents(t *testing.T) {
 	}
 }
 
-func TestCollectionsOverviewVariablesSaveCancelAndExport(t *testing.T) {
+func TestCollectionsContextVariablesSaveCancelAndExport(t *testing.T) {
 	svc := fake.New()
 	col, _ := svc.Collections.Create("Payments")
 	col.Variables = []model.KV{{Key: "host", Value: "before"}}
 	_ = svc.Collections.Save(col)
 	h := newHarness(t, svc)
-	h.click(h.App.S.Shell.Collections)
-	if !h.shows(fmt.Sprintf(h.App.S.Collections.RequestCount, 0)) {
-		t.Fatal("missing request count")
-	}
-	h.click(h.App.S.Collections.Variables)
+	collectionsContext(h, "Payments", h.App.S.Collections.Variables)
 	collectionsReplace(h, h.App.S.Common.Value, "after")
 	h.click(h.App.S.Collections.Cancel)
 	h.pump()
@@ -594,19 +582,19 @@ func TestCollectionsOverviewVariablesSaveCancelAndExport(t *testing.T) {
 	if stored.Variables[0].Value != "before" {
 		t.Fatal("cancel persisted variables")
 	}
-	h.click(h.App.S.Collections.Variables)
+	collectionsContext(h, "Payments", h.App.S.Collections.Variables)
 	collectionsReplace(h, h.App.S.Common.Value, "after")
 	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	stored, _ = svc.Collections.Get(col.ID)
 	if stored.Variables[0].Value != "after" || !h.shows(h.App.S.Collections.VariablesSaved) {
-		t.Fatal("overview did not save edited variables")
+		t.Fatal("collection menu did not save edited variables")
 	}
 	path := filepath.Join(t.TempDir(), "collection.json")
 	if err := h.D.QueueSaveFile(path, nil); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.Collections.Export)
+	collectionsContext(h, "Payments", h.App.S.Collections.Export)
 	h.pump()
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -634,28 +622,22 @@ func TestCollectionsLayoutBothThemesAndLanguages(t *testing.T) {
 				h.App.ApplySettings(settings)
 				h.App.sideSplit.Pos = 220
 				collectionsPaint(h)
-				check := func(section Section) {
-					label := h.App.S.Shell.APIs
-					if section == SectionCollections {
-						label = h.App.S.Shell.Collections
-					}
-					h.click(label)
+				check := func() {
+					h.click(h.App.S.Shell.APIs)
 					collectionsPaint(h)
 					for _, issue := range headless.CheckLayout(h.D.Snapshot()) {
 						if issue.Bounds.X >= RailWidth && issue.Bounds.X < RailWidth+220 && issue.Bounds.Y > 48 {
-							t.Errorf("section %d: %s: %q (%s)", section, issue.Kind, issue.Text, issue.Detail)
+							t.Errorf("collections sidebar: %s: %q (%s)", issue.Kind, issue.Text, issue.Detail)
 						}
 					}
 				}
-				check(SectionAPIs)
-				check(SectionCollections)
+				check()
 				col, _ := h.Svc.Collections.Create("Payments")
 				folder, _ := h.Svc.Collections.AddFolder(col.ID, "", "Invoices")
 				r := model.NewRequest("invoice")
 				r.Name = "List invoices"
 				_, _ = h.Svc.Collections.SaveRequest(col.ID, folder.ID, r)
-				check(SectionAPIs)
-				check(SectionCollections)
+				check()
 			})
 		}
 	}

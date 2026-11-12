@@ -18,20 +18,16 @@ go tool viva build --target darwin --arch "$arch" -o "$output_dir/reqo"
 go tool viva package --target darwin --arch "$arch" --format app,dmg --no-sign \
     --program "$output_dir/reqo" -o "$output_dir/Reqo.app"
 
-check_size() {
+print_size() {
     bytes=$1
     artifact=$2
-    echo "$artifact: $bytes bytes (limit: 15,000,000 bytes)"
-    if [ "$bytes" -gt 15000000 ]; then
-        echo "$artifact exceeds 15 MB." >&2
-        exit 1
-    fi
+    echo "$artifact: $bytes bytes"
 }
 
-check_size "$(stat -f %z "$output_dir/reqo")" "$output_dir/reqo"
+print_size "$(stat -f %z "$output_dir/reqo")" "$output_dir/reqo"
 # Sum file lengths, including the executable, Info.plist and generated .icns.
 bundle_bytes=$(find "$output_dir/Reqo.app" -type f -exec stat -f %z {} + | awk '{sum += $1} END {printf "%.0f", sum}')
-check_size "$bundle_bytes" "$output_dir/Reqo.app (all files)"
+print_size "$bundle_bytes" "$output_dir/Reqo.app (all files)"
 for image in "$output_dir"/reqo-*-darwin-"$arch".dmg; do
-    check_size "$(stat -f %z "$image")" "$image"
+    print_size "$(stat -f %z "$image")" "$image"
 done

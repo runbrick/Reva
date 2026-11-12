@@ -1,6 +1,7 @@
 package gui
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -12,11 +13,45 @@ import (
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reqo/internal/update"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/headless"
 	"github.com/vivaui/viva/ui"
 )
+
+func TestSettingsCheckUpdates(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		release update.Release
+		err     error
+		want    string
+	}{
+		{"new release", update.Release{Version: "0.3.0", URL: "https://github.com/runbrick/Reva/releases/tag/v0.3.0"}, nil, "New version available"},
+		{"current release", update.Release{Version: settingsVersion, URL: "https://github.com/runbrick/Reva/releases/tag/v0.2.0"}, nil, "You're up to date"},
+		{"no release", update.Release{}, update.ErrNoRelease, "No published release yet"},
+		{"offline", update.Release{}, errors.New("connection failed"), "connection failed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(storage.EnvHome, t.TempDir())
+			h := newHarness(t)
+			h.App.settings.check = func(context.Context) (update.Release, error) { return tc.release, tc.err }
+			h.click(h.App.S.Settings.Title)
+			h.click("English")
+			if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 600, DeltaY: 1000, Precise: true}); err != nil {
+				t.Fatal(err)
+			}
+			h.click(h.App.S.Settings.CheckUpdates)
+			h.waitFor(tc.want, func() bool { return h.shows(tc.want) })
+			if tc.name == "new release" {
+				h.click(h.App.S.Settings.OpenRelease)
+				if opened, ok := h.D.LastOpenedURL(); !ok || opened != tc.release.URL {
+					t.Fatalf("opened URL %q (ok=%t), want %q", opened, ok, tc.release.URL)
+				}
+			}
+		})
+	}
+}
 
 func TestSettingsLanguageAppliesAndSavesImmediately(t *testing.T) {
 	t.Setenv(storage.EnvHome, t.TempDir())
@@ -363,7 +398,17 @@ func TestSettingsPageScrollsAtMinimumWindowSize(t *testing.T) {
 
 func settingsAssertLayout(t *testing.T, h *harness) {
 	t.Helper()
-	for _, problem := range headless.CheckLayout(h.D.Snapshot()) {
+	snapshot := h.D.Snapshot()
+	// A clipped line at the scroll boundary can be attributed to a titlebar
+	// control by CheckLayout, which searches hits using its unclipped position.
+	var pageHits []gfx.Hit
+	for _, hit := range snapshot.Hits {
+		if hit.Bounds.X >= RailWidth && hit.Bounds.Y >= TitlebarHeight {
+			pageHits = append(pageHits, hit)
+		}
+	}
+	snapshot.Hits = pageHits
+	for _, problem := range headless.CheckLayout(snapshot) {
 		// The settings feature owns the main page; the shell owns the rail and titlebar.
 		if problem.Bounds.X >= RailWidth && problem.Bounds.Y >= TitlebarHeight {
 			t.Errorf("settings layout: %+v", problem)

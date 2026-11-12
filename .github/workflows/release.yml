@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, platform: windows-amd64 }
+          - { os: macos-15, platform: darwin-amd64 }
+    steps:
+      - name: Preserve LF line endings
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify release version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $manifest = Get-Content viva.toml -Raw
+          if ($manifest -notmatch '(?m)^version\s*=\s*"(\d+\.\d+\.\d+)"') { throw 'Missing version in viva.toml' }
+          if ($env:RELEASE_TAG -ne "v$($Matches[1])") { throw "Tag $env:RELEASE_TAG does not match viva.toml" }
+      - name: Verify source
+        shell: pwsh
+        run: |
+          if (gofmt -l .) { throw 'gofmt reported unformatted files' }
+          go vet ./...
+          if ($LASTEXITCODE -ne 0) { throw 'go vet failed' }
+          go tool viva vet ./...
+          if ($LASTEXITCODE -ne 0) { throw 'Viva vet failed' }
+          go test ./... -count=1
+          if ($LASTEXITCODE -ne 0) { throw 'Go tests failed' }
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/build.ps1 -Arch amd64
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: sh ./scripts/build.sh amd64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reqo-${{ matrix.platform }}
+          path: |
+            dist/${{ matrix.platform }}/reqo-*.zip
+            dist/${{ matrix.platform }}/reqo-*.dmg
+          if-no-files-found: error
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: reqo-*
+          path: release
+          merge-multiple: true
+      - name: Verify both packages and generate checksums
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          mapfile -t zip < <(find release -maxdepth 1 -name "reqo-${version}-windows-amd64.zip" -type f)
+          mapfile -t dmg < <(find release -maxdepth 1 -name "reqo-${version}-darwin-amd64.dmg" -type f)
+          test "${#zip[@]}" -eq 1 && test "${#dmg[@]}" -eq 1
+          (cd release && sha256sum "${zip[0]##*/}" "${dmg[0]##*/}" > SHA256SUMS)
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != true ]; then
+              echo "Release already published; refusing to overwrite it" >&2
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+          else
+            gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "Reqo $RELEASE_TAG" --generate-notes --latest
+          fi

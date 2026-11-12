@@ -12,7 +12,6 @@ import (
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
-	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -165,7 +164,7 @@ func TestResponseSearchCountsStepsWrapsAndReveals(t *testing.T) {
 	}
 	h.click(h.App.S.Response.CloseSearch)
 	h.click(h.App.S.Response.CodeBody)
-	if _, err := h.D.ShortcutChord(gfx.ModifierControl, 'f'); err != nil {
+	if _, err := h.D.ShortcutChord(ui.Primary, 'f'); err != nil {
 		t.Fatal(err)
 	}
 	if !v.find || !h.shows("2 / 2") {

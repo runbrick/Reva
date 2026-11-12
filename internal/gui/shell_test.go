@@ -18,9 +18,10 @@ func TestRailItemsSelectTheirOwnSection(t *testing.T) {
 	if h.App.Section != SectionAPIs || h.App.Main != PageWorkbench {
 		t.Fatalf("APIs click: section=%d main=%d, want APIs on the workbench", h.App.Section, h.App.Main)
 	}
-	h.click(h.App.S.Shell.Collections)
-	if h.App.Section != SectionCollections || h.App.Main != PageWorkbench {
-		t.Fatalf("Collections click: section=%d main=%d", h.App.Section, h.App.Main)
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Shell.Collections {
+			t.Fatal("collections rail entry is still visible")
+		}
 	}
 	ids := map[gfx.ID]string{}
 	for _, hit := range h.D.Snapshot().Hits {

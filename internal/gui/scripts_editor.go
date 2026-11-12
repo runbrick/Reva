@@ -16,20 +16,36 @@ var scriptCodeOptions = text.CodeOptions{
 
 // Each script owns its caret, scroll position and undo history independently.
 type scriptCodeEditor struct {
-	view     components.CodeEditor
-	editor   *text.Editor
-	input    ui.Handlers
-	native   app.TextInput
-	snapshot components.CodeEditorSnapshot
-	palette  Palette
-	runs     [][]scriptRun
-	synced   string
-	paint    func(*ui.DrawContext)
-	dragging bool
+	view        components.CodeEditor
+	editor      *text.Editor
+	input       ui.Handlers
+	native      app.TextInput
+	snapshot    components.CodeEditorSnapshot
+	palette     Palette
+	runs        [][]scriptRun
+	synced      string
+	paint       func(*ui.DrawContext)
+	dragging    bool
+	height      float32
+	resizeLabel string
+	resizing    bool
+	startY      float32
+	startH      float32
+
+	completions []scriptCompletion
+	start       int
+	selected    int
+	query       string
+	dismissed   bool
+	accepted    bool
+	popup       gfx.Rect
+	controlID   gfx.ID
+	refocus     bool
 }
 
-func (v *scriptCodeEditor) declare(c ui.C, source *string, label string, palette Palette) bool {
+func (v *scriptCodeEditor) declare(c ui.C, source *string, label, resizeLabel string, palette Palette, tests bool) bool {
 	if v.editor == nil {
+		v.height = Space6 * 6
 		v.editor = text.NewEditor(*source)
 		v.editor.SetCode(scriptCodeOptions)
 		v.synced = *source
@@ -38,6 +54,7 @@ func (v *scriptCodeEditor) declare(c ui.C, source *string, label string, palette
 		v.input.Pointer = v.pointer
 		v.input.Scroll = v.view.Scroll
 		v.native.NavigationKeys = true
+		v.native.OnEvent = v.onText
 		v.paint = v.draw
 		v.snapshot.LineNumbers = true
 		v.snapshot.CurrentLine = true
@@ -61,7 +78,9 @@ func (v *scriptCodeEditor) declare(c ui.C, source *string, label string, palette
 	}
 	v.palette = palette
 	v.snapshot.Label = label
-	box := ui.Control(c, label, &v.input).FillWidth().Height(Space6 * 6)
+	v.resizeLabel = resizeLabel
+	v.updateCompletions(tests)
+	box := ui.Control(c, label, &v.input).FillWidth().Height(v.height)
 	v.snapshot.ScrollbarID = v.input.Parts().At(0)
 	v.snapshot.HorizontalScrollbarID = v.input.Parts().At(1)
 	box.Draw(v.paint)
@@ -78,6 +97,11 @@ func (v *scriptCodeEditor) draw(d *ui.DrawContext) {
 	v.snapshot.ID = gfx.ID{}
 	if d.State.Focused {
 		v.snapshot.ID = d.Canvas.Focused()
+		v.controlID = v.snapshot.ID
+	}
+	if v.refocus && !v.controlID.IsZero() {
+		d.Canvas.RequestFocus(v.controlID)
+		v.refocus = false
 	}
 	v.snapshot.CompositionStart, v.snapshot.CompositionEnd = 0, 0
 	if marked, ok := v.editor.Composition(); ok {
@@ -87,10 +111,14 @@ func (v *scriptCodeEditor) draw(d *ui.DrawContext) {
 	theme := *d.Theme
 	theme.MutedForeground = d.Fade(v.palette.CodeLineNo)
 	v.view.Paint(d.Canvas, theme, d.Rect, v.snapshot)
+	v.drawGrip(d)
+	if d.State.Focused && len(v.completions) > 0 && !v.dismissed {
+		v.drawCompletions(d)
+	}
 }
 
 func (v *scriptCodeEditor) textInput(context app.TextInputContext) *app.TextInput {
-	v.native.Editor = v.editor
+	v.native.State = app.TextStateOf(v.editor)
 	v.native.HideNativeOverlays = true
 	if caret, ok := v.view.CaretBounds(); ok {
 		v.native.Bounds = caret
@@ -101,6 +129,17 @@ func (v *scriptCodeEditor) textInput(context app.TextInputContext) *app.TextInpu
 }
 
 func (v *scriptCodeEditor) pointer(event gfx.PointerEvent) gfx.EventResult {
+	if part, ok := event.Target.In(v.input.Parts()); ok && part == 2 {
+		return v.resizePointer(event)
+	} else if ok && part >= 10 && part < 10+len(v.completions) {
+		if event.Kind == gfx.PointerDown && event.Button == gfx.PointerButtonPrimary {
+			v.selected = part - 10
+			v.acceptCompletion()
+			v.refocus = true
+			return gfx.EventResult{Handled: true, Repaint: true}
+		}
+		return gfx.EventResult{}
+	}
 	if result := v.view.Pointer(event); result.Handled {
 		return result
 	}
@@ -124,6 +163,25 @@ func (v *scriptCodeEditor) pointer(event gfx.PointerEvent) gfx.EventResult {
 }
 
 func (v *scriptCodeEditor) key(event gfx.KeyEvent) gfx.EventResult {
+	if part, ok := event.Target.In(v.input.Parts()); ok && part == 2 {
+		return v.resizeKey(event)
+	}
+	if !event.Release && len(v.completions) > 0 && !v.dismissed {
+		switch event.Key {
+		case gfx.KeyDown:
+			v.selected = (v.selected + 1) % len(v.completions)
+			return gfx.EventResult{Handled: true, Repaint: true}
+		case gfx.KeyUp:
+			v.selected = (v.selected + len(v.completions) - 1) % len(v.completions)
+			return gfx.EventResult{Handled: true, Repaint: true}
+		case gfx.KeyTab:
+			v.acceptCompletion()
+			return gfx.EventResult{Handled: true, Repaint: true}
+		case gfx.KeyEscape:
+			v.dismissed = true
+			return gfx.EventResult{Handled: true, Repaint: true}
+		}
+	}
 	if command, ok := components.CodeEditorCommandForKey(event); ok && command.Apply(v.editor) {
 		return gfx.EventResult{Handled: true, Repaint: true}
 	}
@@ -134,6 +192,63 @@ func (v *scriptCodeEditor) key(event gfx.KeyEvent) gfx.EventResult {
 	offset := v.view.Move(v.editor.String(), v.editor.ByteOffset(v.editor.Caret()), movement)
 	v.editor.MoveTo(v.editor.RuneIndex(offset), extend)
 	return gfx.EventResult{Handled: true, Repaint: true}
+}
+
+func (v *scriptCodeEditor) onText(event app.TextEvent) (app.TextState, error) {
+	if event.Kind == app.TextCommandEvent && (event.Command == app.TextInsertNewline || event.Command == app.TextInsertLineBreak) &&
+		len(v.completions) > 0 && !v.dismissed {
+		v.acceptCompletion()
+	} else {
+		event.Apply(v.editor)
+	}
+	return app.TextStateOf(v.editor), nil
+}
+
+func (v *scriptCodeEditor) resizePointer(event gfx.PointerEvent) gfx.EventResult {
+	switch event.Kind {
+	case gfx.PointerDown:
+		if event.Button != gfx.PointerButtonPrimary {
+			return gfx.EventResult{}
+		}
+		v.resizing, v.startY, v.startH = true, event.Y, v.height
+	case gfx.PointerMove:
+		if !v.resizing {
+			return gfx.EventResult{}
+		}
+		v.height = min(max(v.startH+event.Y-v.startY, Space6*5), Space6*34)
+	case gfx.PointerUp:
+		if !v.resizing {
+			return gfx.EventResult{}
+		}
+		v.resizing = false
+	default:
+		return gfx.EventResult{}
+	}
+	return gfx.EventResult{Handled: true, Repaint: true}
+}
+
+func (v *scriptCodeEditor) resizeKey(event gfx.KeyEvent) gfx.EventResult {
+	if event.Release {
+		return gfx.EventResult{}
+	}
+	switch event.Key {
+	case gfx.KeyUp:
+		v.height = max(Space6*5, v.height-Space4)
+	case gfx.KeyDown:
+		v.height = min(Space6*34, v.height+Space4)
+	default:
+		return gfx.EventResult{}
+	}
+	return gfx.EventResult{Handled: true, Repaint: true}
+}
+
+func (v *scriptCodeEditor) drawGrip(d *ui.DrawContext) {
+	grip := gfx.Rect{X: d.Rect.X + Space2, Y: d.Rect.Y + d.Rect.Height - Space3, Width: d.Rect.Width - Space4, Height: Space3}
+	d.Canvas.Fill(grip, d.Theme.Background)
+	for i := float32(0); i < 2; i++ {
+		d.Canvas.Rounded(gfx.Rect{X: grip.X + grip.Width/2 - Space4, Y: grip.Y + Space1/2 + i*Space1, Width: Space4 * 2, Height: 1}, 1, d.Theme.MutedForeground)
+	}
+	d.Canvas.HitWithOptions(v.input.Parts().At(2), grip, v.resizeLabel, gfx.HitOptions{Role: gfx.RoleSlider, Cursor: gfx.PointerCursorResizeVertical})
 }
 
 type scriptRun struct {

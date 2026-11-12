@@ -132,7 +132,7 @@ func (a *App) scriptsSection(c ui.C, t *Tab) {
 			text, label = &t.Request.TestScript, a.S.Scripts.Tests
 			editor = &s.testEditor
 		}
-		if editor.declare(c, text, label, a.palette) {
+		if editor.declare(c, text, label, a.S.Scripts.ResizeEditor, a.palette, s.testsEditor) {
 			t.Dirty = true
 		}
 	})

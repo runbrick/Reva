@@ -285,6 +285,179 @@ func TestScriptCodeEditorScrollsLongScripts(t *testing.T) {
 	t.Fatal("script editor hit not found")
 }
 
+func TestScriptCompletionKeyboardAndContext(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm.re"); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if len(v.completions) != 1 || v.completions[0].name != "request" || !h.shows("request") {
+		t.Fatalf("expected request suggestion, got %+v", v.completions)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request" {
+		t.Fatalf("Enter did not accept completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".hea"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyTab, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request.headers" {
+		t.Fatalf("Tab did not accept member completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".up"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request.headers.upsert()" || v.editor.Caret() != len([]rune(tab.Request.PreScript))-1 {
+		t.Fatalf("call completion or caret failed: %q at %d", tab.Request.PreScript, v.editor.Caret())
+	}
+	h.click(h.App.S.Scripts.Tests)
+	focusScriptEditor(t, h, h.App.S.Scripts.Tests)
+	if err := h.D.Type("pm.res"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.App.scriptTab(tab).testEditor.completions; len(got) != 1 || got[0].name != "response" {
+		t.Fatalf("test script response suggestion = %+v", got)
+	}
+}
+
+func TestScriptCompletionClickAndIgnoreStrings(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm."); err != nil {
+		t.Fatal(err)
+	}
+	h.click("variables")
+	if tab.Request.PreScript != "pm.variables" {
+		t.Fatalf("click did not insert completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".get"); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.variables.get" {
+		t.Fatalf("click did not restore editor focus: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("('pm.re"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.App.scriptTab(tab).preEditor.completions; len(got) != 0 {
+		t.Fatalf("suggestions inside string: %+v", got)
+	}
+}
+
+func TestScriptCompletionNavigationAndDismiss(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm."); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if err := h.D.Key(gfx.KeyDown, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.variables" {
+		t.Fatalf("arrow selection inserted %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".s"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEscape, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !v.dismissed {
+		t.Fatal("Escape did not dismiss suggestions")
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(tab.Request.PreScript, ".s\n") {
+		t.Fatalf("Enter accepted a dismissed suggestion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("Math.fl"); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.completions; len(got) != 1 || got[0].name != "floor" {
+		t.Fatalf("ES5 builtin suggestions did not reopen: %+v", got)
+	}
+}
+
+func TestScriptEditorDragResizesAndKeepsPerScriptHeight(t *testing.T) {
+	h := newHarness(t)
+	h.click(h.App.S.Request.Scripts)
+	v := &h.App.scriptTab(h.App.Active()).preEditor
+	before := v.height
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Scripts.ResizeEditor {
+			x, y := hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2
+			if err := h.D.Press(x, y, gfx.PointerButtonPrimary); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.D.Move(x, y+72); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.D.Release(x, y+72, gfx.PointerButtonPrimary); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	if v.height <= before || v.height > Space6*34 {
+		t.Fatalf("resize height = %v, initial = %v", v.height, before)
+	}
+	grown := v.height
+	h.App.mainSplit.Ratio = 0
+	h.App.mainSplit.Pos = 500
+	if err := h.D.Resize(1280, 800); err != nil {
+		t.Fatal(err)
+	}
+	foundGrip := false
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label != h.App.S.Scripts.ResizeEditor {
+			continue
+		}
+		foundGrip = true
+		x, y := hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2
+		if err := h.D.Press(x, y, gfx.PointerButtonPrimary); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.D.Move(x, y-48); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.D.Release(x, y-48, gfx.PointerButtonPrimary); err != nil {
+			t.Fatal(err)
+		}
+		break
+	}
+	if !foundGrip || v.height >= grown {
+		t.Fatalf("editor did not shrink: %v -> %v", grown, v.height)
+	}
+	h.click(h.App.S.Scripts.Tests)
+	if h.App.scriptTab(h.App.Active()).testEditor.height != Space6*6 {
+		t.Fatal("test editor inherited pre-request editor height")
+	}
+	h.click(h.App.S.Scripts.PreRequest)
+	if v.height <= before {
+		t.Fatal("resized height was not kept after switching scripts")
+	}
+}
+
 func TestScriptLexerDoesNotHighlightTokensInsideStringsAndComments(t *testing.T) {
 	runs := lexScript("var x = 'http://example/true'; // false 12\n/* var\ntrue */ pm.test(42);")
 	if len(runs) != 3 {

@@ -372,7 +372,7 @@ func (a *App) runSearch(r searchResult) {
 			a.NewTab()
 			a.Main = PageWorkbench
 		case searchNewCollection:
-			a.SelectSection(SectionCollections)
+			a.SelectSection(SectionAPIs)
 			a.collectionNameDialog(collectionCreate, collectionNode{})
 		case searchImport:
 			a.importer.open, a.importer.err = true, ""

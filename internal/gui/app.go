@@ -74,17 +74,16 @@ type Section int
 
 const (
 	SectionAPIs         Section = iota // collections tree, the default
-	SectionCollections                 // collection management overview
 	SectionEnvironments                // environment list and editor
 	SectionSettings                    // settings page
 )
 
 // Sections lists the rail items in display order.
-var Sections = []Section{SectionAPIs, SectionCollections, SectionEnvironments, SectionSettings}
+var Sections = []Section{SectionAPIs, SectionEnvironments}
 
 // railParts names each rail item's hit identity.
 var railParts = map[Section]string{
-	SectionAPIs: "apis", SectionCollections: "collections",
+	SectionAPIs:         "apis",
 	SectionEnvironments: "environments", SectionSettings: "settings",
 }
 
@@ -370,8 +369,6 @@ func (a *App) SelectSection(s Section) {
 
 func (a *App) sectionLabel(s Section) string {
 	switch s {
-	case SectionCollections:
-		return a.S.Shell.Collections
 	case SectionEnvironments:
 		return a.S.Shell.Environments
 	case SectionSettings:
@@ -382,8 +379,6 @@ func (a *App) sectionLabel(s Section) string {
 
 func (a *App) sectionIcon(s Section) gfx.Icon {
 	switch s {
-	case SectionCollections:
-		return icons.Package
 	case SectionEnvironments:
 		return icons.Globe
 	case SectionSettings:
@@ -398,8 +393,6 @@ func (a *App) sidebar(c ui.C) {
 		switch a.Section {
 		case SectionEnvironments:
 			a.envSidebar(c)
-		case SectionCollections:
-			a.collectionsOverview(c)
 		default:
 			a.collectionsPane(c)
 		}

@@ -259,6 +259,19 @@ func (a *App) collectionsPane(c ui.C) {
 						a.newWebSocket(n)
 					})
 				}
+				if menu.Item(text.NewGraphQL).Icon(icons.Braces).Clicked() {
+					c.After(func() {
+						if s.selected.collectionID == "" {
+							a.newGraphQLTab()
+						} else {
+							n := s.selected
+							if !n.branch {
+								n.id = n.parentID
+							}
+							a.newCollectionGraphQLRequest(n)
+						}
+					})
+				}
 			})
 		})
 		ui.TextField(c, &s.filter, text.Filter, text.Filter).Icon(icons.Search).FillWidth()
@@ -328,6 +341,11 @@ func (a *App) collectionsPane(c ui.C) {
 func (a *App) newCollectionTab() {
 	a.NewTab()
 	a.Main, a.Section = PageWorkbench, SectionAPIs
+}
+
+func (a *App) newGraphQLTab() {
+	a.newCollectionTab()
+	a.initGraphQLRequest(a.Active())
 }
 
 // Only an inside drop is accepted; collection roots cannot themselves be moved.
@@ -432,6 +450,24 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		if menu.Item(s.NewWebSocket).Icon(icons.Activity).Clicked() {
 			c.After(func() { a.newWebSocket(n) })
 		}
+		if menu.Item(s.NewGraphQL).Icon(icons.Braces).Clicked() {
+			c.After(func() { a.newCollectionGraphQLRequest(n) })
+		}
+		if n.id == "" {
+			if menu.Item(s.Variables).Clicked() {
+				c.After(func() {
+					if col, ok := a.Svc.Collections.Get(n.collectionID); ok {
+						state := &a.collections
+						state.variablesCollection, state.variablesOpen = col.ID, true
+						state.variables = append([]model.KV(nil), col.Variables...)
+						state.variablesTable = kvTableState{}
+					}
+				})
+			}
+			if menu.Item(s.Export).Clicked() {
+				c.After(func() { a.exportCollection(n.collectionID) })
+			}
+		}
 	} else {
 		if menu.Item(s.Open).Clicked() {
 			c.After(func() { a.openCollectionRequest(n) })
@@ -466,8 +502,20 @@ func (a *App) openCollectionRequest(n collectionNode) {
 }
 
 func (a *App) newCollectionRequest(n collectionNode) {
+	a.createCollectionRequest(n, false)
+}
+
+func (a *App) newCollectionGraphQLRequest(n collectionNode) {
+	a.createCollectionRequest(n, true)
+}
+
+func (a *App) createCollectionRequest(n collectionNode, graphQL bool) {
 	r := model.NewRequest(storage.NewID())
 	r.Name = a.S.Collections.NewRequest
+	if graphQL {
+		r.Name = a.S.Collections.NewGraphQL
+		initGraphQLBody(&r)
+	}
 	r, err := a.Svc.Collections.SaveRequest(n.collectionID, n.id, r)
 	if a.collectionError(err) {
 		return
@@ -475,6 +523,9 @@ func (a *App) newCollectionRequest(n collectionNode) {
 	a.collections.closed[a.collections.nodeKey(n)] = false
 	a.refreshCollections()
 	a.OpenRequest(r, n.collectionID)
+	if graphQL {
+		a.requestTab(a.Active()).section = requestBody
+	}
 	a.Main, a.Section = PageWorkbench, SectionAPIs
 }
 
@@ -725,54 +776,6 @@ func (a *App) applyCollectionEdit() {
 	}
 	s.dialogOpen = false
 	a.refreshCollections()
-}
-
-// collectionsOverview manages collection metadata in the Collections rail section.
-func (a *App) collectionsOverview(c ui.C) {
-	a.refreshCollections()
-	text, theme := a.S.Collections, c.Theme()
-	ui.Column(c).Fill().Pad(Space3).Gap(Space3).Children(func() {
-		ui.Text(c, text.Overview).Bold()
-		if ui.Button(c, text.NewCollection).Icon(icons.Plus).Outline().FillWidth().Clicked() {
-			a.collectionNameDialog(collectionCreate, collectionNode{})
-		}
-		ui.Scroll(c).Grow(1).FillWidth().Children(func() {
-			ui.Column(c).FillWidth().Gap(Space3).Children(func() {
-				for _, col := range a.Svc.Collections.List() {
-					rc := c.Key(col.ID)
-					n := collectionNode{collectionID: col.ID, name: col.Name, branch: true}
-					count := 0
-					model.WalkRequests(col.Items, func(*model.Request) { count++ })
-					ui.Column(rc).FillWidth().Pad(Space3).Gap(Space2).Background(theme.Card).Radius(theme.Metrics.RadiusSurface).Children(func() {
-						ui.Text(rc, col.Name).Bold().Ellipsis()
-						ui.Text(rc, fmt.Sprintf(text.RequestCount, count)).Muted().FontSize(theme.Metrics.FontSizeS)
-						ui.Row(rc).FillWidth().Gap(Space1).Children(func() {
-							if ui.Button(rc, text.Rename).Ghost().Clicked() {
-								c.After(func() { a.collectionNameDialog(collectionRename, n) })
-							}
-							if ui.Button(rc, text.Delete).Ghost().Color(theme.Danger).Clicked() {
-								c.After(func() { a.collectionNameDialog(collectionDelete, n) })
-							}
-						})
-						if ui.Button(rc, text.Export).Outline().FillWidth().Clicked() {
-							c.After(func() { a.exportCollection(col.ID) })
-						}
-						if ui.Button(rc, text.Variables).Outline().FillWidth().Clicked() {
-							c.After(func() {
-								s := &a.collections
-								s.variablesCollection, s.variablesOpen = col.ID, true
-								s.variables = append([]model.KV(nil), col.Variables...)
-								s.variablesTable = kvTableState{}
-							})
-						}
-					})
-				}
-			})
-		})
-		if len(a.collections.collectionIDs) == 0 {
-			ui.Paragraph(c, text.Empty, 0).FillWidth().Muted()
-		}
-	})
 }
 
 func (a *App) exportCollection(id string) {

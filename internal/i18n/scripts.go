@@ -8,6 +8,7 @@ type Scripts struct {
 	StatusSnippet, TimeSnippet, VariableSnippet                    string
 	PreScriptError, TestScriptError, PassedSummary, Empty, Console string
 	PassMarker, FailMarker                                         string
+	ResizeEditor                                                   string
 }
 
 var scriptsZh = Scripts{
@@ -19,6 +20,7 @@ var scriptsZh = Scripts{
 	VariableSnippet: "pm.variables.set(\"token\", pm.response.json().token);",
 	PreScriptError:  "预请求脚本错误", TestScriptError: "测试脚本错误", PassedSummary: "%d/%d 通过",
 	Empty: "尚无测试结果。添加测试脚本并发送请求。", Console: "控制台", PassMarker: "✓", FailMarker: "✗",
+	ResizeEditor: "拖动调整脚本编辑器高度",
 }
 
 var scriptsEn = Scripts{
@@ -30,4 +32,5 @@ var scriptsEn = Scripts{
 	VariableSnippet: "pm.variables.set(\"token\", pm.response.json().token);",
 	PreScriptError:  "Pre-request script error", TestScriptError: "Test script error", PassedSummary: "%d/%d passed",
 	Empty: "No test results yet. Add a test script and send the request.", Console: "Console", PassMarker: "✓", FailMarker: "✗",
+	ResizeEditor: "Drag to resize script editor",
 }

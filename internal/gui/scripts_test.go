@@ -11,6 +11,7 @@ import (
 	"github.com/runbrick/reqo/internal/script"
 	"github.com/runbrick/reqo/internal/service/fake"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -144,6 +145,382 @@ func TestScriptEditorsAndSnippetsMarkDirty(t *testing.T) {
 	h.click(h.App.S.Scripts.VariableSnippetLabel)
 	if !strings.Contains(tab.Request.TestScript, ".to.be.below(500)") || !strings.Contains(tab.Request.TestScript, "pm.response.json().token") {
 		t.Fatalf("missing snippets: %s", tab.Request.TestScript)
+	}
+}
+
+func focusScriptEditor(t *testing.T, h *harness, label string) {
+	t.Helper()
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == label && hit.Bounds.Height > 80 {
+			if err := h.D.Click(hit.Bounds.X+60, hit.Bounds.Y+20); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing script editor %q", label)
+}
+
+func TestScriptCodeEditorEditingAndIndependentState(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("var count = 42;"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyTab, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Type("pm.variables.set('count', count);"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tab.Request.PreScript, "\n    pm.variables") || !tab.Dirty {
+		t.Fatalf("script editing or dirty flag failed: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("\nconsole.log(count);"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(tab.Request.PreScript, "\nconsole.log(count);") {
+		t.Fatalf("multiline input was flattened: %q", tab.Request.PreScript)
+	}
+	if _, err := h.D.ShortcutChord(ui.Primary, 'z'); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(tab.Request.PreScript, "console.log") {
+		t.Fatal("undo did not update the saved script")
+	}
+	h.click(h.App.S.Scripts.Tests)
+	focusScriptEditor(t, h, h.App.S.Scripts.Tests)
+	if err := h.D.Type("pm.test('ok', function() {});"); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.TestScript == "" || strings.Contains(tab.Request.PreScript, "pm.test") {
+		t.Fatal("pre-request and test editors share content")
+	}
+	h.click(h.App.S.Scripts.PreRequest)
+	if !strings.HasPrefix(tab.Request.PreScript, "var count = 42;") {
+		t.Fatal("switching scripts lost edits")
+	}
+}
+
+func TestScriptCodeEditorLineNumbersAndSyntaxInThemes(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = "var count = 42; // note\n/* across\nlines */ pm.variables.set('x', true);"
+	h.click(h.App.S.Request.Scripts)
+	for _, mode := range []string{"light", "dark"} {
+		h.App.ApplySettings(model.Settings{Language: "en", Theme: mode})
+		if err := h.D.Resize(1280, 800); err != nil {
+			t.Fatal(err)
+		}
+		v := &h.App.scriptTab(tab).preEditor
+		if !v.snapshot.LineNumbers || v.view.LineCount() != 3 {
+			t.Fatalf("%s: line numbers missing: %d", mode, v.view.LineCount())
+		}
+		if !h.shows("1") || !h.shows("2") || !h.shows("3") {
+			t.Fatalf("%s: line number labels missing", mode)
+		}
+		for _, want := range []gfx.Color{h.App.palette.CodeLiteral, h.App.palette.CodeNumber, h.App.palette.CodeString, h.App.palette.CodeLineNo, h.App.palette.CodeKey} {
+			found := false
+			for _, label := range h.D.Snapshot().Labels {
+				for _, run := range label.Runs {
+					found = found || run.Color == want
+				}
+			}
+			if !found {
+				t.Errorf("%s: syntax color %+v not painted", mode, want)
+			}
+		}
+	}
+}
+
+func TestScriptCodeEditorClipboardPreservesNewlines(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	h.D.SetClipboard("var first = 1;\nvar second = 2;")
+	if _, err := h.D.ShortcutChord(ui.Primary, 'v'); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != h.D.Clipboard() {
+		t.Fatalf("paste changed line breaks: %q", tab.Request.PreScript)
+	}
+	if _, err := h.D.ShortcutChord(ui.Primary, 'a'); err != nil {
+		t.Fatal(err)
+	}
+	h.D.SetClipboard("")
+	if _, err := h.D.ShortcutChord(ui.Primary, 'c'); err != nil {
+		t.Fatal(err)
+	}
+	if h.D.Clipboard() != tab.Request.PreScript {
+		t.Fatalf("copied %q, want %q", h.D.Clipboard(), tab.Request.PreScript)
+	}
+}
+
+func TestScriptCodeEditorScrollsLongScripts(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = strings.Repeat("console.log('line');\n", 200)
+	h.click(h.App.S.Request.Scripts)
+	v := &h.App.scriptTab(tab).preEditor
+	if v.view.LineCount() != 201 {
+		t.Fatalf("line count = %d", v.view.LineCount())
+	}
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Scripts.PreRequest && hit.Bounds.Height > 80 {
+			if err := h.D.Scroll(gfx.ScrollEvent{X: hit.Bounds.X + 100, Y: hit.Bounds.Y + 30, DeltaY: 320, Precise: true}); err != nil {
+				t.Fatal(err)
+			}
+			if v.view.ScrollY() <= 0 {
+				t.Fatal("editor did not scroll")
+			}
+			return
+		}
+	}
+	t.Fatal("script editor hit not found")
+}
+
+func TestScriptCompletionKeyboardAndContext(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm.re"); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if len(v.completions) != 1 || v.completions[0].name != "request" || !h.shows("request") {
+		t.Fatalf("expected request suggestion, got %+v", v.completions)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request" {
+		t.Fatalf("Enter did not accept completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".hea"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyTab, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request.headers" {
+		t.Fatalf("Tab did not accept member completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".up"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.request.headers.upsert()" || v.editor.Caret() != len([]rune(tab.Request.PreScript))-1 {
+		t.Fatalf("call completion or caret failed: %q at %d", tab.Request.PreScript, v.editor.Caret())
+	}
+	h.click(h.App.S.Scripts.Tests)
+	focusScriptEditor(t, h, h.App.S.Scripts.Tests)
+	if err := h.D.Type("pm.res"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.App.scriptTab(tab).testEditor.completions; len(got) != 1 || got[0].name != "response" {
+		t.Fatalf("test script response suggestion = %+v", got)
+	}
+}
+
+func TestScriptCompletionClickAndIgnoreStrings(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm."); err != nil {
+		t.Fatal(err)
+	}
+	h.click("variables")
+	if tab.Request.PreScript != "pm.variables" {
+		t.Fatalf("click did not insert completion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".get"); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.variables.get" {
+		t.Fatalf("click did not restore editor focus: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("('pm.re"); err != nil {
+		t.Fatal(err)
+	}
+	if got := h.App.scriptTab(tab).preEditor.completions; len(got) != 0 {
+		t.Fatalf("suggestions inside string: %+v", got)
+	}
+}
+
+func TestScriptCompletionNavigationAndDismiss(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.Type("pm."); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if err := h.D.Key(gfx.KeyDown, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.PreScript != "pm.variables" {
+		t.Fatalf("arrow selection inserted %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type(".s"); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEscape, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !v.dismissed {
+		t.Fatal("Escape did not dismiss suggestions")
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasSuffix(tab.Request.PreScript, ".s\n") {
+		t.Fatalf("Enter accepted a dismissed suggestion: %q", tab.Request.PreScript)
+	}
+	if err := h.D.Type("Math.fl"); err != nil {
+		t.Fatal(err)
+	}
+	if got := v.completions; len(got) != 1 || got[0].name != "floor" {
+		t.Fatalf("ES5 builtin suggestions did not reopen: %+v", got)
+	}
+}
+
+func TestScriptCompletionPaintsOpaqueAboveCode(t *testing.T) {
+	h := newHarness(t)
+	tab := h.App.Active()
+	tab.Request.PreScript = "pm.\nvar underlying = 7;\nvar another = 9;"
+	h.click(h.App.S.Request.Scripts)
+	focusScriptEditor(t, h, h.App.S.Scripts.PreRequest)
+	if err := h.D.SelectText(3, 3); err != nil {
+		t.Fatal(err)
+	}
+	v := &h.App.scriptTab(tab).preEditor
+	if len(v.completions) == 0 || v.popup.Width == 0 {
+		t.Fatalf("completion popup missing: %+v", v.popup)
+	}
+	snapshot := h.D.Snapshot()
+	backgroundLayer := uint16(0)
+	for _, primitive := range snapshot.Primitives {
+		if primitive.Color == h.App.theme.Popover && primitive.Bounds.X > v.popup.X && primitive.Bounds.Y > v.popup.Y &&
+			primitive.Bounds.X+primitive.Bounds.Width < v.popup.X+v.popup.Width && primitive.Bounds.Y+primitive.Bounds.Height < v.popup.Y+v.popup.Height {
+			if primitive.Color.Alpha != 1 {
+				t.Fatalf("popup background alpha = %v", primitive.Color.Alpha)
+			}
+			backgroundLayer = primitive.Layer
+		}
+	}
+	if backgroundLayer == 0 {
+		t.Fatal("completion has no opaque elevated background")
+	}
+	codeOverlaps := false
+	completionLabel := false
+	for _, label := range snapshot.Labels {
+		if label.Value == "var underlying = 7;" && label.Bounds.Y < v.popup.Y+v.popup.Height && label.Bounds.Y+label.Bounds.Height > v.popup.Y {
+			codeOverlaps = true
+			if label.Layer >= backgroundLayer {
+				t.Fatalf("code layer %d overlays completion background %d", label.Layer, backgroundLayer)
+			}
+		}
+		if label.Value == "request" && label.Layer != backgroundLayer {
+			t.Fatalf("completion label layer %d, background layer %d", label.Layer, backgroundLayer)
+		} else if label.Value == "request" {
+			completionLabel = true
+		}
+	}
+	if !codeOverlaps || !completionLabel {
+		t.Fatalf("expected overlapping code and completion label: code=%v label=%v", codeOverlaps, completionLabel)
+	}
+}
+
+func TestScriptEditorDragResizesAndKeepsPerScriptHeight(t *testing.T) {
+	h := newHarness(t)
+	h.click(h.App.S.Request.Scripts)
+	v := &h.App.scriptTab(h.App.Active()).preEditor
+	before := v.height
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label == h.App.S.Scripts.ResizeEditor {
+			x, y := hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2
+			if err := h.D.Press(x, y, gfx.PointerButtonPrimary); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.D.Move(x, y+72); err != nil {
+				t.Fatal(err)
+			}
+			if err := h.D.Release(x, y+72, gfx.PointerButtonPrimary); err != nil {
+				t.Fatal(err)
+			}
+			break
+		}
+	}
+	if v.height <= before || v.height > Space6*34 {
+		t.Fatalf("resize height = %v, initial = %v", v.height, before)
+	}
+	grown := v.height
+	h.App.mainSplit.Ratio = 0
+	h.App.mainSplit.Pos = 500
+	if err := h.D.Resize(1280, 800); err != nil {
+		t.Fatal(err)
+	}
+	foundGrip := false
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Label != h.App.S.Scripts.ResizeEditor {
+			continue
+		}
+		foundGrip = true
+		x, y := hit.Bounds.X+hit.Bounds.Width/2, hit.Bounds.Y+hit.Bounds.Height/2
+		if err := h.D.Press(x, y, gfx.PointerButtonPrimary); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.D.Move(x, y-48); err != nil {
+			t.Fatal(err)
+		}
+		if err := h.D.Release(x, y-48, gfx.PointerButtonPrimary); err != nil {
+			t.Fatal(err)
+		}
+		break
+	}
+	if !foundGrip || v.height >= grown {
+		t.Fatalf("editor did not shrink: %v -> %v", grown, v.height)
+	}
+	h.click(h.App.S.Scripts.Tests)
+	if h.App.scriptTab(h.App.Active()).testEditor.height != Space6*6 {
+		t.Fatal("test editor inherited pre-request editor height")
+	}
+	h.click(h.App.S.Scripts.PreRequest)
+	if v.height <= before {
+		t.Fatal("resized height was not kept after switching scripts")
+	}
+}
+
+func TestScriptLexerDoesNotHighlightTokensInsideStringsAndComments(t *testing.T) {
+	runs := lexScript("var x = 'http://example/true'; // false 12\n/* var\ntrue */ pm.test(42);")
+	if len(runs) != 3 {
+		t.Fatalf("lines = %d", len(runs))
+	}
+	for line, tokens := range runs {
+		last := 0
+		for _, token := range tokens {
+			if token.start < last || token.end <= token.start {
+				t.Fatalf("line %d: unordered or empty token: %+v", line, token)
+			}
+			last = token.end
+		}
+	}
+	if runs[0][2].kind != scriptString || runs[1][0].kind != scriptComment || runs[2][0].kind != scriptComment {
+		t.Fatalf("string and block comment tokens = %+v", runs)
 	}
 }
 

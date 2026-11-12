@@ -35,6 +35,7 @@ type settingsState struct {
 	latest                     update.Release
 	checkError                 error
 	checked                    bool
+	sync                       syncState
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
@@ -67,12 +68,13 @@ func (a *App) settingsButton(c ui.C) {
 			state.latest, state.checkError, state.checked = release, err, true
 		}
 	}
+	a.declareSync(c)
 }
 
 func (a *App) openSettings() { a.Main = PageSettings }
 
 // settingsDialog remains the shell's compatibility hook; settings is a page.
-func (a *App) settingsDialog(c ui.C) {}
+func (a *App) settingsDialog(c ui.C) { a.syncDialog(c) }
 
 func (a *App) settingsPage(c ui.C) {
 	state := &a.settings
@@ -151,7 +153,9 @@ func (a *App) settingsPage(c ui.C) {
 							c.After(func() { state.reveal = ui.NewEffectKeyed[struct{}, string](revealSettingsFolder) })
 						}
 					})
-					ui.Divider(c)
+				})
+				a.syncSettings(c)
+				settingsCard(c, s.About, func() {
 					settingsRow(c, s.About, a.S.Common.AppName, func() {
 						ui.Text(c, "v"+settingsVersion).Muted()
 						if ui.Button(c, s.CheckUpdates).Icon(icons.RefreshCw).Outline().Disabled(state.checking != nil).Clicked() {

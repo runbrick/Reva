@@ -346,8 +346,7 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 					t.Fatal(err)
 				}
 				h := newHarness(t, svc)
-				// The rail enters the same page without the titlebar action.
-				settingsClickRail(t, h, h.App.S.Settings.Title)
+				h.click(h.App.S.Settings.Title)
 				for _, label := range []string{h.App.S.Settings.Appearance, h.App.S.Settings.Requests,
 					h.App.S.Settings.History, h.App.S.Settings.Data} {
 					if !h.shows(label) {
@@ -366,6 +365,29 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 				settingsAssertLayout(t, h)
 			})
 		}
+	}
+}
+
+func TestSettingsRailOmittedAndGearAvailable(t *testing.T) {
+	for _, lang := range []string{"zh", "en"} {
+		t.Run(lang, func(t *testing.T) {
+			svc := fake.New()
+			settings := svc.Settings.Get()
+			settings.Language = lang
+			if err := svc.Settings.Save(settings); err != nil {
+				t.Fatal(err)
+			}
+			h := newHarness(t, svc)
+			for _, hit := range h.D.Snapshot().Hits {
+				if hit.Label == h.App.S.Settings.Title && hit.Bounds.X < RailWidth && hit.Bounds.Y >= TitlebarHeight {
+					t.Fatal("Settings still appears in the left rail")
+				}
+			}
+			h.click(h.App.S.Settings.Title)
+			if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.Appearance) {
+				t.Fatal("Settings gear did not open the Settings page")
+			}
+		})
 	}
 }
 
@@ -414,20 +436,6 @@ func settingsAssertLayout(t *testing.T, h *harness) {
 			t.Errorf("settings layout: %+v", problem)
 		}
 	}
-}
-
-func settingsClickRail(t *testing.T, h *harness, label string) {
-	t.Helper()
-	for _, hit := range h.D.Snapshot().Hits {
-		if hit.Label == label && hit.Bounds.X < RailWidth {
-			b := hit.Bounds
-			if err := h.D.Click(b.X+b.Width/2, b.Y+b.Height/2); err != nil {
-				t.Fatal(err)
-			}
-			return
-		}
-	}
-	t.Fatalf("no rail item named %q", label)
 }
 
 type settingsSaveFailure struct{ *fake.Settings }

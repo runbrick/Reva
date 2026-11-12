@@ -16,6 +16,10 @@ import (
 
 const settingsVersion = update.Current
 
+func init() {
+	Sections = []Section{SectionAPIs, SectionCollections, SectionEnvironments}
+}
+
 // settingsState holds the page's controls and folder-reveal effect.
 type settingsState struct {
 	initialized                bool

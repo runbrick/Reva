@@ -388,7 +388,7 @@ func TestSearchCommandsOpenCollectionImportAndSettings(t *testing.T) {
 			searchKey(t, h, gfx.KeyEnter)
 			switch command {
 			case "New collection":
-				if !h.App.collections.dialogOpen || h.App.Section != SectionCollections {
+				if !h.App.collections.dialogOpen || h.App.Section != SectionAPIs || h.App.Main != PageWorkbench {
 					t.Fatal("new collection command did not open the creation dialog")
 				}
 			case "Import":

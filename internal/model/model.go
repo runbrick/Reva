@@ -302,6 +302,8 @@ type Settings struct {
 	Language     string `json:"language"` // "zh" or "en"
 	ActiveEnvID  string `json:"activeEnvId,omitempty"`
 	HistoryLimit int    `json:"historyLimit"`
+	// OnboardingCompleted stays false for new and pre-onboarding settings.
+	OnboardingCompleted bool `json:"onboardingCompleted,omitempty"`
 	// RequestTimeoutSec is the default send timeout; 0 means 60.
 	RequestTimeoutSec int `json:"requestTimeoutSec,omitempty"`
 	// NoFollowRedirects and InsecureTLS are the global transport defaults;

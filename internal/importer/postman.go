@@ -67,34 +67,34 @@ func Postman(data []byte) (model.Collection, error) {
 	if err != nil {
 		return model.Collection{}, err
 	}
-	items, err := postmanItems(source.Item, auth, 0)
+	items, err := postmanItems(source.Item, 0)
 	if err != nil {
 		return model.Collection{}, err
 	}
-	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: source.Info.Name, Items: items}
+	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: source.Info.Name, Auth: auth, Items: items}
 	for _, kv := range source.Variable {
 		col.Variables = append(col.Variables, kv.row())
 	}
 	return col, nil
 }
 
-func postmanItems(source []postmanItem, inherited model.Auth, depth int) ([]model.Item, error) {
+func postmanItems(source []postmanItem, depth int) ([]model.Item, error) {
 	if depth > 256 {
 		return nil, errors.New("Postman folders are nested too deeply")
 	}
 	items := make([]model.Item, 0, len(source))
 	for _, item := range source {
-		auth, err := postmanAuth(item.Auth, inherited)
-		if err != nil {
-			return nil, err
-		}
+		var err error
 		out := model.Item{ID: storage.NewID(), Name: item.Name}
 		if item.Item != nil {
 			out.Type = model.ItemFolder
-			out.Items, err = postmanItems(item.Item, auth, depth+1)
+			out.Auth, err = postmanAuth(item.Auth, model.Auth{Type: model.AuthInherit})
+			if err == nil {
+				out.Items, err = postmanItems(item.Item, depth+1)
+			}
 		} else if len(item.Request) > 0 && string(item.Request) != "null" {
 			out.Type = model.ItemRequest
-			req, reqErr := postmanRequest(item.Request, auth)
+			req, reqErr := postmanRequest(item.Request)
 			err = reqErr
 			req.Name, req.ID = item.Name, out.ID
 			out.Request = &req
@@ -109,9 +109,9 @@ func postmanItems(source []postmanItem, inherited model.Auth, depth int) ([]mode
 	return items, nil
 }
 
-func postmanRequest(raw json.RawMessage, inherited model.Auth) (model.Request, error) {
+func postmanRequest(raw json.RawMessage) (model.Request, error) {
 	r := model.NewRequest(storage.NewID())
-	r.Auth = inherited
+	r.Auth = model.Auth{Type: model.AuthInherit}
 	var urlOnly string
 	if json.Unmarshal(raw, &urlOnly) == nil {
 		r.URL, r.Params = splitURL(urlOnly)
@@ -153,7 +153,7 @@ func postmanRequest(raw json.RawMessage, inherited model.Auth) (model.Request, e
 		}
 	}
 	r.Body = source.Body.model()
-	r.Auth, err = postmanAuth(source.Auth, inherited)
+	r.Auth, err = postmanAuth(source.Auth, model.Auth{Type: model.AuthInherit})
 	return r, err
 }
 
@@ -316,9 +316,9 @@ func postmanAuth(raw json.RawMessage, inherited model.Auth) (model.Auth, error) 
 	out.Token, out.Username, out.Password = values["token"], values["username"], values["password"]
 	out.Key, out.Value = values["key"], values["value"]
 	if out.Type == model.AuthAPIKey {
-		out.In = model.APIKeyInHeader
-		if values["in"] == "query" {
-			out.In = model.APIKeyInQuery
+		out.In = model.APIKeyIn(values["in"])
+		if out.In == "" {
+			out.In = model.APIKeyInHeader
 		}
 	}
 	return out, nil

@@ -81,10 +81,11 @@ type Body struct {
 type AuthType string
 
 const (
-	AuthNone   AuthType = "none"
-	AuthBearer AuthType = "bearer"
-	AuthBasic  AuthType = "basic"
-	AuthAPIKey AuthType = "apikey"
+	AuthInherit AuthType = "inherit"
+	AuthNone    AuthType = "none"
+	AuthBearer  AuthType = "bearer"
+	AuthBasic   AuthType = "basic"
+	AuthAPIKey  AuthType = "apikey"
 )
 
 // AuthTypes lists the auth schemes in display order.
@@ -271,9 +272,11 @@ const (
 
 // Item is a node in a collection: a folder holding more items, or a request.
 type Item struct {
-	Type    ItemType `json:"type"`
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
+	Type ItemType `json:"type"`
+	ID   string   `json:"id"`
+	Name string   `json:"name"`
+	// Auth is used only by folders. Request items use Request.Auth.
+	Auth    Auth     `json:"auth,omitzero"`
 	Request *Request `json:"request,omitempty"`
 	Items   []Item   `json:"items,omitempty"`
 }
@@ -283,6 +286,7 @@ type Collection struct {
 	Version   int    `json:"version"`
 	ID        string `json:"id"`
 	Name      string `json:"name"`
+	Auth      Auth   `json:"auth,omitzero"`
 	Items     []Item `json:"items"`
 	Variables []KV   `json:"variables,omitempty"`
 }

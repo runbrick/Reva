@@ -271,9 +271,9 @@ func Merge(base, local, remote Snapshot, now time.Time) Snapshot {
 					}
 					oldMeta, localMeta, remoteMeta := metadata(old), metadata(here), metadata(there)
 					if slices.Equal(remoteMeta, oldMeta) && !slices.Equal(localMeta, oldMeta) {
-						col.Name, col.Variables = here.Name, here.Variables
+						col.Name, col.Variables, col.Auth = here.Name, here.Variables, here.Auth
 					} else if slices.Equal(localMeta, oldMeta) && !slices.Equal(remoteMeta, oldMeta) {
-						col.Name, col.Variables = there.Name, there.Variables
+						col.Name, col.Variables, col.Auth = there.Name, there.Variables, there.Auth
 					}
 				}
 				col.Items = mergeItems("i:"+col.ID+":", old.Items, here.Items, there.Items, result.Deleted, now)

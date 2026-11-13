@@ -2,6 +2,9 @@ package i18n
 
 // Request holds the strings of the request editor. Owned by that feature's PR.
 type Request struct {
+	Bearer, AuthInherit, AuthMissingContext, AuthParentNone    string
+	AuthFromCollection, AuthFromFolder, AuthError, AuthInvalid string
+	CURLFailed, AuthUnsupported                                string
 	Title, Method, Send, SendAccessible, Save, Cancel          string
 	Params, Headers, Body, Auth, Scripts                       string
 	None, Raw, FormData, URLEncoded, Binary                    string
@@ -19,7 +22,11 @@ type Request struct {
 }
 
 var requestZh = Request{
-	GraphQLQuery: "GraphQL 查询", GraphQLVariables: "GraphQL 变量（JSON）", GraphQLRaw: "编辑 JSON", GraphQLEdit: "编辑 GraphQL",
+	Bearer: "Bearer", AuthInherit: "继承父级认证", AuthMissingContext: "无法继承认证：所属集合或请求项已不存在，请重新打开请求或选择独立认证。",
+	AuthParentNone: "父级已禁用认证，不会自动添加凭据。", AuthFromCollection: "%s · 来自集合「%s」", AuthFromFolder: "%s · 来自文件夹「%s」",
+	AuthError: "认证错误", AuthInvalid: "认证配置无效，请检查认证类型、密钥位置及请求头名称和值。", CURLFailed: "无法生成 cURL，请检查 URL 查询参数。",
+	AuthUnsupported: "不支持的认证类型",
+	GraphQLQuery:    "GraphQL 查询", GraphQLVariables: "GraphQL 变量（JSON）", GraphQLRaw: "编辑 JSON", GraphQLEdit: "编辑 GraphQL",
 	Title: "请求", Method: "方法", Send: "Send / 发送", SendAccessible: "Send / 发送", Save: "保存", Cancel: "取消",
 	Params: "参数", Headers: "请求头", Body: "请求体", Auth: "认证", Scripts: "脚本",
 	None: "无", Raw: "原始文本", FormData: "表单数据", URLEncoded: "网址编码表单", Binary: "二进制",
@@ -36,7 +43,11 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
-	GraphQLQuery: "GraphQL query", GraphQLVariables: "GraphQL variables (JSON)", GraphQLRaw: "Edit JSON", GraphQLEdit: "Edit GraphQL",
+	Bearer: "Bearer", AuthInherit: "Inherit auth from parent", AuthMissingContext: "Cannot inherit authentication: the collection or request item is missing. Reopen the request or select its own authentication.",
+	AuthParentNone: "Authentication is disabled by the parent; no credentials will be generated.", AuthFromCollection: "%s · From collection “%s”", AuthFromFolder: "%s · From folder “%s”",
+	AuthError: "Authentication error", AuthInvalid: "Invalid authentication configuration. Check the scheme, API key placement, and header name and value.", CURLFailed: "Cannot generate cURL. Check the URL query parameters.",
+	AuthUnsupported: "Unsupported authentication",
+	GraphQLQuery:    "GraphQL query", GraphQLVariables: "GraphQL variables (JSON)", GraphQLRaw: "Edit JSON", GraphQLEdit: "Edit GraphQL",
 	Title: "Request", Method: "Method", Send: "Send", SendAccessible: "Send", Save: "Save", Cancel: "Cancel",
 	Params: "Params", Headers: "Headers", Body: "Body", Auth: "Authorization", Scripts: "Scripts",
 	None: "None", Raw: "Raw", FormData: "Form data", URLEncoded: "URL encoded", Binary: "Binary",

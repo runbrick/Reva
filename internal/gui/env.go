@@ -35,8 +35,14 @@ type envDraft struct {
 // Vars returns send variables in order of increasing precedence. Disabled
 // environment variables never shadow collection variables.
 func (a *App) Vars() []model.KV {
+	return a.VarsFor(a.Active())
+}
+
+// VarsFor uses the passed tab's collection, including when another tab is active.
+// Pre-request script variables are appended by prepareSend at send start.
+func (a *App) VarsFor(t *Tab) []model.KV {
 	var out []model.KV
-	if col, ok := a.Svc.Collections.Get(a.Active().CollectionID); ok {
+	if col, ok := a.Svc.Collections.Get(t.CollectionID); ok {
 		out = append(out, col.Variables...)
 	}
 	if env, ok := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID); ok {
@@ -60,6 +66,24 @@ func (a *App) UnresolvedVars() []string {
 		for _, name := range vars.Unresolved(h.Value, vs) {
 			if !slices.Contains(out, name) {
 				out = append(out, name)
+			}
+		}
+	}
+	if cfg, _, err := a.effectiveAuth(a.Active()); err == nil && !isWebSocket(*req) {
+		var fields [2]string
+		switch cfg.Type {
+		case model.AuthBearer:
+			fields[0] = cfg.Token
+		case model.AuthBasic:
+			fields = [2]string{cfg.Username, cfg.Password}
+		case model.AuthAPIKey:
+			fields = [2]string{cfg.Key, cfg.Value}
+		}
+		for _, field := range fields {
+			for _, name := range vars.Unresolved(field, vs) {
+				if !slices.Contains(out, name) {
+					out = append(out, name)
+				}
 			}
 		}
 	}

@@ -2,18 +2,20 @@ package i18n
 
 // Collections holds the strings of the collections sidebar and save dialog. Owned by that feature's PR.
 type Collections struct {
-	Title, NewCollection, NewFolder, NewRequest string
-	NewGraphQL, NewWebSocket                    string
-	Empty, Name, Collection, Folder, Root       string
-	SaveRequest, Save, Saved, Cancel            string
-	Rename, Delete, DeleteTitle, DeletePrompt   string
-	Open, Duplicate, CopyName, Create           string
-	InlineCollection, CollectionName            string
-	Add, Actions, Filter, NoMatches             string
-	Variables, Export, VariablesSaved, Exported string
+	Authentication, AuthSaved, AuthSaveFailed, AuthTargetMissing string
+	Title, NewCollection, NewFolder, NewRequest                  string
+	NewGraphQL, NewWebSocket                                     string
+	Empty, Name, Collection, Folder, Root                        string
+	SaveRequest, Save, Saved, Cancel                             string
+	Rename, Delete, DeleteTitle, DeletePrompt                    string
+	Open, Duplicate, CopyName, Create                            string
+	InlineCollection, CollectionName                             string
+	Add, Actions, Filter, NoMatches                              string
+	Variables, Export, VariablesSaved, Exported                  string
 }
 
 var collectionsZh = Collections{
+	Authentication: "身份认证", AuthSaved: "认证已保存", AuthSaveFailed: "无法保存认证，请重试。", AuthTargetMissing: "集合或文件夹已不存在，无法保存认证。",
 	NewWebSocket: "新建 WebSocket",
 	NewGraphQL:   "新建 GraphQL 请求",
 	Title:        "我的集合", NewCollection: "新建集合", NewFolder: "新建文件夹", NewRequest: "新建请求",
@@ -28,6 +30,7 @@ var collectionsZh = Collections{
 }
 
 var collectionsEn = Collections{
+	Authentication: "Authentication", AuthSaved: "Authentication saved", AuthSaveFailed: "Could not save authentication. Please try again.", AuthTargetMissing: "The collection or folder no longer exists. Authentication could not be saved.",
 	NewWebSocket: "New WebSocket",
 	NewGraphQL:   "New GraphQL request",
 	Title:        "My collections", NewCollection: "New collection", NewFolder: "New folder", NewRequest: "New request",

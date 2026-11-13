@@ -3,15 +3,17 @@ package gui
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
 	"net/url"
 	"os"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/runbrick/reqo/internal/auth"
 	"github.com/runbrick/reqo/internal/gui/icons"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/vars"
@@ -40,6 +42,7 @@ type requestState struct {
 }
 
 type requestTabState struct {
+	auth                           authEditorState
 	section                        requestSection
 	params, headers, encoded, form kvTableState
 	url                            string
@@ -309,14 +312,18 @@ func (a *App) requestFileField(c ui.C, t *Tab, path *string) {
 func (a *App) requestAuthTypeLabel(kind model.AuthType) string {
 	s := &a.S.Request
 	switch kind {
+	case model.AuthInherit:
+		return s.AuthInherit
 	case model.AuthBearer:
-		return "Bearer"
+		return s.Bearer
 	case model.AuthBasic:
 		return s.Basic
 	case model.AuthAPIKey:
 		return s.APIKey
-	default:
+	case "", model.AuthNone:
 		return s.None
+	default:
+		return s.AuthUnsupported
 	}
 }
 
@@ -328,36 +335,13 @@ func (a *App) requestAPIKeyInLabel(in model.APIKeyIn) string {
 }
 
 func (a *App) requestAuthSection(c ui.C, t *Tab) {
-	auth := &t.Request.Auth
-	s := &a.S.Request
-	if ui.Choice(c, &auth.Type, model.AuthTypes, a.requestAuthTypeLabel).Changed() {
+	s := &a.requestTab(t).auth
+	if a.authEditor(c, &t.Request.Auth, s, true, false) {
 		t.Dirty = true
-		if auth.Type == model.AuthAPIKey && auth.In == "" {
-			auth.In = model.APIKeyInHeader
-		}
 	}
-	switch auth.Type {
-	case model.AuthBearer:
-		if ui.TextField(c, &auth.Token, s.Token, "").FillWidth().Changed() {
-			t.Dirty = true
-		}
-	case model.AuthBasic:
-		if ui.TextField(c, &auth.Username, s.Username, "").FillWidth().Changed() {
-			t.Dirty = true
-		}
-		if ui.TextField(c, &auth.Password, s.Password, "").Secure().FillWidth().Changed() {
-			t.Dirty = true
-		}
-	case model.AuthAPIKey:
-		if ui.TextField(c, &auth.Key, s.APIKeyName, "").FillWidth().Changed() {
-			t.Dirty = true
-		}
-		if ui.TextField(c, &auth.Value, s.APIKeyValue, "").FillWidth().Changed() {
-			t.Dirty = true
-		}
-		if ui.Choice(c, &auth.In, requestAPIKeyLocations, a.requestAPIKeyInLabel).Label(s.APIKeyLocation).Changed() {
-			t.Dirty = true
-		}
+	if t.Request.Auth.Type == model.AuthInherit {
+		col, _ := a.Svc.Collections.Get(t.CollectionID)
+		a.authPreview(c, s, col, t.Request.ID)
 	}
 }
 
@@ -503,12 +487,17 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 							return
 						}
 						a.Send(t)
-						s.downloadJob, s.downloadPath = t.job, path
+						if t.Sending {
+							s.downloadJob, s.downloadPath = t.job, path
+						}
 					})
 				}
 				if menu.Item(labels.CopyCURL).Icon(icons.Copy).Clicked() {
-					command := requestCURL(vars.Apply(t.Request, a.Vars()))
 					c.After(func() {
+						command, err := a.requestCURLFor(t)
+						if err != nil {
+							return
+						}
 						if err := app.SetClipboardText(command); err != nil {
 							a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
 						}
@@ -664,8 +653,71 @@ func (a *App) requestDownloads(c ui.C) {
 // requestCURL receives an already resolved copy, leaving the stored request
 // untouched. Arguments use POSIX shell quoting, including embedded apostrophes.
 func requestCURL(req model.Request) string {
-	if len(req.Params) == 0 {
-		requestParamsFromURL(&req)
+	command, _ := requestCURLChecked(req)
+	return command
+}
+
+func (a *App) requestCURLFor(t *Tab) (string, error) {
+	req := t.Request.Clone()
+	cfg, _, err := a.effectiveAuth(t)
+	if err != nil {
+		return "", a.authFailure(t, true)
+	}
+	req.Auth = cfg
+	req = vars.Apply(req, a.VarsFor(t))
+	if err := auth.Validate(req.Auth); err != nil {
+		return "", a.authFailure(t, false)
+	}
+	command, err := requestCURLChecked(req)
+	if err != nil {
+		t.Err = a.S.Request.CURLFailed
+		a.Toast(a.S.Common.Error, t.Err, ui.ToastError)
+		return "", errors.New(t.Err)
+	}
+	return command, nil
+}
+
+func requestCURLChecked(req model.Request) (string, error) {
+	base, rawQuery, fragment := requestURLParts(req.URL)
+	query, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return "", err
+	}
+	// Match the backend's URL/Params multiset merge before query auth Set.
+	type pair struct{ key, value string }
+	remaining := make(map[pair]int)
+	for key, values := range query {
+		for _, value := range values {
+			remaining[pair{key, value}]++
+		}
+	}
+	for _, row := range req.Params {
+		if row.Disabled {
+			continue
+		}
+		p := pair{row.Key, row.Value}
+		if remaining[p] > 0 {
+			remaining[p]--
+		} else {
+			query.Add(row.Key, row.Value)
+		}
+	}
+	if err := auth.ApplyQuery(query, req.Auth); err != nil {
+		return "", err
+	}
+	req.URL = base
+	if encoded := query.Encode(); encoded != "" {
+		req.URL += "?" + encoded
+	}
+	req.URL += fragment
+	headers := make(http.Header)
+	for _, row := range req.Headers {
+		if !row.Disabled && row.Key != "" {
+			headers.Add(row.Key, row.Value)
+		}
+	}
+	if err := auth.ApplyHeaders(headers, req.Auth); err != nil {
+		return "", err
 	}
 	quote := func(s string) string { return "'" + strings.ReplaceAll(s, "'", "'\"'\"'") + "'" }
 	var out strings.Builder
@@ -673,26 +725,22 @@ func requestCURL(req model.Request) string {
 	out.WriteString(quote(string(req.Method)))
 	header := func(key, value string) { out.WriteString(" -H "); out.WriteString(quote(key + ": " + value)) }
 	hasContentType := false
-	for _, row := range req.Headers {
-		if !row.Disabled && row.Key != "" {
-			header(row.Key, row.Value)
-			hasContentType = hasContentType || strings.EqualFold(row.Key, "Content-Type")
-		}
+	keys := make([]string, 0, len(headers))
+	for key := range headers {
+		keys = append(keys, key)
 	}
-	switch req.Auth.Type {
-	case model.AuthBearer:
-		header("Authorization", "Bearer "+req.Auth.Token)
-	case model.AuthBasic:
-		header("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(req.Auth.Username+":"+req.Auth.Password)))
-	case model.AuthAPIKey:
-		if req.Auth.In == model.APIKeyInQuery {
-			req.Params = append(req.Params, model.KV{Key: req.Auth.Key, Value: req.Auth.Value})
-		} else {
-			header(req.Auth.Key, req.Auth.Value)
+	sort.Strings(keys)
+	for _, key := range keys {
+		for _, value := range headers[key] {
+			if value == "" {
+				// curl's semicolon form sends an explicitly empty header.
+				out.WriteString(" -H ")
+				out.WriteString(quote(key + ";"))
+			} else {
+				header(key, value)
+			}
 		}
-	}
-	if len(req.Params) > 0 {
-		requestURLFromParams(&req)
+		hasContentType = hasContentType || strings.EqualFold(key, "Content-Type")
 	}
 	out.WriteByte(' ')
 	out.WriteString(quote(req.URL))
@@ -743,5 +791,5 @@ func requestCURL(req model.Request) string {
 			}
 		}
 	}
-	return out.String()
+	return out.String(), nil
 }

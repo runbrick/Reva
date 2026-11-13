@@ -1,9 +1,8 @@
-// Package importer converts pasted Postman collections and curl commands into
-// Reqo models. It never executes commands or reads files named in a command.
+// Package importer converts native Reqo, Postman-compatible, environment, HAR,
+// and curl inputs into Reqo models without executing commands or reading files.
 package importer
 
 import (
-	"encoding/json"
 	"net/url"
 	"strings"
 
@@ -19,27 +18,39 @@ const (
 	KindCurl    Kind = "curl"
 )
 
-// Detect identifies collection-shaped JSON or a command starting with curl.
+// Detect identifies a single supported format, returning Unknown for ambiguous input.
 // Parsing is still required to validate the complete input.
-func Detect(input string) Kind {
-	input = strings.TrimSpace(strings.TrimPrefix(input, "\ufeff"))
-	var col struct {
-		Info json.RawMessage `json:"info"`
-		Item json.RawMessage `json:"item"`
+func Detect(input string) (kind Kind) {
+	if len(input) > MaxInputBytes {
+		return KindUnknown
 	}
-	if json.Unmarshal([]byte(input), &col) == nil && len(col.Info) > 0 && len(col.Item) > 0 {
-		return KindPostman
+	input = cleanInput(input)
+	if curlCandidate(input) {
+		return KindCurl
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			if _, ok := p.(*ParseError); ok {
+				kind = KindUnknown
+			} else {
+				panic(p)
+			}
+		}
+	}()
+	return identify(readJSON(input))
+}
+
+func curlCandidate(input string) bool {
+	if !strings.HasPrefix(strings.ToLower(input), "curl") && !strings.HasPrefix(input, "\"curl") && !strings.HasPrefix(input, "'curl") {
+		return false
 	}
 	words, err := shellWords(input)
 	if err == nil && len(words) > 0 && isCurl(words[0]) {
-		return KindCurl
+		return true
 	}
 	// Recognize incomplete commands too, so the parser can explain the error.
-	first, _, _ := strings.Cut(input, " ")
-	if isCurl(first) {
-		return KindCurl
-	}
-	return KindUnknown
+	first := strings.Fields(input)
+	return len(first) > 0 && isCurl(first[0])
 }
 
 func isCurl(s string) bool {

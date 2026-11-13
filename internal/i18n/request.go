@@ -43,7 +43,7 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
-	Bearer: "Bearer", AuthInherit: "Inherit auth from parent", AuthMissingContext: "Cannot inherit authentication: the collection or request item is missing. Reopen the request or select its own authentication.",
+	Bearer: "Bearer", AuthInherit: "Inherit", AuthMissingContext: "Cannot inherit authentication: the collection or request item is missing. Reopen the request or select its own authentication.",
 	AuthParentNone: "Authentication is disabled by the parent; no credentials will be generated.", AuthFromCollection: "%s · From collection “%s”", AuthFromFolder: "%s · From folder “%s”",
 	AuthError: "Authentication error", AuthInvalid: "Invalid authentication configuration. Check the scheme, API key placement, and header name and value.", CURLFailed: "Cannot generate cURL. Check the URL query parameters.",
 	AuthUnsupported: "Unsupported authentication",

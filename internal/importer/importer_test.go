@@ -274,6 +274,67 @@ func TestCurlEscapingEdgeCases(t *testing.T) {
 	}
 }
 
+func TestPostmanHierarchicalAuthBarriersAndLiveParents(t *testing.T) {
+	for _, version := range []string{"v2.0.0", "v2.1.0"} {
+		t.Run(version, func(t *testing.T) {
+			input := fmt.Sprintf(`{"info":{"name":"API","schema":"https://schema.getpostman.com/json/collection/%s/collection.json"},"auth":{"type":"bearer","bearer":{"token":"{{root}}"}},"item":[
+			{"name":"Shared","auth":{"type":"basic","basic":{"username":"u","password":""}},"item":[
+			{"name":"omitted","request":{"url":"https://example.test?x=a&x=b","header":[{"key":"X-Off","value":"kept","disabled":true}]}},
+			{"name":"null","request":{"url":"https://example.test","auth":null}},
+			{"name":"url-only","request":"https://example.test?x=1"},
+			{"name":"none","request":{"url":"https://example.test","auth":{"type":"noauth"}}},
+			{"name":"unknown","request":{"url":"https://example.test","auth":{"type":"oauth2"}}},
+			{"name":"public","auth":{"type":"noauth"},"item":[{"name":"child","request":"https://example.test"}]},
+			{"name":"unsupported","auth":{"type":"digest"},"item":[{"name":"child","request":"https://example.test"}]},
+			{"name":"transparent","auth":null,"item":[{"name":"child","request":"https://example.test"}]}
+			]}]}`, version)
+			col, err := Postman([]byte(input))
+			if err != nil {
+				t.Fatal(err)
+			}
+			folder := &col.Items[0]
+			for i, item := range folder.Items {
+				if item.Type == model.ItemFolder {
+					item = item.Items[0]
+				}
+				want := model.Auth{Type: model.AuthBasic, Username: "u"}
+				if i == 3 || i == 4 || i == 5 || i == 6 {
+					want = model.Auth{Type: model.AuthNone}
+				}
+				got, _, err := auth.Resolve(col, item.ID, item.Request.Auth)
+				if err != nil || got != want {
+					t.Fatalf("%s effective auth=%#v %v, want %#v", item.Name, got, err, want)
+				}
+				if i != 3 && i != 4 && item.Request.Auth.Type != model.AuthInherit {
+					t.Fatalf("%s copied parent instead of inheriting", item.Name)
+				}
+			}
+			if len(folder.Items[0].Request.Params) != 2 || !folder.Items[0].Request.Headers[0].Disabled {
+				t.Fatal("auth import lost unrelated URL/disabled fields")
+			}
+			folder.Auth = model.Auth{Type: model.AuthInherit}
+			col.Auth.Token = "{{edited}}"
+			r := folder.Items[0].Request
+			got, src, err := auth.Resolve(col, r.ID, r.Auth)
+			if err != nil || got != col.Auth || src.ID != col.ID {
+				t.Fatalf("parent edit not live after import: %#v %#v %v", got, src, err)
+			}
+		})
+	}
+}
+
+func TestPostmanInvalidAPIKeyPlacementRemainsInvalid(t *testing.T) {
+	col, err := Postman([]byte(`{"info":{"name":"Invalid placement"},"auth":{"type":"apikey","apikey":{"key":"X-Key","value":"private-marker","in":"cookie"}},"item":[{"name":"Inherited","request":"https://example.test"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := col.Items[0].Request
+	resolved, _, err := auth.Resolve(col, r.ID, r.Auth)
+	if err != nil || resolved.In != "cookie" || auth.Validate(resolved) == nil {
+		t.Fatalf("invalid imported auth was silently changed: %#v %v", resolved, err)
+	}
+}
+
 func TestDetect(t *testing.T) {
 	for _, tc := range []struct {
 		input string

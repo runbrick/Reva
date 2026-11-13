@@ -3,8 +3,8 @@ package importer
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -171,6 +171,9 @@ func TestImportPostmanCompatibleExports(t *testing.T) {
 	}
 	for _, f := range fixtures {
 		t.Run(f.Name, func(t *testing.T) {
+			if !strings.HasPrefix(f.Name, "synthetic ") {
+				t.Fatal("compatibility fixture must identify its synthetic provenance")
+			}
 			r := parseOK(t, string(f.Input))
 			if r.Kind != KindPostman {
 				t.Fatal(r.Kind)
@@ -178,6 +181,15 @@ func TestImportPostmanCompatibleExports(t *testing.T) {
 			col := r.Collection
 			if len(col.Items) != 2 || col.Items[1].Type != model.ItemFolder {
 				t.Fatal("empty folder/order lost")
+			}
+			if len(col.Items[0].Items) != 2 || col.Items[0].Items[0].Name != col.Items[0].Items[1].Name || len(col.Items[1].Items) != 0 {
+				t.Fatal("duplicate sibling names or empty folders were lost")
+			}
+			if col.Auth.Type != model.AuthBearer || col.Auth.Token != "{{root}}" || col.Items[0].Auth.Type != model.AuthNone || col.Items[1].Auth.Type != model.AuthInherit {
+				t.Fatal("shared auth scopes changed during compatible export conversion")
+			}
+			if len(col.Variables) != 2 || col.Variables[0].Key != col.Variables[1].Key || col.Variables[0].Description != "Source base" || !col.Variables[1].Disabled {
+				t.Fatal("collection variable scope/order/duplicates/descriptions/disabled state changed")
 			}
 			req := col.Items[0].Items[0].Request
 			if req.URL != "{{baseUrl}}/path#frag" || len(req.Params) != 2 || len(req.Headers) != 2 || !req.Headers[1].Disabled || req.Headers[0].Description != "保留" {
@@ -368,9 +380,25 @@ func TestImportValidationIsBounded(t *testing.T) {
 }
 
 func FuzzParseNeverPanics(f *testing.F) {
-	for _, s := range []string{string(fixture(f, "postman-v20.json")), string(fixture(f, "postman-v21.json")), `{"version":1,"name":"C","items":[]}`, `{"version":1,"name":"E","variables":[]}`, `{"_postman_variable_scope":"environment","name":"E","values":[]}`, harInput(`{"mimeType":"text/plain","text":"hello"}`), `curl https://example.test -k`, strings.Repeat("[", 300), `{"info":null,"info":{}}`} {
+	for _, s := range []string{
+		string(fixture(f, "postman-v20.json")), string(fixture(f, "postman-v21.json")),
+		`{"version":1,"name":"C","items":[]}`, `{"version":1,"name":"E","variables":[]}`,
+		`{"_postman_variable_scope":"environment","name":"E","values":[]}`,
+		harInput(`{"mimeType":"text/plain","text":"hello"}`), `curl https://example.test -k`,
+		strings.Repeat("[", 300), `{"info":null,"info":{}}`,
+		`{"info":{"name":"C","\u006eame":"duplicate"},"item":[]}`,
+		`{"version":1,"name":"C","items":[],"log":null}`,
+		`{"version":1,"name":"E","variables":[{"key":"x","value":null}]}`,
+		`{"_postman_variable_scope":"globals","name":"G","values":[]}`,
+		pmRequest(`{"mode":"graphql","graphql":{"query":"literal"}}`, ""),
+		pmRequest("", `{"type":"bearer","bearer":[{"key":"token","value":null}]}`),
+		" \n\ufeff" + `{"version":1,"name":"空","items":null}`,
+		`{"format":"reqo-backup-v1","ciphertext":"literal"}`,
+		harInput(`{"mimeType":"application/json","text":"e30=","encoding":"base64"}`),
+	} {
 		f.Add(s)
 	}
+	structuralPath := regexp.MustCompile(`^\$(\.[A-Za-z_][A-Za-z_0-9]*|\[[0-9]+\])*$`)
 	f.Fuzz(func(t *testing.T, input string) {
 		r, e := Parse(input)
 		if e != nil {
@@ -378,10 +406,42 @@ func FuzzParseNeverPanics(f *testing.F) {
 			if !errors.As(e, &p) || !reflect.DeepEqual(r, Result{}) {
 				t.Fatal("invalid failure contract")
 			}
+			if p.Code == "" || !structuralPath.MatchString(p.Path) || p.Error() != p.Code+": "+p.Path {
+				t.Fatal("failure diagnostic is not code plus structural path")
+			}
 			return
 		}
-		if fmt.Sprint(r.Kind) == "" {
-			t.Fatal("missing kind")
+		payloads := 0
+		for _, present := range []bool{r.Collection != nil, r.Environment != nil, r.Request != nil} {
+			if present {
+				payloads++
+			}
+		}
+		if payloads != 1 {
+			t.Fatal("success must have exactly one payload")
+		}
+		switch r.Kind {
+		case KindPostman, KindNativeCollection, KindHAR:
+			if r.Collection == nil {
+				t.Fatal("collection kind without collection")
+			}
+		case KindPostmanEnvironment, KindNativeEnvironment:
+			if r.Environment == nil {
+				t.Fatal("environment kind without environment")
+			}
+		case KindCurl:
+			if r.Request == nil {
+				t.Fatal("curl kind without request")
+			}
+		default:
+			t.Fatal("success has unknown kind")
+		}
+		seen := map[Diagnostic]bool{}
+		for _, diagnostic := range r.Warnings {
+			if diagnostic.Code == "" || !structuralPath.MatchString(diagnostic.Path) || seen[diagnostic] {
+				t.Fatal("warning is not a unique code plus structural path")
+			}
+			seen[diagnostic] = true
 		}
 	})
 }

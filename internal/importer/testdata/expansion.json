@@ -4,6 +4,7 @@
     "Input": {
       "info": {"name": "接口", "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"},
       "auth": {"type": "bearer", "bearer": {"token": "{{root}}"}},
+      "variable": [{"key": "baseUrl", "value": "https://example.test", "description": "Source base"}, {"key": "baseUrl", "value": "https://disabled.test", "disabled": true}],
       "item": [
         {"name": "Folder", "auth": {"type": "noauth"}, "item": [
           {"name": "Same", "request": {"url": {"raw": "{{baseUrl}}/path?old=1#frag", "query": [{"key": "q", "value": "1"}, {"key": "q", "value": "2", "disabled": true}]}, "header": [{"key": "X", "value": "", "description": "保留"}, {"key": "X", "value": "off", "disabled": true}], "body": {"mode": "raw", "raw": "<node/>", "options": {"raw": {"language": "xml"}}}}},
@@ -18,6 +19,7 @@
     "Input": {
       "info": {"name": "接口", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
       "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{root}}", "type": "string"}]},
+      "variable": [{"key": "baseUrl", "value": "https://example.test", "description": "Source base"}, {"key": "baseUrl", "value": "https://disabled.test", "disabled": true}],
       "item": [
         {"name": "Folder", "auth": {"type": "noauth"}, "item": [
           {"name": "Same", "request": {"url": {"raw": "{{baseUrl}}/path?old=1#frag", "query": [{"key": "q", "value": "1"}, {"key": "q", "value": "2", "disabled": true}]}, "header": [{"key": "X", "value": "", "description": {"content": "保留", "type": "text/plain"}}, {"key": "X", "value": "off", "disabled": true}], "body": {"mode": "raw", "raw": "<node/>", "options": {"raw": {"language": "xml"}}}}},

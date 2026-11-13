@@ -1,9 +1,12 @@
 # Import expansion: investigation and sequential implementation plan
 
-Status: planning deliverable only, 2026-11-13. No production code is changed by
-this phase. Run the remaining phases strictly in order: backend, then UI, then
-tests. Start no overlapping worker or helper. Each phase commits locally and
-reports its actual checks before the coordinator dispatches the next phase.
+Status: all four sequential phases completed, 2026-11-13. Planning commit
+`e601a5410a651c9d8ce04263558812412abc92cb`, backend commit
+`c34ea76b740771c6d6bb5c110be0d261460bfa45`, and UI commit
+`3f9b4588bcfd9bf1b5cca0396610c4a570231eb8` precede the independent acceptance
+tests recorded below. Historical investigation and dispatch specifications stay
+here for context; final support and verification claims are bounded by the
+final acceptance evidence. No overlapping worker or helper was used in phase 4.
 
 ## Objective and bounded scope
 
@@ -358,3 +361,72 @@ Multi-file transactions, drag/drop/bulk/zip import, destructive restore/merge
 and vendor cloud APIs are separate features. This cycle ends when the supported
 inputs are reviewable, preserve their documented subset, disclose omissions,
 create new durable entities safely, and pass the checks above.
+
+## Final independent acceptance evidence (2026-11-13)
+
+Phase 4 stayed on `runbrick/refactor-auth-features` and changed only the seven
+assigned test/fixture/document files. Production code, the shared harness and
+fake services were read-only. No reproducible production defect was found in
+the covered behaviors, and no production ownership exception was requested.
+Resolve the acceptance commit with `git log -1 --format=%H --
+internal/importer/import_regression_test.go`; its full hash and actual command
+tails are also in the phase-4 worker report. No push, merge or next worker
+dispatch is part of this acceptance stage.
+
+Accepted support remains bounded: native schema-v1 collection and environment,
+Postman Collection v2.0/v2.1 and standalone environment, HAR 1.2 request
+extraction, and the existing supported single-curl grammar. Apifox and ApiPost
+are Postman-export compatibility routes. They do not have proprietary native
+parsers. Unsupported auth/body semantics block; disclosed omissions require
+acknowledgement before confirmation. Collections/environments create new durable
+entities; curl creates an unsaved tab. Import never sends, runs scripts,
+resolves variables or opens referenced upload paths.
+
+The independent coverage adds 15 named behavior tests and extends the existing
+synthetic compatibility test and fuzz target:
+
+| Acceptance area | Actual independent evidence |
+| --- | --- |
+| Native fidelity and identity | `TestImportRegressionNativeEveryCurrentFieldAndCollidingIDs` compares complete exported models across every current body mode/auth type, including inactive fields, all request options, scripts, Unicode, nested shared auth, None, empty folders and duplicate/disabled/described rows. Source IDs deliberately collide, both parses receive unique collection/tree IDs, item/request IDs agree, and mutable results/input models remain isolated. Existing native environment roundtrip tests continue to pass. |
+| Persistence and copy isolation | `TestImportExpansionFreshIDsCopyIsolationAndReload` imports the same colliding source twice into a real store alongside a same-name entity, exercises input/return/Get/List mutation isolation, checks original bytes and reloads all three entities. `TestImportExpansionEnvironmentRenameFailureCleanupAndIsolation` forces the final atomic rename to fail after temporary bytes are written, proves cleanup and no in-memory publication, repairs/retries, and checks environment row isolation and reload. |
+| Synthetic Postman/vendor compatibility | The explicitly synthetic Apifox-compatible v2.0 and ApiPost-compatible v2.1 fixtures now also carry duplicate/disabled/described collection variables. Extended `TestImportPostmanCompatibleExports` verifies duplicate sibling names, empty folders, inherited/None auth scopes and variable scope/order without claiming authentic vendor provenance. Existing v2.0/v2.1 fixtures and body/auth mapping tests also pass. |
+| Blocking/secret-free diagnostics | `TestImportRegressionMalformedCandidatesStayBlocked` adds escaped-equivalent duplicate keys, trailing documents, malformed known-format candidates, ambiguous markers, scalar/struct nulls, timeout overflow, invalid methods, future fields, globals and unsupported proprietary shapes. `TestImportRegressionWarningsAreStructuralAndStable` checks repeated parse stability, de-duplication, multi-file reference expansion and exclusion of source values/arbitrary property names. Existing unsupported auth/body and omission-category tests remain passing. |
+| Limits | Existing exact 32 MiB, 10,000-node, 100,000-row and item-depth-256 tests remain passing. New tests independently check aggregate native inactive-body rows, HAR cookie rows, native item depth, expanded file-reference rows plus auth attributes/collection variables, and the JSON token-depth boundary (root zero; value at depth 1,024 accepted, next rejected). `TestImportFileByteBoundaryAndCancellation` proves exact original UTF-8/BOM file bytes are accepted at 32 MiB, one extra byte returns no partial content, and file/paste parser limits agree. |
+| HAR wire fidelity | `TestImportRegressionHAROrderBodiesAndExplicitCredentialsOnWire` sends three extracted requests through the real RequestService to a local `httptest.Server`. Order, repeated query/form rows, JSON-compatible textual MIME parameters, URL-encoded escaping, multipart Unicode text and captured explicit Cookie/Authorization headers survive. Cookie lists alone generate no Cookie header. Response/page omissions remain warnings; existing file/encoded/binary/conflicting-body rejection tests pass. |
+| Review and cancellation | `TestImportCancelledOldParseCannotReplaceNewReview` lets an old cancelled parse finish after the replacement review already exists and proves it cannot replace or accept the new review. Back clears acknowledgement. `TestImportSameFileRepairAfterBlockingError` fixes a synthetic file at the same path without dismissing the dialog, rereads/reviews it and imports once; the failed attempt exposes only localized structural errors and changes no stored bytes/tabs. Existing smoke tests cover Cancel/Escape/backdrop, stale file work, warning gating, duplicate commit and no mutation until confirmation. |
+| Real GUI disk failure/retry | `TestImportDiskFailureRetryAndReload` drives collection AND environment import through the headless dialog over real store services. A real filesystem obstruction makes Save fail; preview/input remain retryable and existing collections/environments/settings/history/draft stay intact. Repair and retry save exactly one complete fresh-ID entity, leave no orphan/empty/temp data, preserve all existing bytes and active environment, and survive Store/App recreation. The store-specific actual-write failure test independently checks the same publication/reload boundary. |
+| Imported auth through GUI and HTTP | `TestImportedAuthSendPreservesHierarchy` imports a synthetic Postman collection and environment through the dialog, explicitly selects the environment, opens imported requests, edits parent auth via the real GUI, and sends through the real RequestService to a local server. It proves live Bearer/Basic/API-key parent changes, explicit request None and folder None barriers, last-enabled environment duplicate precedence, disabled-environment fallback to collection variables, disabled-header behavior, enabled empty/repeated Authorization/API-key overrides, and API-key query replacement while retaining unrelated repeats. Review/confirmation perform no send; history retains placeholders and editor auth stays inherited. |
+| Bilingual diagnostics/help and layout | `TestImportCopyCoversDiagnosticsAndCompatibilityRoutes` inventories actual parser-emitted codes, checks dedicated nonempty distinct zh/en copy for all 12 errors and 10 warnings, and checks native labels versus explicit vendor Postman routes/proprietary exclusions. The existing eight zh/en × light/dark × 960×600/1280×800 headless smoke cases were independently inspected and rerun in the full suite, including long scrollable warnings/errors and reachable acknowledgement/footer controls. No duplicate layout matrix was added. |
+| Fuzz contracts | `FuzzParseNeverPanics` now has 18 explicit seeds covering every kind and additional malformed/unsupported/BOM cases. Invariants include zero failed results, one correctly typed success payload, and unique code/structural-path-only diagnostics. A separate 5-second bounded run with two fuzz workers passed 104,019 executions (baseline also included the existing local fuzz cache). |
+
+Final required checks ran against all final Go/fixture changes on Windows/amd64
+and exited zero:
+
+```text
+gofmt -l .                  <empty output>
+go vet ./...                <empty output>
+go tool viva vet ./...      <empty output>
+go test ./... -count=1      all packages passed
+git diff --check            <empty output>
+git diff --cached --check   <empty output; all seven owned files staged>
+```
+
+The full-suite changed-package results were GUI `4.793s`, i18n `0.994s`, importer
+`1.973s`, and store `1.512s`; existing auth, transport, storage, scripting, sync,
+update and WebSocket packages also passed. The phase-4 report contains the
+complete test tail and fuzz tail; empty checks are recorded as empty rather
+than fabricated output. Earlier local test-development failures were a test
+fixture using Postman's `formdata` spelling in native JSON and an unused test
+import; both were corrected before these final checks, with no production fix.
+
+Acceptance limits remain explicit. Vendor compatibility fixtures are synthetic;
+no authentic customer export or vendor-version matrix was verified. Layout is
+headless geometry/text/hit-bound evidence, not native-window pixels, native
+file-picker interaction or a macOS run. Real disk failures were exercised via
+portable deterministic filesystem obstructions on this Windows run, not an ACL,
+disk-full, process-crash or power-loss campaign. The bounded fuzz run is not an
+exhaustive proof. Referenced uploads were never opened or sent, and vendor
+scripts were never executed; native inactive Auth/Body retention is intentional
+editor fidelity. No live external server/schema/vendor calls occurred. Direct
+Apifox/ApiPost native, OpenAPI/YAML/Insomnia, OAuth lifecycle, bulk import and
+backup/restore remain deferred, not passed acceptance criteria.

@@ -33,7 +33,7 @@ internal/service/      service interfaces (the contract between UI and back end)
   fake/                in-memory services for tests
   request/             HTTP sending                       (PR: svc-http)
   store/               history, collections, envs, settings on disk (PR: svc-storage)
-internal/importer/     Postman collection and curl import (PR: import)
+internal/importer/     bounded collection/environment, HAR and curl import
 internal/script/       pre-request / test JavaScript      (PR: scripts)
 internal/i18n/         every user-visible string, zh + en, one file per feature
 internal/gui/          Viva UI: app.go is the shell, one file per feature
@@ -57,8 +57,62 @@ Postman v2 imports retain collection/folder auth and request inheritance.
 These fields are additive within native schema version 1; older binaries cannot
 preserve their semantics. Native exports include configured shared credentials.
 Secure input masking is presentation, not a credential vault. History keeps
-unexpanded variable placeholders. OAuth2 lifecycle, WebSocket Auth (manual
-headers remain available), and native JSON reimport are deferred.
+unexpanded variable placeholders. OAuth2 lifecycle and WebSocket Auth (manual
+headers remain available) are deferred.
+
+## Import and migration
+
+Paste content or open a `.json`, `.har`, or other text file, then choose **Review
+import**. Review the detected format, destination, request/folder/variable counts,
+and compatibility notices before **Confirm import**. Every notice requires an
+explicit acknowledgement. Nothing is saved or opened during review. Errors keep
+the input available; save failures preserve the review for retry.
+
+Supported inputs create one new entity, without replacing existing data:
+
+- Reqo schema-v1 collection and standalone environment JSON. Current fields,
+  shared auth, request options, disabled rows, descriptions, and empty folders
+  are retained. Native scripts are retained but never executed by import.
+  Unknown native fields and future versions are rejected to avoid silent loss.
+- Postman Collection v2.0/v2.1 JSON and single Postman environment exports.
+  Nested requests/folders, repeated rows, variables, Bearer/Basic/API-key auth,
+  inheritance and explicit no-auth barriers are preserved. Supported bodies are
+  raw/JSON, URL-encoded, multipart text/file references, and binary file references.
+  GraphQL bodies and OAuth1/OAuth2/Digest/AWS/NTLM or unknown auth block import.
+  Postman scripts, saved responses/examples, and unsupported metadata are omitted
+  with notices. Dynamic/vault and request-local path variables remain literal
+  and need attention before sending. Only values present in an export can be
+  imported; secret fields do not gain vault protection.
+- HAR 1.2 request extraction into a new collection. Requests retain order,
+  repeated headers/query rows and supported textual, URL-encoded or multipart
+  text bodies. Captured explicit auth/Cookie headers remain headers; auth is not
+  inferred. Responses, timings and pages are omitted, not restored as history.
+  Cookie lists without a Cookie header warn. Missing file payloads, encoded or
+  binary bodies, and conflicting body representations block import.
+- A single supported curl command opens a new unsaved request after confirmation.
+  TLS, redirect and compression flags that are not applied generate notices.
+  Commands are never executed. Local upload paths remain references: import
+  never reads them, and files must be checked/reselected before sending.
+
+For **Apifox**, use **Settings > Export data > Postman**. For **ApiPost**, use
+**Project settings > Export project > Postman 2.1** (or copy one request as curl).
+Import the resulting Postman file; proprietary Apifox/ApiPost project exports are
+unsupported. This is a compatibility route, not a lossless migration or vendor
+version certification. Inspect all notices and review requests before sending.
+
+File and pasted input share a **32 MiB** UTF-8 limit. One JSON object is accepted;
+invalid JSON, duplicate object keys and ambiguous formats are rejected. Limits
+are 256 nested item levels, 10,000 aggregate tree nodes/requests, 100,000 aggregate
+key/value/form rows, and a defensive 1,024 JSON-container nesting cap. Split
+larger exports. JSON/BOM whitespace is supported; OpenAPI/Swagger, Insomnia, YAML,
+bulk dumps and backup restore are outside this importer. Encrypted backup/sync
+restore remains a separate feature.
+
+Imported collections and environments get fresh IDs. Environments are saved
+without automatic activation; existing drafts and preferences remain unchanged.
+Imported credentials remain configured credentials in local JSON, not a vault.
+Import does not resolve variables, send requests, fetch schemas, or execute
+scripts. Native scripts may execute later through the normal explicit send flow.
 
 ## Checks
 

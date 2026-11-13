@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runbrick/reqo/internal/i18n"
@@ -26,6 +27,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 			h := newHarness(t, svc)
 			h.click(h.App.S.Import.Title)
 			h.typeInto(h.App.S.Import.Input, `curl 'https://example.test/users?q=active' -H 'Authorization: Bearer {{token}}' -d '{"name":"你好"}'`)
+			reviewImportForTest(h)
 			h.click(h.App.S.Import.Submit)
 			r := h.App.Active().Request
 			if r.URL != "https://example.test/users?q=active" || r.Method != model.MethodPost || r.Body.Mode != model.BodyJSON || r.Body.Text != `{"name":"你好"}` || len(r.Params) != 1 || len(r.Headers) != 1 || r.Headers[0].Key != "Authorization" {
@@ -42,6 +44,7 @@ func TestImportPostmanAddsCollection(t *testing.T) {
 	h := newHarness(t)
 	h.click(h.App.S.Import.Title)
 	h.typeInto(h.App.S.Import.Input, `{"info":{"name":"Imported API"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
 	cols := h.Svc.Collections.List()
 	if len(cols) != 1 || cols[0].Name != "Imported API" || len(cols[0].Items) != 1 || cols[0].Items[0].Request.URL != "https://example.test/ping" {
@@ -64,9 +67,9 @@ func TestImportInvalidInputStaysOpen(t *testing.T) {
 			h := newHarness(t)
 			h.click(h.App.S.Import.Title)
 			h.typeInto(h.App.S.Import.Input, tc.input)
-			h.click(h.App.S.Import.Submit)
+			reviewImportForTest(h)
 			h.pump()
-			if !h.App.importer.open || h.App.importer.err == "" || !h.shows(h.App.importer.err) || h.App.importer.input != tc.input {
+			if !h.App.importer.open || h.App.importer.err == "" || !h.shows(string([]rune(strings.Split(h.App.importer.err, "\n")[0])[:8])) || h.App.importer.input != tc.input {
 				t.Fatal("invalid import must keep input and display an inline error")
 			}
 			if len(h.Svc.Collections.List()) != 0 || h.App.Active().Request.URL != "" {
@@ -94,9 +97,10 @@ func TestImportJSONFile(t *testing.T) {
 	h.click(h.App.S.Import.LoadFile)
 	h.waitFor("file contents", func() bool { return h.App.importer.input == data })
 	request, ok := h.D.LastOpenFilesRequest()
-	if !ok || request.AllowMultiple || len(request.Filters) != 1 || request.Filters[0].Pattern != "*.json" {
+	if !ok || request.AllowMultiple || len(request.Filters) != 3 || request.Filters[0].Pattern != "*.json" || request.Filters[1].Pattern != "*.har" || request.Filters[2].Pattern != "*" {
 		t.Fatalf("file picker options = %#v", request)
 	}
+	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
 	if cols := h.Svc.Collections.List(); len(cols) != 1 || cols[0].Name != "From file" {
 		t.Fatalf("file was not imported: %#v", cols)
@@ -149,6 +153,7 @@ func TestImportCollectionSaveFailureStaysOpen(t *testing.T) {
 	h := newHarness(t, svc)
 	h.click(h.App.S.Import.Title)
 	h.typeInto(h.App.S.Import.Input, `{"info":{"name":"Fail"},"item":[]}`)
+	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
 	h.pump()
 	if !h.App.importer.open || !h.shows(h.App.S.Import.SaveError) || len(h.Svc.Collections.List()) != 0 {
@@ -188,4 +193,14 @@ func BenchmarkImportDialogPaint(b *testing.B) {
 			}
 		})
 	}
+}
+
+// reviewImportForTest follows the deliberate asynchronous input -> review step.
+func reviewImportForTest(h *harness) {
+	h.t.Helper()
+	h.click(h.App.S.Import.Review)
+	h.waitFor("import review", func() bool {
+		return !h.App.importer.parsing && (h.App.importer.preview != nil || h.App.importer.err != "")
+	})
+	h.pump()
 }

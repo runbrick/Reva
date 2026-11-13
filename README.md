@@ -43,6 +43,23 @@ The UI depends only on the interfaces in `internal/service`; Viva is pure Go, so
 the UI calls Go methods directly and types are checked by the compiler. Network
 calls run in a `ui.Effect` off the UI thread and can be cancelled.
 
+## HTTP authentication
+
+Collections and folders can store shared Bearer, Basic, or API-key credentials.
+Requests explicitly set to inherit use their nearest configured folder, then
+the collection; folder **None** stops inheritance. Existing requests with empty
+auth or **None** continue to send without generated authentication. Enabled
+explicit headers, including empty values, take precedence over generated auth.
+Cross-origin redirects strip Authorization and the configured API-key header
+for the remainder of that send; query API keys are applied only to the initial URL.
+
+Postman v2 imports retain collection/folder auth and request inheritance.
+These fields are additive within native schema version 1; older binaries cannot
+preserve their semantics. Native exports include configured shared credentials.
+Secure input masking is presentation, not a credential vault. History keeps
+unexpanded variable placeholders. OAuth2 lifecycle, WebSocket Auth (manual
+headers remain available), and native JSON reimport are deferred.
+
 ## Checks
 
 ```sh

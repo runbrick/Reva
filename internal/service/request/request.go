@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/runbrick/reqo/internal/auth"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/vars"
@@ -53,6 +54,9 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	ctx, cancel := context.WithTimeout(ctx, s.timeout(req.Options))
 	defer cancel()
 	req = vars.Apply(req, variables)
+	if err := auth.Validate(req.Auth); err != nil {
+		return model.Response{}, err
+	}
 	u, err := requestURL(req.URL)
 	if err != nil {
 		return model.Response{}, err
@@ -81,8 +85,8 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 			query.Add(row.Key, row.Value)
 		}
 	}
-	if req.Auth.Type == model.AuthAPIKey && req.Auth.In == model.APIKeyInQuery {
-		query.Set(req.Auth.Key, req.Auth.Value)
+	if err := auth.ApplyQuery(query, req.Auth); err != nil {
+		return model.Response{}, err
 	}
 	u.RawQuery = query.Encode()
 
@@ -110,7 +114,9 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 			httpReq.Header.Add(row.Key, row.Value)
 		}
 	}
-	applyAuth(httpReq, req.Auth)
+	if err := auth.ApplyHeaders(httpReq.Header, req.Auth); err != nil {
+		return model.Response{}, err
+	}
 	setDefaultHeader(httpReq.Header, "User-Agent", "Reqo/0.1")
 	if contentType != "" {
 		setDefaultHeader(httpReq.Header, "Content-Type", contentType)
@@ -127,6 +133,7 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	// Copy only the client value to attach this send's tracing wrapper. The
 	// cached underlying transport and its connection pool are always reused.
 	client := *s.client(req.Options)
+	protectRedirects(&client, req.Auth)
 	start := time.Now()
 	trace := &sendTrace{base: client.Transport, start: start}
 	client.Transport = trace
@@ -189,19 +196,57 @@ func setDefaultHeader(headers http.Header, key, value string) {
 	}
 }
 
-func applyAuth(req *http.Request, auth model.Auth) {
-	switch auth.Type {
-	case model.AuthBearer:
-		setDefaultHeader(req.Header, "Authorization", "Bearer "+auth.Token)
-	case model.AuthBasic:
-		if _, exists := req.Header["Authorization"]; !exists {
-			req.SetBasicAuth(auth.Username, auth.Password)
-		}
-	case model.AuthAPIKey:
-		if auth.In != model.APIKeyInQuery {
-			setDefaultHeader(req.Header, auth.Key, auth.Value)
+// protectRedirects wraps policy on a per-send client copy. net/http copies
+// initial headers on every hop, so stripping only the first cross-origin hop
+// would leak credentials when a later redirect returns to the initial origin.
+func protectRedirects(client *http.Client, cfg model.Auth) {
+	previous := client.CheckRedirect
+	crossedOrigin := false
+	strip := func(req *http.Request) {
+		// Client.send can synthesize Basic auth from URL userinfo after the
+		// redirect callback. Do not allow it to restore stripped Authorization.
+		req.URL.User = nil
+		for key := range req.Header {
+			if strings.EqualFold(key, "Authorization") ||
+				cfg.Type == model.AuthAPIKey && cfg.In != model.APIKeyInQuery && strings.EqualFold(key, cfg.Key) {
+				delete(req.Header, key)
+			}
 		}
 	}
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		checkOrigin := func() {
+			if len(via) > 0 && !sameOrigin(via[len(via)-1].URL, req.URL) {
+				crossedOrigin = true
+			}
+			if crossedOrigin {
+				strip(req)
+			}
+		}
+		checkOrigin()
+		var err error
+		if previous != nil {
+			err = previous(req, via)
+		} else if len(via) >= 10 {
+			err = fmt.Errorf("stopped after 10 redirects")
+		}
+		// Preserve custom redirect policy while ensuring it cannot reintroduce
+		// protected headers or change the destination across an origin boundary.
+		checkOrigin()
+		return err
+	}
+}
+
+func sameOrigin(a, b *url.URL) bool {
+	port := func(u *url.URL) string {
+		if p := u.Port(); p != "" {
+			return p
+		}
+		if strings.EqualFold(u.Scheme, "https") {
+			return "443"
+		}
+		return "80"
+	}
+	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
 }
 
 func responseHeaders(headers http.Header) []model.KV {

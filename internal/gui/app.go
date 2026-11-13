@@ -22,11 +22,13 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/runbrick/reqo/internal/auth"
 	"github.com/runbrick/reqo/internal/gui/icons"
 	"github.com/runbrick/reqo/internal/i18n"
 	"github.com/runbrick/reqo/internal/model"
 	"github.com/runbrick/reqo/internal/service"
 	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reqo/internal/vars"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -222,9 +224,19 @@ func (a *App) CloseTab(i int) {
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
 	req := t.Request.Clone()
+	cfg, _, err := a.effectiveAuth(t)
+	if err != nil {
+		a.authFailure(t, true)
+		return
+	}
+	req.Auth = cfg
 	req.Options = req.Options.Resolve(a.Svc.Settings.Get())
-	req, vars := a.prepareSend(t, req, a.Vars())
-	t.job = &sendJob{req: req, vars: vars}
+	req, values := a.prepareSend(t, req, a.VarsFor(t))
+	if err := auth.Validate(vars.Apply(req, values).Auth); err != nil {
+		a.authFailure(t, false)
+		return
+	}
+	t.job = &sendJob{req: req, vars: values}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
 }
 
@@ -259,6 +271,7 @@ func (a *App) declareSends(c ui.C) {
 		}
 		t.Sending = false
 		entry := model.HistoryEntry{At: time.Now(), Request: t.Request.Clone()}
+		entry.Request.Auth = t.job.req.Auth
 		if res.err != nil {
 			t.Err = res.err.Error()
 			entry.Error = t.Err

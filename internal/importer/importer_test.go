@@ -235,11 +235,8 @@ func TestPostmanUnknownPartsAndEmptyCollection(t *testing.T) {
 		t.Fatalf("empty collection = %#v, %v", col, err)
 	}
 	col, err = Postman([]byte(`{"info":{"name":"Future"},"item":[{"name":"ignored","future":{}},{"name":"request","request":{"method":"GET","url":{"raw":"{{baseUrl}}?old=value","query":[]},"body":{"mode":"future","future":{}},"auth":{"type":"future"}}}]}`))
-	if err != nil || len(col.Items) != 1 {
-		t.Fatalf("unknown fields = %#v, %v", col, err)
-	}
-	if r := col.Items[0].Request; r.Body.Mode != model.BodyNone || r.Auth.Type != model.AuthNone || r.URL != "{{baseUrl}}" || len(r.Params) != 0 {
-		t.Fatalf("unknown fields changed request = %#v", r)
+	if err == nil {
+		t.Fatal("unsupported executable nodes/auth/body must fail instead of disappearing")
 	}
 }
 
@@ -283,9 +280,7 @@ func TestPostmanHierarchicalAuthBarriersAndLiveParents(t *testing.T) {
 			{"name":"null","request":{"url":"https://example.test","auth":null}},
 			{"name":"url-only","request":"https://example.test?x=1"},
 			{"name":"none","request":{"url":"https://example.test","auth":{"type":"noauth"}}},
-			{"name":"unknown","request":{"url":"https://example.test","auth":{"type":"oauth2"}}},
 			{"name":"public","auth":{"type":"noauth"},"item":[{"name":"child","request":"https://example.test"}]},
-			{"name":"unsupported","auth":{"type":"digest"},"item":[{"name":"child","request":"https://example.test"}]},
 			{"name":"transparent","auth":null,"item":[{"name":"child","request":"https://example.test"}]}
 			]}]}`, version)
 			col, err := Postman([]byte(input))
@@ -298,14 +293,14 @@ func TestPostmanHierarchicalAuthBarriersAndLiveParents(t *testing.T) {
 					item = item.Items[0]
 				}
 				want := model.Auth{Type: model.AuthBasic, Username: "u"}
-				if i == 3 || i == 4 || i == 5 || i == 6 {
+				if i == 3 || i == 4 {
 					want = model.Auth{Type: model.AuthNone}
 				}
 				got, _, err := auth.Resolve(col, item.ID, item.Request.Auth)
 				if err != nil || got != want {
 					t.Fatalf("%s effective auth=%#v %v, want %#v", item.Name, got, err, want)
 				}
-				if i != 3 && i != 4 && item.Request.Auth.Type != model.AuthInherit {
+				if i != 3 && item.Request.Auth.Type != model.AuthInherit {
 					t.Fatalf("%s copied parent instead of inheriting", item.Name)
 				}
 			}
@@ -324,14 +319,9 @@ func TestPostmanHierarchicalAuthBarriersAndLiveParents(t *testing.T) {
 }
 
 func TestPostmanInvalidAPIKeyPlacementRemainsInvalid(t *testing.T) {
-	col, err := Postman([]byte(`{"info":{"name":"Invalid placement"},"auth":{"type":"apikey","apikey":{"key":"X-Key","value":"private-marker","in":"cookie"}},"item":[{"name":"Inherited","request":"https://example.test"}]}`))
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := col.Items[0].Request
-	resolved, _, err := auth.Resolve(col, r.ID, r.Auth)
-	if err != nil || resolved.In != "cookie" || auth.Validate(resolved) == nil {
-		t.Fatalf("invalid imported auth was silently changed: %#v %v", resolved, err)
+	_, err := Postman([]byte(`{"info":{"name":"Invalid placement"},"auth":{"type":"apikey","apikey":{"key":"X-Key","value":"private-marker","in":"cookie"}},"item":[{"name":"Inherited","request":"https://example.test"}]}`))
+	if e, ok := err.(*ParseError); !ok || e.Code != "invalid_auth" || strings.Contains(e.Error(), "private-marker") {
+		t.Fatalf("invalid auth must fail safely: %v", err)
 	}
 }
 

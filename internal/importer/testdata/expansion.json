@@ -1,0 +1,30 @@
+[
+  {
+    "Name": "synthetic Apifox-compatible Postman v2.0 shape",
+    "Input": {
+      "info": {"name": "接口", "schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"},
+      "auth": {"type": "bearer", "bearer": {"token": "{{root}}"}},
+      "item": [
+        {"name": "Folder", "auth": {"type": "noauth"}, "item": [
+          {"name": "Same", "request": {"url": {"raw": "{{baseUrl}}/path?old=1#frag", "query": [{"key": "q", "value": "1"}, {"key": "q", "value": "2", "disabled": true}]}, "header": [{"key": "X", "value": "", "description": "保留"}, {"key": "X", "value": "off", "disabled": true}], "body": {"mode": "raw", "raw": "<node/>", "options": {"raw": {"language": "xml"}}}}},
+          {"name": "Same", "request": "{{baseUrl}}/other"}
+        ]},
+        {"name": "Empty", "item": []}
+      ]
+    }
+  },
+  {
+    "Name": "synthetic ApiPost-compatible Postman v2.1 shape",
+    "Input": {
+      "info": {"name": "接口", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"},
+      "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{root}}", "type": "string"}]},
+      "item": [
+        {"name": "Folder", "auth": {"type": "noauth"}, "item": [
+          {"name": "Same", "request": {"url": {"raw": "{{baseUrl}}/path?old=1#frag", "query": [{"key": "q", "value": "1"}, {"key": "q", "value": "2", "disabled": true}]}, "header": [{"key": "X", "value": "", "description": {"content": "保留", "type": "text/plain"}}, {"key": "X", "value": "off", "disabled": true}], "body": {"mode": "raw", "raw": "<node/>", "options": {"raw": {"language": "xml"}}}}},
+          {"name": "Same", "request": "{{baseUrl}}/other"}
+        ]},
+        {"name": "Empty", "item": []}
+      ]
+    }
+  }
+]

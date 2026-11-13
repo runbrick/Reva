@@ -32,6 +32,8 @@ type settingsState struct {
 	checkError                 error
 	checked                    bool
 	sync                       syncState
+	guideOpen                  bool
+	guideError                 string
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
@@ -69,8 +71,11 @@ func (a *App) settingsButton(c ui.C) {
 
 func (a *App) openSettings() { a.Main = PageSettings }
 
-// settingsDialog remains the shell's compatibility hook; settings is a page.
-func (a *App) settingsDialog(c ui.C) { a.syncDialog(c) }
+// settingsDialog declares the settings page's optional dialogs.
+func (a *App) settingsDialog(c ui.C) {
+	a.syncDialog(c)
+	a.onboardingDialog(c)
+}
 
 func (a *App) settingsPage(c ui.C) {
 	state := &a.settings
@@ -90,7 +95,10 @@ func (a *App) settingsPage(c ui.C) {
 	ui.Scroll(c).FillWidth().Grow(1).Basis(0).Scrollbars().Children(func() {
 		ui.Column(c).FillWidth().Pad(Space6).Items(ui.Center).Children(func() {
 			ui.Column(c).FillWidth().MaxWidth(720).Gap(Space4).Children(func() {
-				ui.Text(c, s.Title).FontSize(theme.Metrics.FontSizeL).Bold()
+				ui.Row(c).FillWidth().Items(ui.Center).Gap(Space3).Children(func() {
+					ui.Text(c, s.Title).FontSize(theme.Metrics.FontSizeL).Bold().Grow(1)
+					a.onboardingEntry(c)
+				})
 				settingsCard(c, s.Appearance, func() {
 					settingsRow(c, s.Theme, s.ThemeDescription, func() {
 						if ui.Choice(c, &state.current.Theme, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {

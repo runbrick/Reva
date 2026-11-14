@@ -25,7 +25,7 @@ func TestImportManualSourcesAndInputModes(t *testing.T) {
 			h := newHarness(t, svc)
 			h.click(h.App.S.Import.Title)
 			text := h.App.S.Import
-			for _, label := range []string{text.SwaggerSource, text.SwaggerURLSource, text.YAPISource, text.MarkdownSource, text.InsomniaSource, text.APIDocSource, text.ApizzaSource, text.EolinkSource, text.CurrentCollection} {
+			for _, label := range []string{text.YAPISource, text.MarkdownSource, text.InsomniaSource, text.APIDocSource, text.ApizzaSource, text.EolinkSource, text.CurrentCollection} {
 				if !importSmokeHit(t, h, label).Disabled {
 					t.Fatalf("unavailable control is enabled: %s", label)
 				}

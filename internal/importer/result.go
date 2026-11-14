@@ -12,6 +12,8 @@ const (
 	KindNativeEnvironment  Kind = "reva-environment"
 	KindPostmanEnvironment Kind = "postman-environment"
 	KindHAR                Kind = "har"
+	KindSwagger            Kind = "swagger"
+	KindOpenAPI            Kind = "openapi"
 	MaxInputBytes               = 32 << 20
 )
 
@@ -41,6 +43,18 @@ func (e *ParseError) Error() string { return e.Code + ": " + e.Path }
 // Parse converts one bounded input without executing scripts, resolving variables,
 // reading referenced files, or accessing services or the network.
 func Parse(input string) (result Result, err error) {
+	return ParseWithOptions(input, Options{AddHost: true, AddBasePath: true})
+}
+
+// Options controls Swagger/OpenAPI URL construction. Other formats retain their URLs.
+type Options struct {
+	AddHost, AddBasePath bool
+	// DocumentURL is the final fetched document URL, used for relative servers only.
+	DocumentURL string
+}
+
+// ParseWithOptions has the same bounded, offline contract as Parse.
+func ParseWithOptions(input string, options Options) (result Result, err error) {
 	defer func() {
 		if p := recover(); p != nil {
 			if failure, ok := p.(*ParseError); ok {
@@ -82,6 +96,8 @@ func Parse(input string) (result Result, err error) {
 		result.Environment = c.environment(root)
 	case KindHAR:
 		result.Collection = c.har(root)
+	case KindSwagger, KindOpenAPI:
+		result.Collection = c.openapi(root, kind, options)
 	default:
 		fail("unknown_format", "$")
 	}

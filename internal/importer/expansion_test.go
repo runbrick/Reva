@@ -353,7 +353,10 @@ func TestImportValidationIsBounded(t *testing.T) {
 	for _, input := range []string{`{"info":{"name":"C"},"item":[],"log":{}}`, `{"version":1,"name":"N","variables":[],"values":[]}`, `{"version":1,"collections":[]}`} {
 		parseFails(t, input, "ambiguous_format")
 	}
-	for _, input := range []string{`{"openapi":"3.0.0"}`, `{"swagger":"2.0"}`, `{"_type":"export","resources":[]}`, `{"format":"reva-backup-v1","data":"private-marker"}`, `{"collections":[],"environments":[]}`} {
+	for _, input := range []string{`{"openapi":"3.0.0"}`, `{"swagger":"2.0"}`} {
+		parseFails(t, input, "invalid_structure")
+	}
+	for _, input := range []string{`{"_type":"export","resources":[]}`, `{"format":"reva-backup-v1","data":"private-marker"}`, `{"collections":[],"environments":[]}`} {
 		parseFails(t, input, "unsupported_format")
 	}
 	for _, input := range []string{`{"version":2,"name":"N","variables":[]}`, `{"log":{"version":"1.3","entries":[]}}`, `{"info":{"name":"P","schema":"https://private-marker/v2.1.0/fake"},"item":[]}`} {
@@ -382,6 +385,7 @@ func TestImportValidationIsBounded(t *testing.T) {
 func FuzzParseNeverPanics(f *testing.F) {
 	for _, s := range []string{
 		string(fixture(f, "postman-v20.json")), string(fixture(f, "postman-v21.json")),
+		swaggerFixture, openapiFixture,
 		`{"version":1,"name":"C","items":[]}`, `{"version":1,"name":"E","variables":[]}`,
 		`{"_postman_variable_scope":"environment","name":"E","values":[]}`,
 		harInput(`{"mimeType":"text/plain","text":"hello"}`), `curl https://example.test -k`,
@@ -421,7 +425,7 @@ func FuzzParseNeverPanics(f *testing.F) {
 			t.Fatal("success must have exactly one payload")
 		}
 		switch r.Kind {
-		case KindPostman, KindNativeCollection, KindHAR:
+		case KindPostman, KindNativeCollection, KindHAR, KindSwagger, KindOpenAPI:
 			if r.Collection == nil {
 				t.Fatal("collection kind without collection")
 			}

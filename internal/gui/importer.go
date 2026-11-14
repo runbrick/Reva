@@ -21,18 +21,23 @@ import (
 // Jobs are immutable snapshots. A new pointer identifies every attempt, including
 // loading the same file again; effects never read or mutate the App off-thread.
 type importFile struct{ path string }
-type importParseJob struct{ input string }
+type importParseJob struct {
+	input   string
+	url     bool
+	options importer.Options
+}
 
 type importerState struct {
 	source                             importSource
 	paste, details, appendToCollection bool
-	basePath, host                     bool // Unavailable until Swagger parsing is supported.
+	basePath, host                     bool
 	fileName, collectionID             string
 	collectionIDs                      []string
 	collectionNames                    map[string]string
 	collectionLabel                    func(string) string
 	open, loading, parsing, committing bool
 	input, err                         string
+	url                                string
 	file                               *importFile
 	read                               *ui.EffectState[string, *importFile]
 	job                                *importParseJob
@@ -54,6 +59,8 @@ const (
 	importApiPost
 	importCurl
 	importHAR
+	importSwagger
+	importSwaggerURL
 	importUnsupported
 )
 
@@ -85,11 +92,30 @@ func parseImport(ctx context.Context, job *importParseJob) (importer.Result, err
 	if err := ctx.Err(); err != nil {
 		return importer.Result{}, err
 	}
-	result, err := importer.Parse(job.input)
+	input, options := job.input, job.options
+	if job.url {
+		var err error
+		input, options.DocumentURL, err = importer.FetchDocument(ctx, job.input)
+		if err != nil {
+			return importer.Result{}, err
+		}
+	}
+	result, err := importer.ParseWithOptions(input, options)
 	if cancel := ctx.Err(); cancel != nil {
 		return importer.Result{}, cancel
 	}
 	return result, err
+}
+
+func (s *importerState) content() string {
+	if s.source == importSwaggerURL {
+		return s.url
+	}
+	return s.input
+}
+
+func (s *importerState) pathOptions() importer.Options {
+	return importer.Options{AddBasePath: s.basePath, AddHost: s.host}
 }
 
 func (s *importerState) invalidateReview() {
@@ -136,7 +162,7 @@ func (a *App) importDialog(c ui.C) {
 		s.dismiss()
 		return
 	}
-	if s.preview != nil && s.reviewedInput != s.input {
+	if s.preview != nil && s.reviewedInput != s.content() {
 		s.invalidateReview()
 	}
 	if s.loading {
@@ -157,7 +183,7 @@ func (a *App) importDialog(c ui.C) {
 		if result, err, ok := s.parse.Take(); ok {
 			s.parsing = false
 			// Even a programmatic edit cannot apply a result for older input.
-			if s.job.input == s.input {
+			if s.job.input == s.content() && s.job.url == (s.source == importSwaggerURL) && s.job.options == s.pathOptions() {
 				if err != nil {
 					s.err = a.importError(err, a.S.Import.Unknown)
 				} else if !s.accepts(result.Kind) {
@@ -201,7 +227,7 @@ func (a *App) importDialog(c ui.C) {
 			s.dismiss()
 		}
 		if s.preview == nil {
-			if ui.Button(c, a.S.Import.Review).Disabled(busy || strings.TrimSpace(s.input) == "").Clicked() {
+			if ui.Button(c, a.S.Import.Review).Disabled(busy || strings.TrimSpace(s.content()) == "").Clicked() {
 				a.reviewImport()
 			}
 		} else {
@@ -233,6 +259,8 @@ func (s *importerState) accepts(kind importer.Kind) bool {
 		return kind == importer.KindCurl
 	case importHAR:
 		return kind == importer.KindHAR
+	case importSwagger, importSwaggerURL:
+		return kind == importer.KindSwagger || kind == importer.KindOpenAPI
 	default:
 		return s.source == importAuto
 	}
@@ -253,6 +281,10 @@ func (a *App) importSourceHelp() string {
 		return text.CurlHelp
 	case importHAR:
 		return text.HARHelp
+	case importSwagger:
+		return text.SwaggerHelp
+	case importSwaggerURL:
+		return text.SwaggerURLHelp
 	default:
 		return text.AutoHelp
 	}
@@ -289,17 +321,30 @@ func (a *App) importSetup(c ui.C, busy bool) {
 	ui.Divider(c)
 	ui.Flow(c).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
 		ui.Text(c, text.PathHandling).Width(Space6 * 4).Shrink(0)
+		pathDisabled := busy || s.source != importSwagger && s.source != importSwaggerURL && s.source != importAuto
 		ui.Row(c).Gap(Space2).Items(ui.Center).Children(func() {
 			ui.Text(c, text.AddBasePath).Muted()
-			ui.Switch(c, &s.basePath, "").Label(text.AddBasePath).Disabled(true)
+			if ui.Switch(c, &s.basePath, "").Label(text.AddBasePath).Disabled(pathDisabled).Changed() {
+				s.invalidateReview()
+			}
 		})
 		ui.Row(c).Gap(Space2).Items(ui.Center).Children(func() {
 			ui.Text(c, text.AddHost).Muted()
-			ui.Switch(c, &s.host, "").Label(text.AddHost).Disabled(true)
+			if ui.Switch(c, &s.host, "").Label(text.AddHost).Disabled(pathDisabled).Changed() {
+				s.invalidateReview()
+			}
 		})
 		ui.Button(c, text.KeepPaths).Icon(icons.Info).IconOnly().Ghost().Tooltip(text.KeepPaths)
 	})
 	ui.Divider(c)
+	if s.source == importSwaggerURL {
+		ui.Wrap(c, text.SwaggerURLHelp).FillWidth().FontSize(theme.Metrics.FontSizeS).Muted()
+		if ui.TextField(c, &s.url, text.SchemaURL, text.SchemaURLPlaceholder).FillWidth().Disabled(busy).Changed() {
+			s.invalidateReview()
+		}
+		ui.Spacer(c).Grow(1)
+		return
+	}
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
 		file := ui.Button(c, text.SelectFile).Small().Ghost().Disabled(busy)
 		if !s.paste {
@@ -398,7 +443,7 @@ func (a *App) importSources(c ui.C, busy, compact bool) {
 		label  string
 		source importSource
 	}{
-		{text.SwaggerSource, importUnsupported}, {text.SwaggerURLSource, importUnsupported}, {text.PostmanSource, importPostman}, {text.ApifoxSource, importApifox}, {text.YAPISource, importUnsupported},
+		{text.SwaggerSource, importSwagger}, {text.SwaggerURLSource, importSwaggerURL}, {text.PostmanSource, importPostman}, {text.ApifoxSource, importApifox}, {text.YAPISource, importUnsupported},
 		{text.ApiPostSource, importApiPost}, {text.CurlSource, importCurl}, {text.MarkdownSource, importUnsupported}, {text.HARSource, importHAR}, {text.InsomniaSource, importUnsupported},
 		{text.APIDocSource, importUnsupported}, {text.ApizzaSource, importUnsupported}, {text.EolinkSource, importUnsupported}, {text.NativeSource, importNative}, {text.AutoSource, importAuto},
 	}
@@ -525,14 +570,14 @@ func (a *App) reviewImport() {
 		return
 	}
 	s.invalidateReview()
-	if len(s.input) > importer.MaxInputBytes {
+	if len(s.content()) > importer.MaxInputBytes {
 		s.err = a.S.Import.InputTooLarge
 		return
 	}
 	if s.parse == nil {
 		s.parse = ui.NewEffectKeyed(parseImport)
 	}
-	s.job = &importParseJob{input: s.input}
+	s.job = &importParseJob{input: s.content(), url: s.source == importSwaggerURL, options: s.pathOptions()}
 	s.parsing = true
 }
 
@@ -551,6 +596,10 @@ func (a *App) importReview(c ui.C) {
 		format = text.PostmanEnvironment
 	case importer.KindHAR:
 		format = text.HAR
+	case importer.KindSwagger:
+		format = text.SwaggerCollection
+	case importer.KindOpenAPI:
+		format = text.OpenAPICollection
 	}
 	name := text.NewRequest
 	requests, folders, variables := 0, 0, 0
@@ -615,7 +664,7 @@ func importCounts(items []model.Item) (requests, folders int) {
 // and input intact for retry; environment import never creates an empty entity.
 func (a *App) performImport() {
 	s := &a.importer
-	if !s.open || !s.committing || s.preview == nil || s.reviewedInput != s.input {
+	if !s.open || !s.committing || s.preview == nil || s.reviewedInput != s.content() {
 		return
 	}
 	s.committing = false

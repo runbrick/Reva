@@ -157,7 +157,15 @@ func identify(m object) Kind {
 	_, scope := m["_postman_variable_scope"]
 	_, values := m["values"]
 	_, log := m["log"]
-	if info || item {
+	_, swagger := m["swagger"]
+	_, openapi := m["openapi"]
+	if swagger {
+		candidates = append(candidates, KindSwagger)
+	}
+	if openapi {
+		candidates = append(candidates, KindOpenAPI)
+	}
+	if item || info && !swagger && !openapi {
 		candidates = append(candidates, KindPostman)
 	}
 	if version || items {
@@ -176,7 +184,7 @@ func identify(m object) Kind {
 		candidates = append(candidates, KindHAR)
 	}
 	unsupported := false
-	for _, k := range []string{"openapi", "swagger", "_type", "__export_format", "resources", "collections", "environments", "format", "snapshot", "encrypted", "ciphertext", "backup"} {
+	for _, k := range []string{"_type", "__export_format", "resources", "collections", "environments", "format", "snapshot", "encrypted", "ciphertext", "backup"} {
 		if _, ok := m[k]; ok {
 			unsupported = true
 		}

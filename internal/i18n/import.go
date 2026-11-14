@@ -2,6 +2,14 @@ package i18n
 
 // Import holds all copy and diagnostic mappings for the import dialog.
 type Import struct {
+	ManualTitle, Sources, AutoSource, NativeSource, PostmanSource, ApifoxSource, ApiPostSource      string
+	SwaggerSource, SwaggerURLSource, YAPISource, CurlSource, MarkdownSource, HARSource              string
+	InsomniaSource, APIDocSource, ApizzaSource, EolinkSource, UnsupportedSource, MoreSources        string
+	Location, CurrentCollection, NewCollection, SelectCollection, NoCollection, CurrentHelp         string
+	PathHandling, AddBasePath, AddHost, KeepPaths, SelectFile, PasteContent, Details, UploadHint    string
+	AutoHelp, NativeHelp, PostmanHelp, ApifoxHelp, ApiPostHelp, CurlHelp, HARHelp, FileLoaded       string
+	SourceMismatch, EnvironmentDestination, MissingDestination, VariableConflict, AppendDestination string
+
 	Title, Description, Input, Placeholder                                                        string
 	LoadFile, JSONFiles, HARFiles, AllFiles, Submit, Cancel                                       string
 	Unknown, InvalidCurl, InvalidPostman                                                          string
@@ -17,6 +25,21 @@ type Import struct {
 }
 
 var importZh = Import{
+	ManualTitle: "导入项目（手动）", Sources: "数据来源", AutoSource: "自动识别", NativeSource: "Reva",
+	PostmanSource: "Postman", ApifoxSource: "Apifox", ApiPostSource: "Apipost", SwaggerSource: "Swagger", SwaggerURLSource: "Swagger URL",
+	YAPISource: "YApi", CurlSource: "cURL 导入", MarkdownSource: ".md 文件", HARSource: ".har 文件", InsomniaSource: "Insomnia",
+	APIDocSource: "Apidoc", ApizzaSource: "Apizza", EolinkSource: "Eolink", UnsupportedSource: "暂不支持此来源，请使用其他受支持的格式。", MoreSources: "滚动查看更多来源",
+	Location: "导入位置", CurrentCollection: "导入已有集合", NewCollection: "作为新项目", SelectCollection: "目标集合", NoCollection: "请先创建一个集合。",
+	CurrentHelp:  "以独立文件夹追加，变量共享到目标集合；同名变量冲突时请作为新项目导入。",
+	PathHandling: "路径处理方式", AddBasePath: "接口路径加上 basePath", AddHost: "接口路径加上 host", KeepPaths: "保留原始 URL；路径拼接仅适用于尚未支持的 Swagger / OpenAPI。",
+	SelectFile: "选择文件", PasteContent: "粘贴内容", Details: "查看详细说明", UploadHint: "点击上传文件，或切换到「粘贴内容」；最大 32 MiB。",
+	AutoHelp: "自动识别 Reva、Postman、HAR 或 cURL；一次导入一个集合、环境或请求。", NativeHelp: "支持 Reva v1 集合和环境 JSON 文件。",
+	PostmanHelp: "支持 Postman v2.0 / v2.1 集合与单个环境的 JSON 导出文件。", ApifoxHelp: "请在 Apifox 中选择「设置 → 导出数据 → Postman」，再上传导出的 JSON；不支持专有项目格式。",
+	ApiPostHelp: "请在 ApiPost 中选择「项目设置 → 导出项目 → Postman 2.1」，再上传导出的 JSON；不支持专有项目格式。",
+	CurlHelp:    "粘贴单条 cURL 命令；仅解析请求，不会执行命令或读取引用的文件。", HARHelp: "支持 HAR 1.2 文件；仅提取请求，响应和耗时不会导入历史记录。",
+	FileLoaded: "已选择：%s · %.1f KiB", SourceMismatch: "内容与所选数据来源不符，请选择对应来源或「自动识别」。",
+	EnvironmentDestination: "环境文件请「作为新项目」导入，导入后可手动启用。", MissingDestination: "目标集合已不存在，请重新选择导入位置。",
+	VariableConflict: "目标集合存在值或启用状态不同的同名变量，请「作为新项目」导入。", AppendDestination: "追加到集合：%s（独立文件夹）",
 	Title: "导入", Description: "先检查内容和兼容性提示，确认后再导入。",
 	Input: "导入内容", Placeholder: "粘贴 curl、Reva / Postman JSON 或 HAR…",
 	LoadFile: "打开文件", JSONFiles: "JSON 文件", HARFiles: "HAR 文件", AllFiles: "所有文件",
@@ -42,6 +65,21 @@ var importZh = Import{
 }
 
 var importEn = Import{
+	ManualTitle: "Import project (manual)", Sources: "Data source", AutoSource: "Auto detect", NativeSource: "Reva",
+	PostmanSource: "Postman", ApifoxSource: "Apifox", ApiPostSource: "Apipost", SwaggerSource: "Swagger", SwaggerURLSource: "Swagger URL",
+	YAPISource: "YApi", CurlSource: "cURL import", MarkdownSource: ".md file", HARSource: ".har file", InsomniaSource: "Insomnia",
+	APIDocSource: "Apidoc", ApizzaSource: "Apizza", EolinkSource: "Eolink", UnsupportedSource: "This source is not supported yet. Choose a supported format.", MoreSources: "Scroll for more sources",
+	Location: "Import location", CurrentCollection: "Existing collection", NewCollection: "As a new project", SelectCollection: "Destination collection", NoCollection: "Create a collection first.",
+	CurrentHelp:  "Append in a separate folder and share variables with the destination. Use a new project if variable values conflict.",
+	PathHandling: "Path handling", AddBasePath: "Add basePath to paths", AddHost: "Add host to paths", KeepPaths: "Keep original URLs. Path joining applies to Swagger / OpenAPI, which is not supported yet.",
+	SelectFile: "Select file", PasteContent: "Paste content", Details: "View instructions", UploadHint: "Click to upload a file, or switch to Paste content. Up to 32 MiB.",
+	AutoHelp: "Detect Reva, Postman, HAR or cURL. Import one collection, environment or request at a time.", NativeHelp: "Supports Reva v1 collection and environment JSON files.",
+	PostmanHelp: "Supports Postman v2.0 / v2.1 collection and single environment JSON exports.", ApifoxHelp: "In Apifox, choose Settings → Export data → Postman, then upload the JSON export. Proprietary project formats are unsupported.",
+	ApiPostHelp: "In ApiPost, choose Project settings → Export project → Postman 2.1, then upload the JSON export. Proprietary project formats are unsupported.",
+	CurlHelp:    "Paste one cURL command. Import only parses the request; it never executes commands or reads referenced files.", HARHelp: "Supports HAR 1.2 files. Only requests are extracted; responses and timings are not restored as history.",
+	FileLoaded: "Selected: %s · %.1f KiB", SourceMismatch: "Content does not match the selected source. Choose the matching source or Auto detect.",
+	EnvironmentDestination: "Import environment files as a new project, then activate them manually.", MissingDestination: "The destination collection no longer exists. Choose an import location again.",
+	VariableConflict: "The destination has a variable with a different value or enabled state. Import as a new project.", AppendDestination: "Append to collection: %s (separate folder)",
 	Title: "Import", Description: "Review content and compatibility notices before confirming the import.",
 	Input: "Import content", Placeholder: "Paste curl, Reva / Postman JSON, or HAR…",
 	LoadFile: "Open file", JSONFiles: "JSON files", HARFiles: "HAR files", AllFiles: "All files",

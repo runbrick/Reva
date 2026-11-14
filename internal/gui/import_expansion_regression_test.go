@@ -42,7 +42,7 @@ func importRegressionServices(t *testing.T) (service.Services, string) {
 func importRegressionReview(h *harness, input string) {
 	h.t.Helper()
 	h.click(h.App.S.Import.Title)
-	h.typeInto(h.App.S.Import.Input, input)
+	importTypeInto(h, input)
 	reviewImportForTest(h)
 	if h.App.importer.preview == nil {
 		h.t.Fatal("supported fixture did not reach review")
@@ -215,7 +215,7 @@ func TestImportCancelledOldParseCannotReplaceNewReview(t *testing.T) {
 		return importer.Parse(job.input)
 	})
 	h.click(h.App.S.Import.Title)
-	h.typeInto(h.App.S.Import.Input, oldInput)
+	importTypeInto(h, oldInput)
 	h.click(h.App.S.Import.Review)
 	h.waitFor("old parse start", func() bool {
 		select {

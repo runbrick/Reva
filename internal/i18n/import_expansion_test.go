@@ -17,12 +17,17 @@ func TestImportCopyCoversDiagnosticsAndCompatibilityRoutes(t *testing.T) {
 		"unsupported_version": "UnsupportedVersion", "ambiguous_format": "AmbiguousFormat", "input_too_large": "InputTooLarge",
 		"limit_exceeded": "LimitExceeded", "invalid_structure": "InvalidStructure", "invalid_auth": "InvalidAuth",
 		"unsupported_auth": "UnsupportedAuth", "unsupported_body": "UnsupportedBody", "invalid_curl": "InvalidCurl",
+		"invalid_source_url": "InvalidSourceURL", "fetch_failed": "FetchFailed",
+		"unsupported_reference": "UnsupportedReference", "unsupported_parameter": "UnsupportedParameter",
 	}
 	warnings := map[string]string{
 		"scripts_omitted": "ScriptsOmitted", "metadata_omitted": "MetadataOmitted", "examples_omitted": "ExamplesOmitted",
 		"path_variables_unresolved": "PathVariablesUnresolved", "dynamic_variables_unsupported": "DynamicVariablesUnsupported",
 		"local_file_references": "LocalFileReferences", "form_metadata_omitted": "FormMetadataOmitted", "transport_flags_ignored": "TransportFlagsIgnored",
 		"har_response_omitted": "HARResponseOmitted", "har_cookies_omitted": "HARCookiesOmitted",
+		"openapi_review": "OpenAPIReview", "openapi_selection": "OpenAPISelection",
+		"openapi_empty_server": "OpenAPIEmptyServer", "openapi_schema_choice": "OpenAPISchemaChoice",
+		"openapi_schema_incomplete": "OpenAPISchemaIncomplete", "openapi_nonstandard_path": "OpenAPINonstandardPath",
 	}
 	// Discover emitted codes as well as checking the frozen contract: a new
 	// parser code must never silently use the generic untranslated fallback.

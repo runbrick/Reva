@@ -1,0 +1,51 @@
+{
+  "openapi": "3.0.0",
+  "info": {"title": "Export compatibility fixture", "version": "1.0"},
+  "servers": [{"url": "", "variables": {}}, {"url": "https://other.example.test/v2"}],
+  "components": {
+    "schemas": {
+      "Choice": {"anyOf": [{"$ref": "#/components/schemas/MissingExportDefinition"}, {"type": "string"}]}
+    }
+  },
+  "paths": {
+    "/empty": {"get": {
+      "tags": ["Imported"],
+      "requestBody": {"content": {"application/json": {"schema": {}, "example": ""}}}
+    }},
+    "/json": {"post": {
+      "tags": ["Imported"],
+      "requestBody": {"content": {"application/json": {
+        "schema": {"type": "object", "properties": {"title": {"type": "string"}}},
+        "example": "{\"title\":\"示例\",\"enabled\":true}"
+      }}}
+    }},
+    "/scalar": {"post": {
+      "tags": ["Imported"],
+      "requestBody": {"content": {"application/json": {"schema": {"type": "string"}, "example": "true"}}}
+    }},
+    "/query": {"get": {
+      "tags": ["Imported"],
+      "parameters": [{
+        "name": "scope", "in": "query", "required": false, "example": "",
+        "schema": {"type": "object", "properties": {"directory": {"type": "string"}, "workspace": {"type": "string"}}, "additionalProperties": false}
+      }]
+    }},
+    "/schema": {"put": {
+      "tags": ["Imported"],
+      "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Choice"}, "example": ""}}}
+    }},
+    "/upload": {"post": {
+      "tags": ["Imported"],
+      "requestBody": {"content": {"multipart/form-data": {"schema": {
+        "type": "object", "required": ["file", "label", ""],
+        "properties": {
+          "file": {"type": "string", "format": "binary", "example": "C:/not-opened/example.csv"},
+          "label": {"type": "string", "example": "demo"}
+        }
+      }}}}
+    }},
+    "https://fixed.example.test/items": {"get": {"tags": ["Imported"]}},
+    "{{baseUrl}}/items": {"get": {"tags": ["Imported"]}},
+    "localhost:14001/items": {"get": {"tags": ["Imported"]}}
+  }
+}

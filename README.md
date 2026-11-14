@@ -76,6 +76,46 @@ the input available; save failures preserve the review for retry.
 
 Supported inputs create one new entity, without replacing existing data:
 
+- Swagger 2.0 and OpenAPI 3.0/3.1 **JSON**, through **Swagger** (file/paste),
+  **Swagger URL**, or automatic format detection. URL import accepts a directly
+  accessible HTTP(S) JSON document, rather than a Swagger UI HTML page. Only
+  clicking **Review import** fetches it, with cancellation, a 30-second timeout,
+  a 32 MiB response limit, and at most nine followed redirects. Confirmation
+  saves the reviewed result without another fetch. Relative OpenAPI servers
+  resolve against the final document URL after redirects.
+  Operations become request templates, grouped by their first tag. Summary,
+  operation ID, method/path, simple path/query/header parameters, examples and
+  defaults, JSON/text bodies and supported text forms are converted. Query objects
+  using `form` style with `explode: true` become individual query rows; nested
+  objects and custom object serialization remain unsupported. Local JSON
+  Pointer references are resolved; external references are never fetched.
+  Basic, Bearer and header/query API-key security become configurable auth with
+  credential placeholders; explicit empty operation security disables auth.
+  Path parameters become collection variables. Optional parameters without
+  examples/defaults start disabled. **Add basePath** and **Add host** independently
+  include the base path and scheme/host (OpenAPI uses the selected server URL);
+  both initially start off in the dialog. Other formats retain their URLs.
+  Multiple servers, media types, examples or security alternatives produce a
+  selection notice: the first array entry is used; maps use sorted key order,
+  and request-body media types prefer `application/json`. An empty selected server
+  URL keeps paths relative (URL imports resolve against the document origin) and
+  warns; another environment is never chosen automatically. Full URLs, base URL
+  variables and host:port addresses in vendor path fields are retained verbatim
+  with a review notice, without prepending a server. JSON examples stored as text
+  are decoded when the schema is not a string; empty JSON-body placeholders with
+  empty schemas become no body. Multipart binary fields are retained as disabled
+  file references: import never opens them; reselect and enable before sending.
+  `oneOf`/`anyOf` use the first branch with a notice. Missing local request-body
+  schema definitions use `null` placeholders with a notice; the operation is kept
+  for editing. Generated templates
+  always require acknowledgement: review values, path variables and credentials
+  before sending. Responses, documentation, schema constraints, callbacks and
+  extensions are omitted. Unsupported auth, combined security requirements,
+  cookie/custom-serialized parameters, binary bodies outside supported multipart
+  file references, form encodings, `allOf` without explicit examples, recursive
+  refs, external refs and missing parameter or requestBody object references block import.
+  YAML is not supported. Generated output and reference expansion
+  are bounded as well as the source document.
 - Reva schema-v1 collection and standalone environment JSON. Current fields,
   shared auth, request options, disabled rows, descriptions, and empty folders
   are retained. Native scripts are retained but never executed by import.
@@ -102,7 +142,8 @@ Supported inputs create one new entity, without replacing existing data:
 
 For **Apifox**, use **Settings > Export data > Postman**. For **ApiPost**, use
 **Project settings > Export project > Postman 2.1** (or copy one request as curl).
-Import the resulting Postman file; proprietary Apifox/ApiPost project exports are
+Import the resulting Postman file; Swagger/OpenAPI JSON exports can also use the
+Swagger entry. Proprietary Apifox/ApiPost project exports are
 unsupported. This is a compatibility route, not a lossless migration or vendor
 version certification. Inspect all notices and review requests before sending.
 
@@ -110,15 +151,21 @@ File and pasted input share a **32 MiB** UTF-8 limit. One JSON object is accepte
 invalid JSON, duplicate object keys and ambiguous formats are rejected. Limits
 are 256 nested item levels, 10,000 aggregate tree nodes/requests, 100,000 aggregate
 key/value/form rows, and a defensive 1,024 JSON-container nesting cap. Split
-larger exports. JSON/BOM whitespace is supported; OpenAPI/Swagger, Insomnia, YAML,
+larger exports. JSON/BOM whitespace is supported; Insomnia, YAML,
 bulk dumps and backup restore are outside this importer. Encrypted backup/sync
 restore remains a separate feature.
 
 Imported collections and environments get fresh IDs. Environments are saved
 without automatic activation; existing drafts and preferences remain unchanged.
 Imported credentials remain configured credentials in local JSON, not a vault.
-Import does not resolve variables, send requests, fetch schemas, or execute
-scripts. Native scripts may execute later through the normal explicit send flow.
+Import does not resolve Reva variables, send imported requests, or execute scripts.
+Only the explicitly selected Swagger URL flow fetches a schema; file/paste parsing
+stays offline. Native scripts may execute later through the normal explicit send flow.
+
+Choose **Existing collection** to append imported requests in a separate folder,
+preserving existing items and the imported auth scope. Imported variables are
+shared with the destination; conflicting variable values block append and can
+instead be imported as a new project.
 
 ## Checks
 

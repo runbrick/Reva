@@ -43,7 +43,7 @@ func TestImportSmokeReviewGateAndEdit(t *testing.T) {
 				input = smokeWarnedCollection
 			}
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, input)
+			importTypeInto(h, input)
 			reviewImportForTest(h)
 			if len(h.Svc.Collections.List()) != 0 || len(h.Svc.Environments.List()) != 0 || len(h.App.tabs) != 1 {
 				t.Fatal("review mutated data")
@@ -72,7 +72,7 @@ func TestImportSmokeReviewGateAndEdit(t *testing.T) {
 			if h.App.importer.preview != nil || h.App.importer.acknowledged || h.App.importer.input != input {
 				t.Fatal("back did not invalidate review and preserve input")
 			}
-			h.typeInto(h.App.S.Import.Input, " ")
+			importTypeInto(h, " ")
 			reviewImportForTest(h)
 			if warned {
 				if h.App.importer.acknowledged || !importSmokeHit(t, h, h.App.S.Import.Submit).Disabled {
@@ -82,7 +82,7 @@ func TestImportSmokeReviewGateAndEdit(t *testing.T) {
 			}
 			h.click(h.App.S.Import.Submit)
 			if len(h.Svc.Collections.List()) != 1 || h.App.importer.open {
-				t.Fatal("confirmed import failed")
+				t.Fatalf("confirmed import failed: open=%t preview=%#v error=%q input=%q", h.App.importer.open, h.App.importer.preview, h.App.importer.err, h.App.importer.input)
 			}
 			// A duplicate queued invocation after success has no authority to write.
 			h.App.performImport()
@@ -122,7 +122,7 @@ func TestImportSmokeNativeEnvironmentAndHAR(t *testing.T) {
 			h := newHarness(t, svc)
 			before := h.App.Active().Request.Clone()
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, tc.input)
+			importTypeInto(h, tc.input)
 			reviewImportForTest(h)
 			if h.App.importer.preview == nil {
 				t.Fatalf("no preview: %s", h.App.importer.err)
@@ -205,7 +205,7 @@ func TestImportSmokeSaveRetryAndCancel(t *testing.T) {
 				input = `{"version":1,"name":"Retry","variables":[]}`
 			}
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, input)
+			importTypeInto(h, input)
 			reviewImportForTest(h)
 			preview := h.App.importer.preview
 			h.click(h.App.S.Import.Submit)
@@ -224,7 +224,7 @@ func TestImportSmokeSaveRetryAndCancel(t *testing.T) {
 				t.Fatal("unexpected number of writes")
 			}
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, input)
+			importTypeInto(h, input)
 			reviewImportForTest(h)
 			h.click(h.App.S.Import.Cancel)
 			if len(svc.Environments.List())+len(svc.Collections.List()) != 1 {
@@ -247,7 +247,7 @@ func TestImportSmokeCancelLateParseAndReopen(t *testing.T) {
 				return importer.Parse(job.input)
 			})
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, smokeWarnedCollection)
+			importTypeInto(h, smokeWarnedCollection)
 			h.click(h.App.S.Import.Review)
 			h.waitFor("parse started", func() bool {
 				select {
@@ -350,7 +350,7 @@ func TestImportSmokeCancelLateFile(t *testing.T) {
 		return smokeWarnedCollection, nil
 	})
 	h.click(h.App.S.Import.Title)
-	h.typeInto(h.App.S.Import.Input, "keep original input")
+	importTypeInto(h, "keep original input")
 	if err := h.D.QueueOpenFiles([]string{"unused.json"}, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +405,7 @@ func TestImportSmokeLanguagesThemesAndLayout(t *testing.T) {
 					input := `{"info":{"name":"Layout"},"item":[` + strings.Join(items, ",") + `]}`
 					h.click(h.App.S.Import.Title)
 					importSmokeLayout(t, h)
-					h.typeInto(h.App.S.Import.Input, input)
+					importTypeInto(h, input)
 					reviewImportForTest(h)
 					if h.App.importer.preview == nil {
 						t.Fatal(h.App.importer.err)

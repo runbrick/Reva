@@ -12,6 +12,7 @@ import (
 	"github.com/runbrick/reva/internal/service"
 	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/app"
+	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -26,7 +27,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 			}
 			h := newHarness(t, svc)
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, `curl 'https://example.test/users?q=active' -H 'Authorization: Bearer {{token}}' -d '{"name":"你好"}'`)
+			importTypeInto(h, `curl 'https://example.test/users?q=active' -H 'Authorization: Bearer {{token}}' -d '{"name":"你好"}'`)
 			reviewImportForTest(h)
 			h.click(h.App.S.Import.Submit)
 			r := h.App.Active().Request
@@ -43,7 +44,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 func TestImportPostmanAddsCollection(t *testing.T) {
 	h := newHarness(t)
 	h.click(h.App.S.Import.Title)
-	h.typeInto(h.App.S.Import.Input, `{"info":{"name":"Imported API"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
+	importTypeInto(h, `{"info":{"name":"Imported API"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
 	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
 	cols := h.Svc.Collections.List()
@@ -66,7 +67,7 @@ func TestImportInvalidInputStaysOpen(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, tc.input)
+			importTypeInto(h, tc.input)
 			reviewImportForTest(h)
 			h.pump()
 			if !h.App.importer.open || h.App.importer.err == "" || !h.shows(string([]rune(strings.Split(h.App.importer.err, "\n")[0])[:8])) || h.App.importer.input != tc.input {
@@ -120,7 +121,7 @@ func TestImportFileErrorsAndCancellation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
 			h.click(h.App.S.Import.Title)
-			h.typeInto(h.App.S.Import.Input, "keep me")
+			importTypeInto(h, "keep me")
 			if err := h.D.QueueOpenFiles(tc.paths, tc.err); err != nil {
 				t.Fatal(err)
 			}
@@ -152,7 +153,7 @@ func TestImportCollectionSaveFailureStaysOpen(t *testing.T) {
 	svc.Collections = failedImportCollections{svc.Collections}
 	h := newHarness(t, svc)
 	h.click(h.App.S.Import.Title)
-	h.typeInto(h.App.S.Import.Input, `{"info":{"name":"Fail"},"item":[]}`)
+	importTypeInto(h, `{"info":{"name":"Fail"},"item":[]}`)
 	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
 	h.pump()
@@ -192,6 +193,20 @@ func BenchmarkImportDialogPaint(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func importTypeInto(h *harness, input string) {
+	h.t.Helper()
+	if !h.App.importer.paste {
+		h.click(h.App.S.Import.PasteContent)
+	}
+	h.click(h.App.S.Import.Input)
+	if err := h.D.Key(gfx.KeyEnd, 0); err != nil {
+		h.t.Fatal(err)
+	}
+	if err := h.D.Type(input); err != nil {
+		h.t.Fatal(err)
 	}
 }
 

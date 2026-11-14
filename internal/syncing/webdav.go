@@ -36,7 +36,7 @@ func NewWebDAV(config WebDAVConfig) (*WebDAV, error) {
 		}
 	}
 	if config.File == "" {
-		config.File = "reqo/backup.reqobak"
+		config.File = "reva/backup.revabak"
 	}
 	if strings.HasPrefix(config.File, "/") || strings.Contains(config.File, "..") || strings.ContainsAny(config.File, "\\\r\n\x00") || path.Clean(config.File) == "." {
 		return nil, errors.New("invalid backup file path")

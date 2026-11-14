@@ -13,10 +13,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )

@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runbrick/reqo/internal/gist"
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/s3"
-	"github.com/runbrick/reqo/internal/storage"
-	"github.com/runbrick/reqo/internal/syncing"
+	"github.com/runbrick/reva/internal/gist"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/s3"
+	"github.com/runbrick/reva/internal/storage"
+	"github.com/runbrick/reva/internal/syncing"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )
@@ -181,7 +181,7 @@ func (a *App) syncDialog(c ui.C) {
 				default:
 					ui.TextField(c, &s.editURL, labels.Address, "https://example.com/dav/").FillWidth()
 					ui.TextField(c, &s.editUser, labels.Username, "").FillWidth()
-					ui.TextField(c, &s.editFile, labels.RemoteFile, "reqo/backup.reqobak").FillWidth()
+					ui.TextField(c, &s.editFile, labels.RemoteFile, "reva/backup.revabak").FillWidth()
 					ui.TextField(c, &s.editServerPassword, labels.ServerPassword, "").FillWidth().Secure()
 				}
 				ui.TextField(c, &s.editBackupPassword, labels.BackupPassword, "").FillWidth().Secure()
@@ -247,7 +247,7 @@ func (a *App) configureSync() {
 	}
 	if s.config.Provider != config.Provider || s.config.URL != config.URL || s.config.Bucket != config.Bucket || s.config.SnippetID != config.SnippetID || s.config.File != config.File {
 		// A different remote starts with no common baseline.
-		if err := os.Remove(filepath.Join(a.settings.dir, "sync-baseline.reqobak")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.Remove(filepath.Join(a.settings.dir, "sync-baseline.revabak")); err != nil && !errors.Is(err, os.ErrNotExist) {
 			s.errorText = err.Error()
 			return
 		}
@@ -268,11 +268,11 @@ func (a *App) chooseBackupFile() {
 		s.errorText = a.S.Settings.ShortPassword
 		return
 	}
-	filter := []app.FileFilter{{Name: a.S.Settings.FileType, Pattern: "*.reqobak"}}
+	filter := []app.FileFilter{{Name: a.S.Settings.FileType, Pattern: "*.revabak"}}
 	var path string
 	var err error
 	if s.action == "export" {
-		path, err = app.SaveFile(app.SaveFileOptions{Title: a.S.Settings.Export, SuggestedName: "reqo.reqobak", Filters: filter})
+		path, err = app.SaveFile(app.SaveFileOptions{Title: a.S.Settings.Export, SuggestedName: "reva.revabak", Filters: filter})
 	} else {
 		var paths []string
 		paths, err = app.OpenFiles(app.OpenFileOptions{Title: a.S.Settings.Restore, Filters: filter})
@@ -463,9 +463,9 @@ func (a *App) finishSync(result syncResult) error {
 	if err != nil {
 		return err
 	}
-	name := "before-sync.reqobak"
+	name := "before-sync.revabak"
 	if result.action == "remote-restore" || result.action == "restore" {
-		name = "before-restore.reqobak"
+		name = "before-restore.revabak"
 	}
 	if err := storage.WriteFileAtomic(filepath.Join(a.settings.dir, name), data); err != nil {
 		return err

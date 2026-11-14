@@ -62,11 +62,11 @@ jobs:
         run: sh ./scripts/build.sh amd64
       - uses: actions/upload-artifact@v4
         with:
-          name: reqo-${{ matrix.platform }}
+          name: reva-${{ matrix.platform }}
           path: |
-            dist/${{ matrix.platform }}/reqo-*.zip
-            dist/${{ matrix.platform }}/reqo-*-setup.exe
-            dist/${{ matrix.platform }}/reqo-*.dmg
+            dist/${{ matrix.platform }}/reva-*.zip
+            dist/${{ matrix.platform }}/reva-*-setup.exe
+            dist/${{ matrix.platform }}/reva-*.dmg
           if-no-files-found: error
 
   publish:
@@ -75,7 +75,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: reqo-*
+          pattern: reva-*
           path: release
           merge-multiple: true
       - name: Verify both packages and generate checksums
@@ -85,9 +85,9 @@ jobs:
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
-          mapfile -t zip < <(find release -maxdepth 1 -name "reqo-${version}-windows-amd64.zip" -type f)
-          mapfile -t installer < <(find release -maxdepth 1 -name "reqo-${version}-windows-amd64-setup.exe" -type f)
-          mapfile -t dmg < <(find release -maxdepth 1 -name "reqo-${version}-darwin-amd64.dmg" -type f)
+          mapfile -t zip < <(find release -maxdepth 1 -name "reva-${version}-windows-amd64.zip" -type f)
+          mapfile -t installer < <(find release -maxdepth 1 -name "reva-${version}-windows-amd64-setup.exe" -type f)
+          mapfile -t dmg < <(find release -maxdepth 1 -name "reva-${version}-darwin-amd64.dmg" -type f)
           test "${#zip[@]}" -eq 1 && test "${#installer[@]}" -eq 1 && test "${#dmg[@]}" -eq 1
           (cd release && sha256sum "${installer[0]##*/}" "${zip[0]##*/}" "${dmg[0]##*/}" > SHA256SUMS)
       - name: Publish GitHub release
@@ -103,5 +103,5 @@ jobs:
             gh release upload "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --clobber
             gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
           else
-            gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "Reqo $RELEASE_TAG" --generate-notes --latest
+            gh release create "$RELEASE_TAG" release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "Reva $RELEASE_TAG" --generate-notes --latest
           fi

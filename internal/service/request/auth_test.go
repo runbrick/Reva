@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func TestAuthValidationBeforeNetworkAfterExpansion(t *testing.T) {

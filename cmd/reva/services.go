@@ -1,11 +1,11 @@
 package main
 
 import (
-	"github.com/runbrick/reqo/internal/service"
-	"github.com/runbrick/reqo/internal/service/fake"
-	"github.com/runbrick/reqo/internal/service/request"
-	"github.com/runbrick/reqo/internal/service/store"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/service/fake"
+	"github.com/runbrick/reva/internal/service/request"
+	"github.com/runbrick/reva/internal/service/store"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // services builds the service set the app runs on. Each service PR replaces

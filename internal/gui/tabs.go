@@ -1,9 +1,9 @@
 package gui
 
 import (
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"

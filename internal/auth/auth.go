@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 // SourceKind identifies the scope that supplied effective authentication.

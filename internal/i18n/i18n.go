@@ -1,4 +1,4 @@
-// Package i18n holds every user-visible string in Reqo, in Chinese (the
+// Package i18n holds every user-visible string in Reva, in Chinese (the
 // default) and English, as typed struct fields so a missing translation is a
 // compile error rather than a blank label.
 //

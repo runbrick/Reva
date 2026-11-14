@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/importer"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/importer"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 func TestImportExpansionFreshIDsCopyIsolationAndReload(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("REQO_HOME", dir)
+	t.Setenv("REVA_HOME", dir)
 	s, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -99,7 +99,7 @@ func TestImportExpansionActualWriteFailureRepairRetry(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			t.Setenv("REQO_HOME", dir)
+			t.Setenv("REVA_HOME", dir)
 			s, err := Open(dir)
 			if err != nil {
 				t.Fatal(err)
@@ -216,7 +216,7 @@ func snapshotImportFiles(t *testing.T, dir string) map[string]string {
 
 func TestImportExpansionEnvironmentRenameFailureCleanupAndIsolation(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("REQO_HOME", dir)
+	t.Setenv("REVA_HOME", dir)
 	s, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)

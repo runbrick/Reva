@@ -8,9 +8,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/runbrick/reqo/internal/i18n"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/i18n"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )

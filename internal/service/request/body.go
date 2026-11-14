@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 type bodyFactory func() (io.ReadCloser, string, error)

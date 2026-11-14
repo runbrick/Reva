@@ -1,4 +1,4 @@
-// Package model holds the plain data types Reqo stores on disk and passes
+// Package model holds the plain data types Reva stores on disk and passes
 // between services and the UI. It has no behavior beyond small helpers and
 // imports nothing outside the standard library.
 //
@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// SchemaVersion is written into every file Reqo persists.
+// SchemaVersion is written into every file Reva persists.
 const SchemaVersion = 1
 
 // Method is an HTTP method.

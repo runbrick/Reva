@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func TestApplyAuthExpandsCopyAndKeepsUnknownPlaceholders(t *testing.T) {

@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func TestAuthPersistenceRoundtripAndCopyIsolation(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("REQO_HOME", dir)
+	t.Setenv("REVA_HOME", dir)
 	s := openStore(t, dir)
 	r := model.NewRequest("request")
 	r.Name, r.Auth = "Inherited", model.Auth{Type: model.AuthInherit}
@@ -47,7 +47,7 @@ func TestAuthPersistenceRoundtripAndCopyIsolation(t *testing.T) {
 
 func TestAuthPersistenceLegacyMissingFieldsStayEmpty(t *testing.T) {
 	dir := t.TempDir()
-	t.Setenv("REQO_HOME", dir)
+	t.Setenv("REVA_HOME", dir)
 	must(t, os.MkdirAll(filepath.Join(dir, "collections"), 0700))
 	must(t, os.WriteFile(filepath.Join(dir, "collections", "legacy.json"), []byte(`{"version":1,"id":"legacy","name":"Old","items":[{"type":"folder","id":"f","name":"Folder","items":[{"type":"request","id":"r","name":"Old request","request":{"id":"r","name":"Old request","method":"GET","url":"https://example.test"}}]}]}`), 0600))
 	s := openStore(t, dir)

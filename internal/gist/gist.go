@@ -18,7 +18,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/cloudsync"
+	"github.com/runbrick/reva/internal/cloudsync"
 )
 
 // Provider is the service that holds the snippet.
@@ -58,7 +58,7 @@ type Config struct {
 }
 
 // DefaultFile is the file name used when the user gives none.
-const DefaultFile = "reqo-backup.reqobak.b64"
+const DefaultFile = "reva-backup.revabak.b64"
 
 // DefaultAPIBase is where GitHub's gists live.
 const DefaultAPIBase = "https://api.github.com"
@@ -179,7 +179,7 @@ func (client *Client) do(ctx context.Context, method, route string, body any) (*
 	} else {
 		request.Header.Set("Accept", "application/json")
 	}
-	request.Header.Set("User-Agent", "reqo")
+	request.Header.Set("User-Agent", "reva")
 	if body != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
@@ -387,7 +387,7 @@ func (client *Client) Get(ctx context.Context) (data []byte, tag string, err err
 	}
 	data, err = base64.StdEncoding.DecodeString(strings.TrimSpace(file.Content))
 	if err != nil {
-		return nil, "", errors.New("gist: the file is not a Reqo backup")
+		return nil, "", errors.New("gist: the file is not a Reva backup")
 	}
 	return data, client.tag(g), nil
 }
@@ -407,10 +407,10 @@ func (client *Client) Put(ctx context.Context, data []byte, previous string) (ta
 	var body any = map[string]any{"files": files}
 	if client.config.ID == "" {
 		method, route = http.MethodPost, "/gists"
-		body = map[string]any{"description": "Reqo encrypted backup", "public": false, "files": files}
+		body = map[string]any{"description": "Reva encrypted backup", "public": false, "files": files}
 	} else {
 		if client.config.Provider == Gitee {
-			body = map[string]any{"description": "Reqo encrypted backup", "files": files}
+			body = map[string]any{"description": "Reva encrypted backup", "files": files}
 		}
 		g, found, err := client.fetch(ctx)
 		if err != nil {

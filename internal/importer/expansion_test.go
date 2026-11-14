@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func parseOK(t testing.TB, input string) Result {
@@ -353,7 +353,7 @@ func TestImportValidationIsBounded(t *testing.T) {
 	for _, input := range []string{`{"info":{"name":"C"},"item":[],"log":{}}`, `{"version":1,"name":"N","variables":[],"values":[]}`, `{"version":1,"collections":[]}`} {
 		parseFails(t, input, "ambiguous_format")
 	}
-	for _, input := range []string{`{"openapi":"3.0.0"}`, `{"swagger":"2.0"}`, `{"_type":"export","resources":[]}`, `{"format":"reqo-backup-v1","data":"private-marker"}`, `{"collections":[],"environments":[]}`} {
+	for _, input := range []string{`{"openapi":"3.0.0"}`, `{"swagger":"2.0"}`, `{"_type":"export","resources":[]}`, `{"format":"reva-backup-v1","data":"private-marker"}`, `{"collections":[],"environments":[]}`} {
 		parseFails(t, input, "unsupported_format")
 	}
 	for _, input := range []string{`{"version":2,"name":"N","variables":[]}`, `{"log":{"version":"1.3","entries":[]}}`, `{"info":{"name":"P","schema":"https://private-marker/v2.1.0/fake"},"item":[]}`} {
@@ -393,7 +393,7 @@ func FuzzParseNeverPanics(f *testing.F) {
 		pmRequest(`{"mode":"graphql","graphql":{"query":"literal"}}`, ""),
 		pmRequest("", `{"type":"bearer","bearer":[{"key":"token","value":null}]}`),
 		" \n\ufeff" + `{"version":1,"name":"空","items":null}`,
-		`{"format":"reqo-backup-v1","ciphertext":"literal"}`,
+		`{"format":"reva-backup-v1","ciphertext":"literal"}`,
 		harInput(`{"mimeType":"application/json","text":"e30=","encoding":"base64"}`),
 	} {
 		f.Add(s)

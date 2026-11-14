@@ -18,27 +18,27 @@ try {
     New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 
     # Keep a bare stripped binary as a baseline for the resource overhead.
-    & go build -trimpath -ldflags "-s -w -buildid= -H=windowsgui" -o "$outputDir/reqo-stripped.exe" ./cmd/reqo
+    & go build -trimpath -ldflags "-s -w -buildid= -H=windowsgui" -o "$outputDir/reva-stripped.exe" ./cmd/reva
     if ($LASTEXITCODE -ne 0) { throw "Stripped baseline build failed." }
-    & go tool viva build --target windows --arch $Arch -o "$outputDir/reqo.exe"
+    & go tool viva build --target windows --arch $Arch -o "$outputDir/reva.exe"
     if ($LASTEXITCODE -ne 0) { throw "Release build failed." }
-    & go tool viva package --target windows --arch $Arch --format nsis,zip --no-sign --program "$outputDir/reqo.exe" -o $outputDir
+    & go tool viva package --target windows --arch $Arch --format nsis,zip --no-sign --program "$outputDir/reva.exe" -o $outputDir
     if ($LASTEXITCODE -ne 0) { throw "Packaging failed." }
 
-    $program = Get-Item -LiteralPath "$outputDir/reqo.exe"
-    if ($program.VersionInfo.ProductName -ne "Reqo" -or [string]::IsNullOrWhiteSpace($program.VersionInfo.ProductVersion)) {
+    $program = Get-Item -LiteralPath "$outputDir/reva.exe"
+    if ($program.VersionInfo.ProductName -ne "Reva" -or [string]::IsNullOrWhiteSpace($program.VersionInfo.ProductVersion)) {
         throw "The release executable is missing the expected version resources."
     }
     $version = $program.VersionInfo.ProductVersion
     $packages = @(
-        Get-Item -LiteralPath "$outputDir/reqo-$version-windows-$Arch-setup.exe"
-        Get-Item -LiteralPath "$outputDir/reqo-$version-windows-$Arch.zip"
+        Get-Item -LiteralPath "$outputDir/reva-$version-windows-$Arch-setup.exe"
+        Get-Item -LiteralPath "$outputDir/reva-$version-windows-$Arch.zip"
     )
     if (@($packages | Where-Object Length -eq 0).Count -gt 0) {
         throw "Windows packaging produced an empty artifact."
     }
     foreach ($artifact in @(
-        Get-Item -LiteralPath "$outputDir/reqo-stripped.exe"
+        Get-Item -LiteralPath "$outputDir/reva-stripped.exe"
         $program
         $packages
     )) {

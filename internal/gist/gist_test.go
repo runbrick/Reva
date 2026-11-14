@@ -14,7 +14,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/cloudsync"
+	"github.com/runbrick/reva/internal/cloudsync"
 )
 
 const testToken = "github_pat_test_token"

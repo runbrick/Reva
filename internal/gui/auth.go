@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/ui"
 )
 

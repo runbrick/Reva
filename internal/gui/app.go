@@ -1,4 +1,4 @@
-// Package gui is Reqo's user interface, written with Viva.
+// Package gui is Reva's user interface, written with Viva.
 //
 // The App owns the window layout and the send pipeline. Every feature lives
 // in its own file and owns its own state struct and draw functions:
@@ -22,13 +22,13 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/i18n"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service"
-	"github.com/runbrick/reqo/internal/storage"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/i18n"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/storage"
+	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"

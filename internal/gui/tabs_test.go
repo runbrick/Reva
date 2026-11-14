@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"

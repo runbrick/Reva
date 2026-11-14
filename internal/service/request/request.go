@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/vars"
 )
 
 const (
@@ -117,7 +117,7 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	if err := auth.ApplyHeaders(httpReq.Header, req.Auth); err != nil {
 		return model.Response{}, err
 	}
-	setDefaultHeader(httpReq.Header, "User-Agent", "Reqo/0.1")
+	setDefaultHeader(httpReq.Header, "User-Agent", "Reva/0.1")
 	if contentType != "" {
 		setDefaultHeader(httpReq.Header, "Content-Type", contentType)
 	}

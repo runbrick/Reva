@@ -1,7 +1,7 @@
 package gui
 
 import (
-	"github.com/runbrick/reqo/internal/format"
+	"github.com/runbrick/reva/internal/format"
 	"github.com/vivaui/viva/components"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/text"

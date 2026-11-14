@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )

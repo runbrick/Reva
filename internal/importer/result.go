@@ -4,12 +4,12 @@ import (
 	"sort"
 	"unicode/utf8"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 const (
-	KindNativeCollection   Kind = "reqo-collection"
-	KindNativeEnvironment  Kind = "reqo-environment"
+	KindNativeCollection   Kind = "reva-collection"
+	KindNativeEnvironment  Kind = "reva-environment"
 	KindPostmanEnvironment Kind = "postman-environment"
 	KindHAR                Kind = "har"
 	MaxInputBytes               = 32 << 20

@@ -3,8 +3,8 @@ package importer
 import (
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // Postman keeps the legacy API, with the same blocking validation as Parse.

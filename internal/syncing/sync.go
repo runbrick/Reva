@@ -1,4 +1,4 @@
-// Package syncing stores an encrypted snapshot of Reqo data in one remote file.
+// Package syncing stores an encrypted snapshot of Reva data in one remote file.
 package syncing
 
 import (
@@ -16,10 +16,10 @@ import (
 	"slices"
 	"time"
 
-	"github.com/runbrick/reqo/internal/cloudsync"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/cloudsync"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 const MaxBytes = 32 << 20
@@ -57,7 +57,7 @@ func Seal(snapshot Snapshot, password string) ([]byte, error) {
 	if len(plain) > MaxBytes/2 {
 		return nil, errors.New("backup exceeds size limit")
 	}
-	file := envelope{Format: "reqo-backup-v1", Salt: make([]byte, 16), Nonce: make([]byte, 12)}
+	file := envelope{Format: "reva-backup-v1", Salt: make([]byte, 16), Nonce: make([]byte, 12)}
 	if _, err = rand.Read(file.Salt); err != nil {
 		return nil, err
 	}
@@ -85,8 +85,8 @@ func Open(data []byte, password string) (Snapshot, error) {
 		return Snapshot{}, errors.New("backup exceeds size limit")
 	}
 	var file envelope
-	if json.Unmarshal(data, &file) != nil || file.Format != "reqo-backup-v1" || len(file.Salt) != 16 || len(file.Nonce) != 12 || len(file.Data) > MaxBytes {
-		return Snapshot{}, errors.New("invalid or unsupported Reqo backup")
+	if json.Unmarshal(data, &file) != nil || file.Format != "reva-backup-v1" || len(file.Salt) != 16 || len(file.Nonce) != 12 || len(file.Data) > MaxBytes {
+		return Snapshot{}, errors.New("invalid or unsupported Reva backup")
 	}
 	key, err := pbkdf2.Key(sha256.New, password, file.Salt, iterations, 32)
 	if err != nil {
@@ -106,7 +106,7 @@ func Open(data []byte, password string) (Snapshot, error) {
 	}
 	var snapshot Snapshot
 	if err := json.Unmarshal(plain, &snapshot); err != nil || snapshot.Version != 1 {
-		return Snapshot{}, errors.New("invalid or unsupported Reqo backup")
+		return Snapshot{}, errors.New("invalid or unsupported Reva backup")
 	}
 	return snapshot, nil
 }
@@ -428,7 +428,7 @@ func Upload(ctx context.Context, remote Remote, snapshot Snapshot, password, tag
 
 // Baseline is the last remote state successfully merged on this device.
 func Baseline(dir, password string) (Snapshot, error) {
-	data, err := os.ReadFile(filepath.Join(dir, "sync-baseline.reqobak"))
+	data, err := os.ReadFile(filepath.Join(dir, "sync-baseline.revabak"))
 	if errors.Is(err, os.ErrNotExist) {
 		return Snapshot{Version: 1}, nil
 	}
@@ -443,5 +443,5 @@ func SaveBaseline(dir string, snapshot Snapshot, password string) error {
 	if err != nil {
 		return err
 	}
-	return storage.WriteFileAtomic(filepath.Join(dir, "sync-baseline.reqobak"), data)
+	return storage.WriteFileAtomic(filepath.Join(dir, "sync-baseline.revabak"), data)
 }

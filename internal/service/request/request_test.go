@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/request"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/request"
 )
 
 func uploadFile(t *testing.T, name, text string) string {
@@ -135,7 +135,7 @@ func TestSendParamsHeadersAndScheme(t *testing.T) {
 		if got := r.Header.Values("X-Multi"); !slices.Equal(got, []string{"one", "two"}) {
 			t.Errorf("multi header = %v", got)
 		}
-		if r.Header.Get("X-Off") != "" || r.Header.Get("User-Agent") != "Reqo/0.1" {
+		if r.Header.Get("X-Off") != "" || r.Header.Get("User-Agent") != "Reva/0.1" {
 			t.Errorf("headers = %v", r.Header)
 		}
 		if r.Host != "custom.local" {

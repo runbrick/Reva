@@ -1,8 +1,8 @@
 package importer
 
 import (
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 func (c *conversion) environment(m object) *model.Environment {

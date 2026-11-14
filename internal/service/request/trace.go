@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 // sendTrace measures the entire redirect chain, but retains only the final

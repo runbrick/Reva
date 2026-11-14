@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func TestSendRequestTimeoutIncludesBody(t *testing.T) {

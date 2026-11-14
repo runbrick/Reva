@@ -164,11 +164,11 @@ $ go vet ./...
 $ go tool viva vet ./...
 (empty)
 $ go test ./... -count=1
-ok   github.com/runbrick/reqo/internal/storage         1.989s
-ok   github.com/runbrick/reqo/internal/syncing          9.031s
-ok   github.com/runbrick/reqo/internal/update           6.806s
-ok   github.com/runbrick/reqo/internal/vars             1.134s
-ok   github.com/runbrick/reqo/internal/websocket        4.528s
+ok   github.com/runbrick/reva/internal/storage         1.989s
+ok   github.com/runbrick/reva/internal/syncing          9.031s
+ok   github.com/runbrick/reva/internal/update           6.806s
+ok   github.com/runbrick/reva/internal/vars             1.134s
+ok   github.com/runbrick/reva/internal/websocket        4.528s
 ```
 
 ### PR 2 original branch check tails
@@ -181,11 +181,11 @@ $ go vet ./...
 $ go tool viva vet ./...
 (empty)
 $ go test ./... -count=1
-ok   github.com/runbrick/reqo/internal/storage         2.984s
-ok   github.com/runbrick/reqo/internal/syncing          6.636s
-ok   github.com/runbrick/reqo/internal/update           6.084s
-ok   github.com/runbrick/reqo/internal/vars             0.045s
-ok   github.com/runbrick/reqo/internal/websocket        3.710s
+ok   github.com/runbrick/reva/internal/storage         2.984s
+ok   github.com/runbrick/reva/internal/syncing          6.636s
+ok   github.com/runbrick/reva/internal/update           6.084s
+ok   github.com/runbrick/reva/internal/vars             0.045s
+ok   github.com/runbrick/reva/internal/websocket        3.710s
 ```
 
 ### PR 3 stack check tails
@@ -198,11 +198,11 @@ $ go vet ./...
 $ go tool viva vet ./...
 (empty)
 $ go test ./... -count=1
-ok   github.com/runbrick/reqo/internal/storage         3.607s
-ok   github.com/runbrick/reqo/internal/syncing          8.857s
-ok   github.com/runbrick/reqo/internal/update           8.295s
-ok   github.com/runbrick/reqo/internal/vars             0.043s
-ok   github.com/runbrick/reqo/internal/websocket        6.901s
+ok   github.com/runbrick/reva/internal/storage         3.607s
+ok   github.com/runbrick/reva/internal/syncing          8.857s
+ok   github.com/runbrick/reva/internal/update           8.295s
+ok   github.com/runbrick/reva/internal/vars             0.043s
+ok   github.com/runbrick/reva/internal/websocket        6.901s
 ```
 
 ### PR 4 final stack check tails
@@ -218,30 +218,30 @@ $ go tool viva vet ./...
 (empty)
 Exit: 0
 $ go test ./... -count=1
-ok   github.com/runbrick/reqo/internal/service/request  3.035s
-ok   github.com/runbrick/reqo/internal/service/store    0.350s
-ok   github.com/runbrick/reqo/internal/storage          2.216s
-ok   github.com/runbrick/reqo/internal/syncing           2.845s
-ok   github.com/runbrick/reqo/internal/update            2.300s
-ok   github.com/runbrick/reqo/internal/vars              0.388s
-ok   github.com/runbrick/reqo/internal/websocket         2.278s
+ok   github.com/runbrick/reva/internal/service/request  3.035s
+ok   github.com/runbrick/reva/internal/service/store    0.350s
+ok   github.com/runbrick/reva/internal/storage          2.216s
+ok   github.com/runbrick/reva/internal/syncing           2.845s
+ok   github.com/runbrick/reva/internal/update            2.300s
+ok   github.com/runbrick/reva/internal/vars              0.388s
+ok   github.com/runbrick/reva/internal/websocket         2.278s
 Exit: 0
 ```
 
 Other relevant final full-suite lines:
 
 ```text
-ok   github.com/runbrick/reqo/internal/gui              3.272s
-ok   github.com/runbrick/reqo/internal/i18n             0.042s
+ok   github.com/runbrick/reva/internal/gui              3.272s
+ok   github.com/runbrick/reva/internal/i18n             0.042s
 ```
 
 Focused regression run, also exit 0:
 
 ```text
 $ go test ./internal/gui ./internal/service/store ./internal/i18n -run 'TestOnboarding(Disk|CompletionRollsBack|CopyFalls)' -count=1
-ok   github.com/runbrick/reqo/internal/gui              1.400s
-ok   github.com/runbrick/reqo/internal/service/store    1.191s
-ok   github.com/runbrick/reqo/internal/i18n             0.022s
+ok   github.com/runbrick/reva/internal/gui              1.400s
+ok   github.com/runbrick/reva/internal/service/store    1.191s
+ok   github.com/runbrick/reva/internal/i18n             0.022s
 ```
 
 `git diff --check` also passed. No production defects or changes outside owned

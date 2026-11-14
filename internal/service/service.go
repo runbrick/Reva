@@ -1,8 +1,8 @@
-// Package service declares the contracts between Reqo's UI and its Go
+// Package service declares the contracts between Reva's UI and its Go
 // back end. The GUI depends only on these interfaces, so each pane can be
 // tested with fakes; the concrete implementations live in sub-packages
 // (service/request, service/history, service/collection, service/environment,
-// service/settings) and are wired together in cmd/reqo.
+// service/settings) and are wired together in cmd/reva.
 //
 // Every method is safe to call from the UI thread. Methods that touch the
 // network take a context and must return promptly when it is cancelled.
@@ -13,7 +13,7 @@ package service
 import (
 	"context"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 // RequestService sends HTTP requests.

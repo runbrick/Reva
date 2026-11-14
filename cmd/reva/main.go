@@ -1,10 +1,10 @@
-// Command reqo is a local, account-free API client.
+// Command reva is a local, account-free API client.
 package main
 
 import (
 	"log"
 
-	"github.com/runbrick/reqo/internal/gui"
+	"github.com/runbrick/reva/internal/gui"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 )

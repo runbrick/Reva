@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runbrick/reqo/internal/cloudsync"
+	"github.com/runbrick/reva/internal/cloudsync"
 )
 
 // Config says where the object is and who may touch it.
@@ -43,7 +43,7 @@ type Config struct {
 }
 
 // DefaultKey is the object name used when the user gives none.
-const DefaultKey = "reqo/backup.reqobak"
+const DefaultKey = "reva/backup.revabak"
 
 // Client talks to one object.
 type Client struct {
@@ -125,7 +125,7 @@ func (client *Client) do(ctx context.Context, method string, body []byte, header
 	if err != nil {
 		return nil, err
 	}
-	request.Header.Set("User-Agent", "reqo")
+	request.Header.Set("User-Agent", "reva")
 	for key, value := range header {
 		request.Header.Set(key, value)
 	}

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/i18n"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/i18n"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func TestWebSocketCreationMenuAndPersistence(t *testing.T) {

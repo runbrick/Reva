@@ -4,7 +4,7 @@ package vars
 import (
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 // Lookup returns the value of the last enabled variable named name, so that

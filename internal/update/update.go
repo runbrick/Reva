@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const Current = "0.2.0"
+const Current = "0.2.1"
 const Feed = "https://api.github.com/repos/runbrick/Reva/releases/latest"
 
 var ErrNoRelease = errors.New("no published release")

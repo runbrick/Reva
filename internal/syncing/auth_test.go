@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/fake"
 )
 
 func authSnapshotCopy(t *testing.T, s Snapshot) Snapshot {
@@ -59,7 +59,7 @@ func TestAuthSyncIndependentMetadataAndChildrenBothOrientations(t *testing.T) {
 }
 
 func TestAuthEncryptedSnapshotCarriesHierarchy(t *testing.T) {
-	t.Setenv("REQO_HOME", t.TempDir())
+	t.Setenv("REVA_HOME", t.TempDir())
 	r := model.NewRequest("r")
 	r.Name, r.Auth = "Private", model.Auth{Type: model.AuthInherit}
 	col := model.Collection{ID: "col", Name: "API", Version: 1, Auth: model.Auth{Type: model.AuthBearer, Token: "root-private-marker"}, Items: []model.Item{{ID: "f", Name: "Shared", Type: model.ItemFolder, Auth: model.Auth{Type: model.AuthAPIKey, Key: "X-Key", Value: "{{folder_private}}"}, Items: []model.Item{{ID: r.ID, Name: r.Name, Type: model.ItemRequest, Request: &r}}}}}

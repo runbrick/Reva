@@ -18,7 +18,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/cloudsync"
+	"github.com/runbrick/reva/internal/cloudsync"
 )
 
 func TestApprovedRemoteHTTPUsesSignedRequests(t *testing.T) {

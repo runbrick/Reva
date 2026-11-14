@@ -1,4 +1,4 @@
-# Reqo
+# Reva
 
 A local, account-free API client. Written in Go with [Viva](https://github.com/vivaui/viva):
 no WebView, no Electron, a single native binary (about 5 MB stripped on Windows).
@@ -6,13 +6,13 @@ no WebView, no Electron, a single native binary (about 5 MB stripped on Windows)
 ## Build and run
 
 ```sh
-go run ./cmd/reqo                                    # development
-go build -ldflags="-s -w" -o bin/reqo ./cmd/reqo     # release binary
+go run ./cmd/reva                                    # development
+go build -ldflags="-s -w" -o bin/reva ./cmd/reva     # release binary
 go tool viva build                                   # packaged app (see `go tool viva help build`)
 ```
 
-Data lives in `<user config dir>/Reqo` (`%AppData%\Reqo` on Windows,
-`~/Library/Application Support/Reqo` on macOS). Set `REQO_HOME` to use another
+Data lives in `<user config dir>/Reva` (`%AppData%\Reva` on Windows,
+`~/Library/Application Support/Reva` on macOS). Set `REVA_HOME` to use another
 directory. Every file is indented JSON, so the directory can be kept in Git:
 
 ```
@@ -22,10 +22,16 @@ collections/<id>.json
 environments/<id>.json
 ```
 
+For data created before the naming correction, copy the existing data directory
+to the new location or set `REVA_HOME` to its current location. This rename does
+not move existing user data. Backups now use `.revabak` and the
+`reva-backup-v1` envelope; backups from earlier builds must be re-exported from
+their local data with this build.
+
 ## Layout
 
 ```
-cmd/reqo/              main: builds the services and opens the window
+cmd/reva/              main: builds the services and opens the window
 internal/model/        plain data types (Request, Response, Collection, Environment, ...)
 internal/storage/      data directory, atomic JSON read/write, IDs
 internal/vars/         {{variable}} substitution
@@ -70,7 +76,7 @@ the input available; save failures preserve the review for retry.
 
 Supported inputs create one new entity, without replacing existing data:
 
-- Reqo schema-v1 collection and standalone environment JSON. Current fields,
+- Reva schema-v1 collection and standalone environment JSON. Current fields,
   shared auth, request options, disabled rows, descriptions, and empty folders
   are retained. Native scripts are retained but never executed by import.
   Unknown native fields and future versions are rejected to avoid silent loss.
@@ -133,14 +139,14 @@ Run the following from the repository root on the corresponding host:
 
 | Host | Release command | Outputs |
 | --- | --- | --- |
-| Windows | `./scripts/build.ps1 -Arch amd64` in PowerShell | `dist/windows-amd64/reqo-<version>-windows-amd64-setup.exe` (installer), `reqo.exe`, and a portable ZIP |
-| macOS | `sh ./scripts/build.sh` | `dist/darwin-<host-arch>/reqo`, `Reqo.app`, and `reqo-<version>-darwin-<host-arch>.dmg` |
+| Windows | `./scripts/build.ps1 -Arch amd64` in PowerShell | `dist/windows-amd64/reva-<version>-windows-amd64-setup.exe` (installer), `reva.exe`, and a portable ZIP |
+| macOS | `sh ./scripts/build.sh` | `dist/darwin-<host-arch>/reva`, `Reva.app`, and `reva-<version>-darwin-<host-arch>.dmg` |
 
 Windows packaging requires NSIS (`makensis`). Install it with
 `winget install --id NSIS.NSIS --exact`, then run the Windows build command.
 If NSIS is unpacked elsewhere, set `NSIS_HOME` to its `Bin` directory.
 The installer installs for the current user without administrator access and
-provides Start Menu shortcuts and an uninstaller. User data in `%AppData%\Reqo`
+provides Start Menu shortcuts and an uninstaller. User data in `%AppData%\Reva`
 is stored separately from the program.
 
 Both scripts accept `arm64` or `amd64` (on macOS, for example,
@@ -154,22 +160,22 @@ native architecture, and Windows CI builds amd64.
 Viva release builds use `-trimpath`, `-s -w`, and an empty build ID. Windows
 builds also use the GUI subsystem and embed the PNG as an icon plus name,
 publisher, and version resources in the executable. The Windows script keeps
-`reqo-stripped.exe` as a bare stripped baseline and packages the resource-bearing
-`reqo.exe` into an NSIS installer and a portable ZIP. The macOS package contains
+`reva-stripped.exe` as a bare stripped baseline and packages the resource-bearing
+`reva.exe` into an NSIS installer and a portable ZIP. The macOS package contains
 `Info.plist`, an `.icns` generated from the PNG, and the executable; its DMG includes an
 Applications shortcut for drag-to-install. These commands are equivalent to
 the main packaging steps (replace the architecture as needed):
 
 ```powershell
 # Windows host
-go tool viva build --target windows --arch amd64 -o dist/reqo.exe
-go tool viva package --target windows --arch amd64 --format nsis,zip --no-sign --program dist/reqo.exe -o dist
+go tool viva build --target windows --arch amd64 -o dist/reva.exe
+go tool viva package --target windows --arch amd64 --format nsis,zip --no-sign --program dist/reva.exe -o dist
 ```
 
 ```sh
 # macOS host
-go tool viva build --target darwin --arch arm64 -o dist/reqo
-go tool viva package --target darwin --arch arm64 --format app,dmg --no-sign --program dist/reqo -o dist/Reqo.app
+go tool viva build --target darwin --arch arm64 -o dist/reva
+go tool viva package --target darwin --arch arm64 --format app,dmg --no-sign --program dist/reva -o dist/Reva.app
 ```
 
 The scripts and CI create unsigned artifacts. Distribution signing is separate:
@@ -184,7 +190,7 @@ On every push and pull request, [CI](.github/workflows/ci.yml) runs Go 1.26 on
 the stripped release build, and packaging. CI disables Git's automatic CRLF
 conversion before checkout so `gofmt` sees LF on both hosts. Each build script
 prints artifact sizes without enforcing a size limit; the macOS script also
-reports the sum of all files in `Reqo.app`.
+reports the sum of all files in `Reva.app`.
 CI installs NSIS on Windows and uploads the installer, ZIP, or DMG as workflow
 artifacts.
 
@@ -202,9 +208,9 @@ Measured on Windows/amd64 with Go 1.26.3 and Viva 0.6.0 using
 
 | Artifact | Bytes | Decimal MB |
 | --- | ---: | ---: |
-| Stripped `cmd/reqo`, before app resources (`reqo-stripped.exe`) | 14,998,016 | 15.00 |
-| Packaged Windows executable, with icon and version resources (`reqo.exe`) | 15,032,320 | 15.03 |
-| Portable Windows package (`reqo-0.2.0-windows-amd64.zip`) | 6,369,720 | 6.37 |
+| Stripped `cmd/reva`, before app resources (`reva-stripped.exe`) | 14,998,016 | 15.00 |
+| Packaged Windows executable, with icon and version resources (`reva.exe`) | 15,032,320 | 15.03 |
+| Portable Windows package (`reva-0.2.0-windows-amd64.zip`) | 6,369,720 | 6.37 |
 
 The Windows app resources add 34,304 bytes. Sizes change as features are added;
 rerun the scripts for current measurements. macOS packaging is configured for

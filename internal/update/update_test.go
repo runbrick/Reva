@@ -40,7 +40,7 @@ func TestNewer(t *testing.T) {
 
 func TestLatestReadsReleaseAndHandlesMissingRelease(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("User-Agent") != "Reqo/"+Current {
+		if r.Header.Get("User-Agent") != "Reva/"+Current {
 			t.Error("missing user agent")
 		}
 		if r.URL.Path == "/missing" {

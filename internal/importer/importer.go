@@ -1,12 +1,12 @@
-// Package importer converts native Reqo, Postman-compatible, environment, HAR,
-// and curl inputs into Reqo models without executing commands or reading files.
+// Package importer converts native Reva, Postman-compatible, environment, HAR,
+// and curl inputs into Reva models without executing commands or reading files.
 package importer
 
 import (
 	"net/url"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 // Kind identifies a supported import format.

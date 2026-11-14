@@ -1,4 +1,4 @@
-// Package websocket implements the client side of RFC 6455 for Reqo sessions.
+// Package websocket implements the client side of RFC 6455 for Reva sessions.
 package websocket
 
 import (

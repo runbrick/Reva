@@ -8,13 +8,13 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/service/fake"
-	"github.com/runbrick/reqo/internal/syncing"
+	"github.com/runbrick/reva/internal/service/fake"
+	"github.com/runbrick/reva/internal/syncing"
 	"github.com/vivaui/viva/gfx"
 )
 
 func TestSettingsEncryptedExportAndRestore(t *testing.T) {
-	t.Setenv("REQO_HOME", t.TempDir())
+	t.Setenv("REVA_HOME", t.TempDir())
 	svc := fake.New()
 	col, err := svc.Collections.Create("Saved API")
 	if err != nil {
@@ -27,7 +27,7 @@ func TestSettingsEncryptedExportAndRestore(t *testing.T) {
 	}
 	h.click(h.App.S.Settings.Export)
 	h.typeInto(h.App.S.Settings.BackupPassword, "abcdefgh")
-	backup := filepath.Join(t.TempDir(), "backup.reqobak")
+	backup := filepath.Join(t.TempDir(), "backup.revabak")
 	if err := h.D.QueueSaveFile(backup, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -43,13 +43,13 @@ func TestSettingsEncryptedExportAndRestore(t *testing.T) {
 	}
 	h.click(h.App.S.Settings.Save)
 	h.waitFor("restore", func() bool { _, ok := svc.Collections.Get(col.ID); return ok && !h.App.settings.sync.running })
-	if _, err := os.Stat(filepath.Join(h.App.settings.dir, "before-restore.reqobak")); err != nil {
+	if _, err := os.Stat(filepath.Join(h.App.settings.dir, "before-restore.revabak")); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestSettingsWebDAVSyncUploadsAndRestores(t *testing.T) {
-	t.Setenv("REQO_HOME", t.TempDir())
+	t.Setenv("REVA_HOME", t.TempDir())
 	var saved []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "MKCOL" {
@@ -82,7 +82,7 @@ func TestSettingsWebDAVSyncUploadsAndRestores(t *testing.T) {
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
 	s := &h.App.settings.sync
-	s.config = syncConfig{Provider: "webdav", URL: server.URL, File: "reqo/backup.reqobak"}
+	s.config = syncConfig{Provider: "webdav", URL: server.URL, File: "reva/backup.revabak"}
 	password := "abcdefgh"
 	s.backupPassword = password
 	h.App.startSync("sync", "")

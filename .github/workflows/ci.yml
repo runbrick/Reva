@@ -49,9 +49,9 @@ jobs:
         run: sh ./scripts/build.sh amd64
       - uses: actions/upload-artifact@v4
         with:
-          name: reqo-${{ matrix.platform }}
+          name: reva-${{ matrix.platform }}
           path: |
-            dist/${{ matrix.platform }}/reqo-*.zip
-            dist/${{ matrix.platform }}/reqo-*-setup.exe
-            dist/${{ matrix.platform }}/reqo-*.dmg
+            dist/${{ matrix.platform }}/reva-*.zip
+            dist/${{ matrix.platform }}/reva-*-setup.exe
+            dist/${{ matrix.platform }}/reva-*.dmg
           if-no-files-found: error

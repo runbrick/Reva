@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // Settings saves can also persist a history trim. Completion must not become

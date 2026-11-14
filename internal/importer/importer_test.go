@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/auth"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/model"
 )
 
 func fixture(t testing.TB, name string) []byte {

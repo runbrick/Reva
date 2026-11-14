@@ -11,9 +11,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/runbrick/reqo/internal/format"
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/format"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/components"
 	"github.com/vivaui/viva/gfx"

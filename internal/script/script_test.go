@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/vars"
 )
 
 func TestRunPreRequestAndVariables(t *testing.T) {

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/robertkrimen/otto"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/vars"
 )
 
 // DefaultTimeout bounds scripts whose caller does not supply a positive timeout.
@@ -29,7 +29,7 @@ type Result struct {
 var apiSource string
 
 var apiProgram = func() *otto.Script {
-	program, err := otto.New().Compile("reqo-api.js", apiSource)
+	program, err := otto.New().Compile("reva-api.js", apiSource)
 	if err != nil {
 		panic(err)
 	}
@@ -140,7 +140,7 @@ func newRunner(req *model.Request, resp *model.Response, values []model.KV) *run
 		}
 	}
 	// These properties are ordinary Go functions and data; Set cannot invoke JS.
-	if err := r.vm.Set("__reqoHost", host); err != nil {
+	if err := r.vm.Set("__revaHost", host); err != nil {
 		panic(err)
 	}
 	return r

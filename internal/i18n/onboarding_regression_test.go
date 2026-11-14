@@ -3,7 +3,7 @@ package i18n_test
 import (
 	"testing"
 
-	"github.com/runbrick/reqo/internal/i18n"
+	"github.com/runbrick/reva/internal/i18n"
 )
 
 // Legacy settings may omit language, and imported settings may use an unknown

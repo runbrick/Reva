@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/store"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/store"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 func openStore(t *testing.T, dir string) *store.Store {

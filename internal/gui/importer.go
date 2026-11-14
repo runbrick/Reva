@@ -8,9 +8,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/importer"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/importer"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )

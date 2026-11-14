@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // Validate exact JSON field names and types before decoding: encoding/json alone
@@ -178,7 +178,7 @@ func validateNativeAuth(a model.Auth, path string) {
 	default:
 		fail("unsupported_auth", path)
 	}
-	// Inactive credential fields are intentionally retained: Reqo's auth editor
+	// Inactive credential fields are intentionally retained: Reva's auth editor
 	// changes Type without clearing them. They do not affect the selected scheme.
 	if a.In != "" && a.In != model.APIKeyInHeader && a.In != model.APIKeyInQuery {
 		fail("invalid_auth", path)

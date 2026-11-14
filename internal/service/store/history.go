@@ -5,8 +5,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 type historyService struct{ s *Store }

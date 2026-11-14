@@ -10,20 +10,20 @@ final acceptance evidence. No overlapping worker or helper was used in phase 4.
 
 ## Objective and bounded scope
 
-Make migration into Reqo useful and predictable: preserve requests, folders,
+Make migration into Reva useful and predictable: preserve requests, folders,
 variables and supported authentication; expose unsupported semantics before
 saving anything; import into new entities without overwriting existing data.
 The existing auth refactor is already present and should be preserved.
 
 This cycle implements:
 
-1. Reqo schema-v1 collection JSON reimport, including shared auth, scripts,
+1. Reva schema-v1 collection JSON reimport, including shared auth, scripts,
    options, variable descriptions and empty folders.
 2. Improved Postman Collection v2.0/v2.1 import with diagnostics and explicit
    failure for authentication/body features that cannot be safely represented.
 3. Apifox and ApiPost migration through their documented Postman export options.
    These are Postman-compatible files, not new proprietary-format parsers.
-4. Postman environment JSON and standalone Reqo schema-v1 environment JSON.
+4. Postman environment JSON and standalone Reva schema-v1 environment JSON.
 5. HAR 1.2 request import into one new collection, with a deliberately restricted
    body/cookie mapping and visible omissions.
 6. Existing curl import, with diagnostics for transport flags currently ignored.
@@ -78,7 +78,7 @@ provide transactions spanning multiple files.
   fresh generated ID directly; do not call `Create` and then `Save`, which could
   leave an empty environment if the second write fails. Active environment,
   preferences and existing drafts should stay unchanged after an import.
-- `syncing` has a separate encrypted `reqo-backup-v1` envelope and snapshot
+- `syncing` has a separate encrypted `reva-backup-v1` envelope and snapshot
   restore path that can replace existing data. Neither its decrypted snapshot
   nor its envelope is a collection import. Do not invoke `syncing.Apply` here.
 - Import UI currently loads one `.json` file through a keyed effect, limits file
@@ -129,8 +129,8 @@ the backend report before UI work starts:
 ```go
 // Keep existing KindUnknown, KindPostman and KindCurl values.
 const (
-    KindNativeCollection Kind = "reqo-collection"
-    KindNativeEnvironment Kind = "reqo-environment"
+    KindNativeCollection Kind = "reva-collection"
+    KindNativeEnvironment Kind = "reva-environment"
     KindPostmanEnvironment Kind = "postman-environment"
     KindHAR Kind = "har"
     MaxInputBytes = 32 << 20
@@ -210,11 +210,11 @@ into the UI. Structural paths use indexes, such as `$.item[2].request.auth`.
 | Auth hierarchy | Postman omitted/null request/folder auth → `inherit`; collection omitted/null → `none`; explicit `noauth` → `none` barrier. Preserve Bearer/Basic/API-key values and placeholders at their original scope; accept documented array auth and existing legacy object auth. Do not flatten parents. Native retains its stored auth verbatim after structural validation. |
 | Unsupported auth | OAuth1/OAuth2/Digest/AWS/NTLM and unknown schemes block the whole import with a structural diagnostic; never become None or inherit. Invalid API-key location blocks import; empty/malformed auth types block too. Do not validate templated credentials as expanded header values or invent token exchange. Explicit Authorization/API-key headers remain explicit headers. |
 | Variables | Keep `{{name}}` literal, order, disabled state and descriptions. Postman collection variables stay collection-scoped; environment entries stay separate. Postman `enabled:false` maps to Disabled; missing enabled means enabled; `type:secret` does not create vault protection. Preserve strings and compact JSON lexical values for numeric/boolean/object values as current importer does. Native copies exact strings. Environment precedence over collection and last-enabled-row precedence remain existing behavior. |
-| Postman environments | Require `_postman_variable_scope:"environment"`, nonblank name and `values` array; map `key,value,enabled` and descriptions. Reject global scope instead of quietly changing scope. An export contains only exported values; never fabricate missing local/current/vault values. Detect vault/dynamic placeholders and warn they are not resolved by Reqo; retain their text. |
+| Postman environments | Require `_postman_variable_scope:"environment"`, nonblank name and `values` array; map `key,value,enabled` and descriptions. Reject global scope instead of quietly changing scope. An export contains only exported values; never fabricate missing local/current/vault values. Detect vault/dynamic placeholders and warn they are not resolved by Reva; retain their text. |
 | URLs/query/headers | Preserve templates, repeated rows, disabled flags and descriptions. Structured Postman query is authoritative even when explicitly empty; do not double-import raw URL query. Keep fragments. Preserve unsupported request-local path variables literally with `path_variables_unresolved` warning; user must edit before sending. Never promote these into collection variables and accidentally change sibling requests. Disabled headers do not override generated auth; enabled explicit empty headers do. |
 | Body | Preserve none/raw/JSON/urlencoded/text-and-file multipart/binary references. Preserve raw language-derived Content-Type where representable without overriding an explicit header; unsupported presentation-only raw languages are raw text. Postman GraphQL body mode and unknown body modes block import this cycle. File references remain literal paths; never open them during parsing or preview, and require acknowledgement that files must be reselected/checked before sending. Warn on per-part descriptions/content types or other metadata absent from `FormField`. Respect a disabled Postman body by mapping no active body with an omission warning when content was supplied. |
-| Scripts/examples/descriptions | Native scripts are retained exactly but never executed by import. Postman request/folder/collection events are omitted with `scripts_omitted`, because Reqo's Otto/pm subset is not full Postman and has no shared lifecycle model. Saved examples/responses warn `examples_omitted`. Preserve descriptions where `model.KV.Description` exists (string or documented description content); collection/request/folder notes and nonrepresentable metadata warn `metadata_omitted`. No claim of lossless Postman import. |
-| Postman options/extensions | Nonempty protocol-profile/certificate/proxy/other behavior extensions absent from Reqo warn `metadata_omitted`; if an unknown feature changes auth or body encoding, block instead. Allow inert source IDs/version/export timestamps without a warning. Nonempty unknown extension fields receive a generic structural omission warning rather than disappearing silently. |
+| Scripts/examples/descriptions | Native scripts are retained exactly but never executed by import. Postman request/folder/collection events are omitted with `scripts_omitted`, because Reva's Otto/pm subset is not full Postman and has no shared lifecycle model. Saved examples/responses warn `examples_omitted`. Preserve descriptions where `model.KV.Description` exists (string or documented description content); collection/request/folder notes and nonrepresentable metadata warn `metadata_omitted`. No claim of lossless Postman import. |
+| Postman options/extensions | Nonempty protocol-profile/certificate/proxy/other behavior extensions absent from Reva warn `metadata_omitted`; if an unknown feature changes auth or body encoding, block instead. Allow inert source IDs/version/export timestamps without a warning. Nonempty unknown extension fields receive a generic structural omission warning rather than disappearing silently. |
 | HAR requests | Require `log.version:"1.2"` and entries array, preserving entry order and repeated request headers/query values. Prefer explicit queryString rows without duplicating URL query; if missing, split the URL query. Map auth only through captured explicit headers/query, with `AuthNone`; never infer credentials or shared auth. Omit responses/timings/pages with an explicit aggregate `har_response_omitted` notice; create no history. |
 | HAR bodies/cookies | Text `postData` maps to raw with its MIME type (JSON may use JSON mode when equivalent); urlencoded params map to ordered rows; multipart text params map to text form fields. Missing multipart file payloads/filename-only params and binary/encoded body extensions block, not imaginary upload paths or empty bodies. If both params and text have conflicting representations, block. Captured Cookie headers are preserved; `request.cookies` without a Cookie header is omitted with `har_cookies_omitted` so the user can supply one. Responses never become a cookie jar. |
 | curl | Keep current command grammar and no-execution/no-file-read behavior. Preserve existing URL/auth/header/body conversion. Detect `-k/--insecure`, `-L/--location` (including combined switches) and `--compressed` with a transport warning since current conversion ignores these. Do not silently change TLS defaults. Unknown flags and multiple URLs continue to fail. |
@@ -231,7 +231,7 @@ Read the installed Viva v0.6.0 source, not hypothetical APIs:
 `Checkbox`), `ui/page.go` (`Ctx.Key`/`KeyInt`), `app/system.go` (`FileFilter`,
 `OpenFileOptions`, `OpenFiles`), and `examples/guides/overlay/main.go`. Also
 inspected the background guide; its raw goroutine example does not override
-Reqo's stricter effect-only rule. Use `ui.NewEffectKeyed`/`ui.Effect`/`Take`;
+Reva's stricter effect-only rule. Use `ui.NewEffectKeyed`/`ui.Effect`/`Take`;
 changed keys cancel old work and late results are dropped. Effects must never
 capture UI context/boxes or mutate App state off the UI thread.
 
@@ -310,7 +310,7 @@ not a requirement to split every row into a separate test function:
 | `TestImportedAuthSendPreservesHierarchy` | GUI opens an imported saved request, edits parent auth, chooses imported environment explicitly, and sends through real RequestService to `httptest.Server`. Verify live nearest parent, None barrier, environment-over-collection variables, disabled rows, explicit empty/repeated header overrides and query API key without damaging unrelated repeated query values. No external network. |
 | `TestImportLanguagesThemesAndLayout`, `TestImportCopyCoversDiagnostics` | Headless snapshots/hit bounds at zh/en × light/dark × two viewport sizes show complete actionable review/errors; acknowledgement and final controls remain reachable with long warnings. Every public backend code has zh/en copy; format help distinguishes compatibility route from native support. Existing auth and import tests continue passing. |
 
-Use `t.TempDir()` and `t.Setenv("REQO_HOME", ...)`, real store APIs and the shared
+Use `t.TempDir()` and `t.Setenv("REVA_HOME", ...)`, real store APIs and the shared
 headless harness. Wrap existing service interfaces in test-local failure spies
 where useful; do not change the production fake or shared harness. Assert no
 request sender invocation until the user explicitly sends. Do not fetch schemas,

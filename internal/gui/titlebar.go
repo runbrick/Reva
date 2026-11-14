@@ -3,7 +3,7 @@ package gui
 import (
 	"runtime"
 
-	"github.com/runbrick/reqo/internal/gui/icons"
+	"github.com/runbrick/reva/internal/gui/icons"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )
@@ -11,7 +11,7 @@ import (
 // titlebarState is retained for the shell's feature state slot.
 type titlebarState struct{}
 
-// windowConfig sets the window chrome on base: a custom titlebar Reqo paints
+// windowConfig sets the window chrome on base: a custom titlebar Reva paints
 // itself. Owned by the titlebar PR.
 func (a *App) windowConfig(base app.Config) app.Config {
 	base.WindowMode = app.WindowCustomTitlebar

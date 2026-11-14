@@ -34,7 +34,7 @@ func Latest(ctx context.Context, client *http.Client, feed string) (Release, err
 		return Release{}, err
 	}
 	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("User-Agent", "Reqo/"+Current)
+	req.Header.Set("User-Agent", "Reva/"+Current)
 	resp, err := client.Do(req)
 	if err != nil {
 		return Release{}, err

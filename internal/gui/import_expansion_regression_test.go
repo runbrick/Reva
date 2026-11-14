@@ -15,18 +15,18 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/importer"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service"
-	requestservice "github.com/runbrick/reqo/internal/service/request"
-	"github.com/runbrick/reqo/internal/service/store"
+	"github.com/runbrick/reva/internal/importer"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service"
+	requestservice "github.com/runbrick/reva/internal/service/request"
+	"github.com/runbrick/reva/internal/service/store"
 	"github.com/vivaui/viva/ui"
 )
 
 func importRegressionServices(t *testing.T) (service.Services, string) {
 	t.Helper()
 	dir := t.TempDir()
-	t.Setenv("REQO_HOME", dir)
+	t.Setenv("REVA_HOME", dir)
 	s, err := store.Open(dir)
 	if err != nil {
 		t.Fatal(err)

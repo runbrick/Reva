@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/i18n"
+	"github.com/runbrick/reva/internal/i18n"
 )
 
 func TestOnboardingFieldsAreTranslated(t *testing.T) {

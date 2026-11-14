@@ -18,7 +18,7 @@ type Common struct {
 }
 
 var commonZh = Common{
-	AppName: "Reqo",
+	AppName: "Reva",
 	OK:      "确定",
 	Cancel:  "取消",
 	Save:    "保存",
@@ -33,7 +33,7 @@ var commonZh = Common{
 }
 
 var commonEn = Common{
-	AppName: "Reqo",
+	AppName: "Reva",
 	OK:      "OK",
 	Cancel:  "Cancel",
 	Save:    "Save",

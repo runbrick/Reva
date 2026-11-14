@@ -91,7 +91,7 @@ func TestImportCopyCoversDiagnosticsAndCompatibilityRoutes(t *testing.T) {
 					t.Errorf("warning %s has no dedicated localized message", code)
 				}
 			}
-			for _, marker := range []string{"Reqo v1", "Postman", "v2.0/v2.1", "HAR 1.2", "curl", "32 MiB", "Apifox", "ApiPost", "Postman 2.1"} {
+			for _, marker := range []string{"Reva v1", "Postman", "v2.0/v2.1", "HAR 1.2", "curl", "32 MiB", "Apifox", "ApiPost", "Postman 2.1"} {
 				if !strings.Contains(copy.Help, marker) {
 					t.Errorf("help omits bounded support/route %q", marker)
 				}

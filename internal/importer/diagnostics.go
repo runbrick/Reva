@@ -3,7 +3,7 @@ package importer
 import (
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 const (

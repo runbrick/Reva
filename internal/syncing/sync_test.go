@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service/fake"
 )
 
 func TestEncryptedBackupRoundTripAndWrongPassword(t *testing.T) {
-	t.Setenv("REQO_HOME", t.TempDir())
+	t.Setenv("REVA_HOME", t.TempDir())
 	svc := fake.New()
 	col, err := svc.Collections.Create("Secrets")
 	if err != nil {
@@ -103,11 +103,11 @@ func TestWebDAVConditionalSyncAndNoCredentialRedirect(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
-		if r.URL.Path == "/reqo" && r.Method == "MKCOL" {
+		if r.URL.Path == "/reva" && r.Method == "MKCOL" {
 			w.WriteHeader(http.StatusCreated)
 			return
 		}
-		if r.URL.Path != "/reqo/backup.reqobak" {
+		if r.URL.Path != "/reva/backup.revabak" {
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
@@ -130,7 +130,7 @@ func TestWebDAVConditionalSyncAndNoCredentialRedirect(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	}))
 	defer server.Close()
-	client, err := NewWebDAV(WebDAVConfig{URL: server.URL, User: "u", Password: "p", File: "reqo/backup.reqobak"})
+	client, err := NewWebDAV(WebDAVConfig{URL: server.URL, User: "u", Password: "p", File: "reva/backup.revabak"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +156,7 @@ func TestWebDAVConditionalSyncAndNoCredentialRedirect(t *testing.T) {
 	if err := Upload(ctx, client, snapshot, "abcdefgh", tag); !errors.Is(err, ErrConflict) {
 		t.Fatalf("stale update: %v", err)
 	}
-	if _, err := NewWebDAV(WebDAVConfig{URL: "http://example.com/dav", File: "reqo/backup.reqobak"}); err == nil {
+	if _, err := NewWebDAV(WebDAVConfig{URL: "http://example.com/dav", File: "reva/backup.revabak"}); err == nil {
 		t.Fatal("HTTP outside loopback allowed credentials")
 	}
 	if _, err := NewWebDAV(WebDAVConfig{URL: server.URL, File: "../outside"}); err == nil {

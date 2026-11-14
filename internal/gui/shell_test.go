@@ -3,7 +3,7 @@ package gui
 import (
 	"testing"
 
-	"github.com/runbrick/reqo/internal/service/fake"
+	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/headless"
 )

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/model"
 )
 
 type clientOptions struct {

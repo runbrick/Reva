@@ -1,4 +1,4 @@
-// Package storage locates Reqo's data directory and reads and writes JSON
+// Package storage locates Reva's data directory and reads and writes JSON
 // files in it atomically. Services build on it; the UI never touches files.
 package storage
 
@@ -13,10 +13,10 @@ import (
 )
 
 // EnvHome overrides the data directory, for tests and portable installs.
-const EnvHome = "REQO_HOME"
+const EnvHome = "REVA_HOME"
 
-// Dir returns the data directory: $REQO_HOME if set, otherwise
-// <os.UserConfigDir>/Reqo. It is created if missing.
+// Dir returns the data directory: $REVA_HOME if set, otherwise
+// <os.UserConfigDir>/Reva. It is created if missing.
 //
 // Layout:
 //
@@ -31,7 +31,7 @@ func Dir() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("locate config dir: %w", err)
 		}
-		dir = filepath.Join(base, "Reqo")
+		dir = filepath.Join(base, "Reva")
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err

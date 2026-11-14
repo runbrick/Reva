@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
+	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/ui"
 )
 

@@ -1,4 +1,4 @@
-module github.com/runbrick/reqo
+module github.com/runbrick/reva
 
 go 1.26.0
 

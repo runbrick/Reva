@@ -10,8 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/runbrick/reqo/internal/model"
-	requestservice "github.com/runbrick/reqo/internal/service/request"
+	"github.com/runbrick/reva/internal/model"
+	requestservice "github.com/runbrick/reva/internal/service/request"
 )
 
 func TestImportRegressionNativeEveryCurrentFieldAndCollidingIDs(t *testing.T) {

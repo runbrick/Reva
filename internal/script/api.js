@@ -1,6 +1,6 @@
 (function (global, host) {
     "use strict";
-    delete global.__reqoHost;
+    delete global.__revaHost;
     var variableAPI = {
         get: function (key) { return host.getVar(String(key)); },
         set: function (key, value) { host.setVar(String(key), String(value)); }
@@ -108,4 +108,4 @@
             return String(value);
         }).join(" "));
     }};
-})(this, __reqoHost);
+})(this, __revaHost);

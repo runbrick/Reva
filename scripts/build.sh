@@ -14,9 +14,9 @@ esac
 output_dir="dist/darwin-$arch"
 mkdir -p "$output_dir"
 
-go tool viva build --target darwin --arch "$arch" -o "$output_dir/reqo"
+go tool viva build --target darwin --arch "$arch" -o "$output_dir/reva"
 go tool viva package --target darwin --arch "$arch" --format app,dmg --no-sign \
-    --program "$output_dir/reqo" -o "$output_dir/Reqo.app"
+    --program "$output_dir/reva" -o "$output_dir/Reva.app"
 
 print_size() {
     bytes=$1
@@ -24,10 +24,10 @@ print_size() {
     echo "$artifact: $bytes bytes"
 }
 
-print_size "$(stat -f %z "$output_dir/reqo")" "$output_dir/reqo"
+print_size "$(stat -f %z "$output_dir/reva")" "$output_dir/reva"
 # Sum file lengths, including the executable, Info.plist and generated .icns.
-bundle_bytes=$(find "$output_dir/Reqo.app" -type f -exec stat -f %z {} + | awk '{sum += $1} END {printf "%.0f", sum}')
-print_size "$bundle_bytes" "$output_dir/Reqo.app (all files)"
-for image in "$output_dir"/reqo-*-darwin-"$arch".dmg; do
+bundle_bytes=$(find "$output_dir/Reva.app" -type f -exec stat -f %z {} + | awk '{sum += $1} END {printf "%.0f", sum}')
+print_size "$bundle_bytes" "$output_dir/Reva.app (all files)"
+for image in "$output_dir"/reva-*-darwin-"$arch".dmg; do
     print_size "$(stat -f %z "$image")" "$image"
 done

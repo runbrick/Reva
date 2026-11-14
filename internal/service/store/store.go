@@ -11,9 +11,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/service"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // ErrNotFound indicates that a collection, environment, folder or item is absent.

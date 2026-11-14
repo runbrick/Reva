@@ -1,9 +1,9 @@
 [app]
-name = "Reqo"
-id = "com.runbrick.reqo"
+name = "Reva"
+id = "com.runbrick.reva"
 version = "0.2.0"
-executable = "reqo"
-package = "./cmd/reqo"
+executable = "reva"
+package = "./cmd/reva"
 icon = "assets/icon.png"
 
 [build]

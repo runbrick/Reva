@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/script"
-	"github.com/runbrick/reqo/internal/vars"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/script"
+	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/ui"
 )
 

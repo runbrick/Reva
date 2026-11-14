@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/runbrick/reqo/internal/model"
-	"github.com/runbrick/reqo/internal/storage"
+	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 // Curl parses one curl command, without running a shell, expanding environment

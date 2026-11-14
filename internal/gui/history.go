@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/runbrick/reqo/internal/gui/icons"
-	"github.com/runbrick/reqo/internal/i18n"
-	"github.com/runbrick/reqo/internal/model"
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/i18n"
+	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )

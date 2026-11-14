@@ -85,7 +85,9 @@ Supported inputs create one new entity, without replacing existing data:
   resolve against the final document URL after redirects.
   Operations become request templates, grouped by their first tag. Summary,
   operation ID, method/path, simple path/query/header parameters, examples and
-  defaults, JSON/text bodies and supported text forms are converted. Local JSON
+  defaults, JSON/text bodies and supported text forms are converted. Query objects
+  using `form` style with `explode: true` become individual query rows; nested
+  objects and custom object serialization remain unsupported. Local JSON
   Pointer references are resolved; external references are never fetched.
   Basic, Bearer and header/query API-key security become configurable auth with
   credential placeholders; explicit empty operation security disables auth.
@@ -95,13 +97,24 @@ Supported inputs create one new entity, without replacing existing data:
   both initially start off in the dialog. Other formats retain their URLs.
   Multiple servers, media types, examples or security alternatives produce a
   selection notice: the first array entry is used; maps use sorted key order,
-  and request-body media types prefer `application/json`. Generated templates
+  and request-body media types prefer `application/json`. An empty selected server
+  URL keeps paths relative (URL imports resolve against the document origin) and
+  warns; another environment is never chosen automatically. Full URLs, base URL
+  variables and host:port addresses in vendor path fields are retained verbatim
+  with a review notice, without prepending a server. JSON examples stored as text
+  are decoded when the schema is not a string; empty JSON-body placeholders with
+  empty schemas become no body. Multipart binary fields are retained as disabled
+  file references: import never opens them; reselect and enable before sending.
+  `oneOf`/`anyOf` use the first branch with a notice. Missing local request-body
+  schema definitions use `null` placeholders with a notice; the operation is kept
+  for editing. Generated templates
   always require acknowledgement: review values, path variables and credentials
   before sending. Responses, documentation, schema constraints, callbacks and
   extensions are omitted. Unsupported auth, combined security requirements,
-  cookie/object/custom-serialized parameters, binary/file bodies, form encodings,
-  composed/union schemas without explicit examples, recursive or broken refs
-  block import. YAML is not supported. Generated output and reference expansion
+  cookie/custom-serialized parameters, binary bodies outside supported multipart
+  file references, form encodings, `allOf` without explicit examples, recursive
+  refs, external refs and missing parameter or requestBody object references block import.
+  YAML is not supported. Generated output and reference expansion
   are bounded as well as the source document.
 - Reva schema-v1 collection and standalone environment JSON. Current fields,
   shared auth, request options, disabled rows, descriptions, and empty folders

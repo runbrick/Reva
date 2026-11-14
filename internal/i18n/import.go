@@ -11,6 +11,7 @@ type Import struct {
 	SourceMismatch, EnvironmentDestination, MissingDestination, VariableConflict, AppendDestination            string
 	SwaggerHelp, SwaggerURLHelp, SchemaURL, SchemaURLPlaceholder, SwaggerCollection, OpenAPICollection         string
 	InvalidSourceURL, FetchFailed, UnsupportedReference, UnsupportedParameter, OpenAPIReview, OpenAPISelection string
+	OpenAPIEmptyServer, OpenAPISchemaChoice, OpenAPISchemaIncomplete, OpenAPINonstandardPath                   string
 
 	Title, Description, Input, Placeholder                                                        string
 	LoadFile, JSONFiles, HARFiles, AllFiles, Submit, Cancel                                       string
@@ -40,7 +41,11 @@ var importZh = Import{
 	SwaggerURLHelp: "输入 Swagger / OpenAPI JSON 文档的 HTTP(S) 地址（不是 Swagger UI 页面）。点击「检查导入」后获取，最长 30 秒、最多 32 MiB；不会获取外部引用。",
 	SchemaURL:      "文档 URL", SchemaURLPlaceholder: "https://api.example.com/openapi.json",
 	SwaggerCollection: "Swagger 2.0 集合", OpenAPICollection: "OpenAPI 3.0 / 3.1 集合",
-	InvalidSourceURL: "文档地址无效，请输入不含用户名、密码或片段的 HTTP(S) URL。", FetchFailed: "无法获取文档，请检查地址、网络和服务状态后重试；需要可直接访问的 JSON 文档。",
+	OpenAPIEmptyServer:      "所选服务器地址为空，按相对路径解析（URL 导入以文档地址为基准）；未切换到其他环境。发送前请检查并补充主机地址。",
+	OpenAPISchemaIncomplete: "请求体 Schema 引用了文档中缺失的定义，该部分使用 null 占位；接口已保留，发送前请根据实际 API 补全请求体。",
+	OpenAPINonstandardPath:  "路径字段使用了完整地址、主机端口或基础 URL 变量，已保留原文且不拼接服务器地址；发送前请检查协议、主机和变量。",
+	OpenAPISchemaChoice:     "请求体包含 oneOf / anyOf，已使用第一个分支生成示例；请根据实际业务选择并修改，请求示例不保证满足 Schema 校验。",
+	InvalidSourceURL:        "文档地址无效，请输入不含用户名、密码或片段的 HTTP(S) URL。", FetchFailed: "无法获取文档，请检查地址、网络和服务状态后重试；需要可直接访问的 JSON 文档。",
 	UnsupportedReference: "引用无法解析：仅支持文档内的有效 JSON Pointer；请先合并外部引用并消除循环引用。", UnsupportedParameter: "不支持此参数位置或序列化方式，请改用简单路径、查询或请求头参数。",
 	OpenAPIReview: "接口定义已转换为请求模板。请检查生成的示例值、路径变量并补充认证凭据后再发送；响应、文档、Schema 校验约束、回调和扩展不保留。", OpenAPISelection: "存在多个服务器、媒体类型、示例或认证方案，仅使用第一个（请求体优先 application/json）；请检查选择结果。",
 	PostmanHelp: "支持 Postman v2.0 / v2.1 集合与单个环境的 JSON 导出文件。", ApifoxHelp: "请在 Apifox 中选择「设置 → 导出数据 → Postman」，再上传导出的 JSON；不支持专有项目格式。",
@@ -87,7 +92,11 @@ var importEn = Import{
 	SwaggerURLHelp: "Enter the HTTP(S) URL of a Swagger / OpenAPI JSON document, rather than its Swagger UI page. Review import fetches it with a 30-second timeout and 32 MiB limit. External references are never fetched.",
 	SchemaURL:      "Document URL", SchemaURLPlaceholder: "https://api.example.com/openapi.json",
 	SwaggerCollection: "Swagger 2.0 collection", OpenAPICollection: "OpenAPI 3.0 / 3.1 collection",
-	InvalidSourceURL: "Invalid document address. Enter an HTTP(S) URL without a username, password or fragment.", FetchFailed: "Cannot fetch the document. Check the address, network and server, then retry. A directly accessible JSON document is required.",
+	OpenAPIEmptyServer:      "The selected server URL is empty. Paths are relative, using the document address for URL imports; another environment was not selected. Check and supply the host before sending.",
+	OpenAPISchemaIncomplete: "A request-body schema references a definition missing from this document. That part uses a null placeholder. The operation is retained; complete its body against the actual API before sending.",
+	OpenAPINonstandardPath:  "A path contains a full address, host and port, or base URL variable. It was preserved without a server prefix. Check its scheme, host and variables before sending.",
+	OpenAPISchemaChoice:     "The body contains oneOf / anyOf. An example was generated from the first branch. Choose and edit it for your use case; the example is not guaranteed to satisfy schema validation.",
+	InvalidSourceURL:        "Invalid document address. Enter an HTTP(S) URL without a username, password or fragment.", FetchFailed: "Cannot fetch the document. Check the address, network and server, then retry. A directly accessible JSON document is required.",
 	UnsupportedReference: "Cannot resolve this reference. Only valid in-document JSON Pointers are supported. Bundle external references and remove reference cycles first.", UnsupportedParameter: "Unsupported parameter location or serialization. Use simple path, query or header parameters.",
 	OpenAPIReview: "API definitions became request templates. Check generated examples and path variables and supply credentials before sending. Responses, documentation, schema validation constraints, callbacks and extensions are omitted.", OpenAPISelection: "Multiple servers, media types, examples or security alternatives exist. Only the first is used (request bodies prefer application/json). Review the selected result.",
 	PostmanHelp: "Supports Postman v2.0 / v2.1 collection and single environment JSON exports.", ApifoxHelp: "In Apifox, choose Settings → Export data → Postman, then upload the JSON export. Proprietary project formats are unsupported.",
@@ -186,6 +195,14 @@ func (s Import) WarningMessage(code string) string {
 		return s.OpenAPIReview
 	case "openapi_selection":
 		return s.OpenAPISelection
+	case "openapi_empty_server":
+		return s.OpenAPIEmptyServer
+	case "openapi_schema_choice":
+		return s.OpenAPISchemaChoice
+	case "openapi_schema_incomplete":
+		return s.OpenAPISchemaIncomplete
+	case "openapi_nonstandard_path":
+		return s.OpenAPINonstandardPath
 	}
 	return s.MetadataOmitted
 }

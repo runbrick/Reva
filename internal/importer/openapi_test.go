@@ -157,7 +157,7 @@ func TestOpenAPIBlocksUnsupportedAndMalformedSemantics(t *testing.T) {
 		{"cookie", `"get":{"parameters":[{"name":"x","in":"cookie","schema":{"type":"string"}}]}`, "unsupported_parameter"},
 		{"deep object", `"get":{"parameters":[{"name":"x","in":"query","style":"deepObject","schema":{"type":"object"}}]}`, "unsupported_parameter"},
 		{"binary", `"post":{"requestBody":{"content":{"application/octet-stream":{"schema":{"type":"string","format":"binary"}}}}}`, "unsupported_body"},
-		{"composition", `"post":{"requestBody":{"content":{"application/json":{"schema":{"oneOf":[{"type":"string"}]}}}}}`, "unsupported_body"},
+		{"composition", `"post":{"requestBody":{"content":{"application/json":{"schema":{"allOf":[{"type":"string"}]}}}}}`, "unsupported_body"},
 		{"encoding", `"post":{"requestBody":{"content":{"multipart/form-data":{"schema":{"type":"object"},"encoding":{"x":{"contentType":"image/png"}}}}}}`, "unsupported_body"},
 		{"null operation", `"get":null`, "invalid_structure"},
 	} {

@@ -71,7 +71,7 @@ func (c *conversion) openapi(root object, kind Kind, options Options) *model.Col
 		if strings.HasPrefix(path, "x-") {
 			continue
 		}
-		if !strings.HasPrefix(path, "/") || strings.ContainsAny(path, "?#\r\n") {
+		if !validAPIPath(path) || strings.ContainsAny(path, "?#\r\n") {
 			fail("invalid_structure", p)
 		}
 		entry := a.resolve(paths[path], p)
@@ -160,6 +160,14 @@ func (c *conversion) openapi(root object, kind Kind, options Options) *model.Col
 // Only local JSON pointers are resolved. Paths in diagnostics never contain
 // user-supplied pointer names, URLs, credentials or arbitrary property names.
 func (a *apiConversion) resolve(v any, path string) object {
+	return a.resolveObject(v, path, false)
+}
+
+func (a *apiConversion) resolveSchema(v any, path string) object {
+	return a.resolveObject(v, path, true)
+}
+
+func (a *apiConversion) resolveObject(v any, path string, template bool) object {
 	seen := map[string]bool{}
 	for depth := 0; ; depth++ {
 		a.work++
@@ -207,6 +215,10 @@ func (a *apiConversion) resolve(v any, path string) object {
 				fail("unsupported_reference", path+".$ref")
 			}
 			if v == nil {
+				if template {
+					a.warn("openapi_schema_incomplete", path+".$ref")
+					return object{"example": nil}
+				}
 				fail("unsupported_reference", path+".$ref")
 			}
 		}
@@ -217,6 +229,12 @@ func (a *apiConversion) resolve(v any, path string) object {
 }
 
 func (a *apiConversion) requestURL(path string, entry, op object, p string) string {
+	if !strings.HasPrefix(path, "/") {
+		// Vendor exports sometimes store a full URL or a base variable in
+		// paths. Preserve that destination without prepending servers.
+		a.warn("openapi_nonstandard_path", p)
+		return path
+	}
 	host, base := "", ""
 	if a.v2 {
 		base = str(a.root, "basePath", "$")
@@ -254,37 +272,46 @@ func (a *apiConversion) requestURL(path string, entry, op object, p string) stri
 		}
 	} else {
 		servers := a.root["servers"]
+		serversPath := "$.servers"
 		if v, ok := entry["servers"]; ok {
 			servers = v
+			serversPath = p[:strings.LastIndex(p, ".")] + ".servers"
 		}
 		if v, ok := op["servers"]; ok {
 			servers = v
+			serversPath = p + ".servers"
 		}
 		address := "/"
 		if servers != nil {
-			values := arr(servers, p+".servers")
+			values := arr(servers, serversPath)
 			if len(values) > 0 {
-				server := obj(values[0], p+".servers[0]")
-				address = str(server, "url", p+".servers[0]")
-				if address == "" {
-					fail("invalid_structure", p+".servers[0].url")
+				server := obj(values[0], serversPath+"[0]")
+				address = str(server, "url", serversPath+"[0]")
+				if !hasKey(server, "url") {
+					fail("invalid_structure", serversPath+"[0].url")
+				}
+				if strings.TrimSpace(address) == "" {
+					// Some exporters include an unconfigured environment first. Keep
+					// that selection relative; never silently select another host.
+					address = "/"
+					a.warn("openapi_empty_server", serversPath+"[0].url")
 				}
 				if variables, ok := server["variables"]; ok {
-					m := obj(variables, p+".servers[0].variables")
+					m := obj(variables, serversPath+"[0].variables")
 					for _, key := range sortedKeys(m) {
-						variable := obj(m[key], p+".servers[0].variables")
-						value := text(variable["default"], p+".servers[0].variables.default")
+						variable := obj(m[key], serversPath+"[0].variables")
+						value := text(variable["default"], serversPath+"[0].variables.default")
 						address = strings.ReplaceAll(address, "{"+key+"}", value)
 					}
 				}
 			}
 			if len(values) > 1 {
-				a.warn("openapi_selection", p+".servers")
+				a.warn("openapi_selection", serversPath)
 			}
 		}
 		u, err := url.Parse(address)
 		if err != nil || strings.ContainsAny(address, "{}\r\n") {
-			fail("invalid_structure", p+".servers")
+			fail("invalid_structure", serversPath)
 		}
 		if a.options.DocumentURL != "" {
 			document, err := url.Parse(a.options.DocumentURL)
@@ -294,7 +321,7 @@ func (a *apiConversion) requestURL(path string, entry, op object, p string) stri
 			u = document.ResolveReference(u)
 		}
 		if u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.Scheme != "" && u.Scheme != "http" && u.Scheme != "https" {
-			fail("invalid_structure", p+".servers")
+			fail("invalid_structure", serversPath)
 		}
 		base = u.EscapedPath()
 		if u.Host != "" {
@@ -319,6 +346,28 @@ func (a *apiConversion) requestURL(path string, entry, op object, p string) stri
 		result = strings.TrimRight(host, "/") + result
 	}
 	return result
+}
+
+func validAPIPath(path string) bool {
+	if strings.HasPrefix(path, "/") {
+		return true
+	}
+	if strings.HasPrefix(path, "{{") {
+		key, tail, ok := strings.Cut(path[2:], "}}")
+		return ok && strings.TrimSpace(key) != "" && !strings.ContainsAny(key, "{}\r\n") && strings.HasPrefix(tail, "/")
+	}
+	u, err := url.Parse(path)
+	if err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != "" && u.User == nil {
+		return true
+	}
+	// Preserve host:port/path exports verbatim. The notice asks the user to
+	// verify the scheme, rather than silently choosing HTTP versus HTTPS.
+	u, err = url.Parse("http://" + path)
+	if err != nil || u.User != nil || u.Hostname() == "" || u.Port() == "" {
+		return false
+	}
+	_, err = strconv.ParseUint(u.Port(), 10, 16)
+	return err == nil
 }
 
 func (a *apiConversion) variable(key, value, path string) {
@@ -424,6 +473,10 @@ func (a *apiConversion) parameters(r *model.Request, entry, op object, path stri
 		schema := param
 		if !a.v2 {
 			schema = a.resolve(param["schema"], p+".schema")
+		}
+		if !a.v2 && str(schema, "type", p+".schema") == "object" && in == "query" {
+			a.objectQuery(r, param, schema, p)
+			continue
 		}
 		value, present := param["example"]
 		if !present {
@@ -531,6 +584,47 @@ func (a *apiConversion) parameters(r *model.Request, entry, op object, path stri
 }
 
 func hasKey(m object, key string) bool { _, ok := m[key]; return ok }
+
+// Several exporters encode JSON examples as text even when the schema says
+// object/array. Decode those templates once, retaining true string examples.
+func (a *apiConversion) example(value any, schema object, path string) any {
+	s, ok := value.(string)
+	if !ok || str(schema, "type", path) == "string" {
+		return value
+	}
+	if strings.TrimSpace(s) != "" && json.Valid([]byte(s)) {
+		return readJSON(`{"value":` + s + `}`)["value"]
+	}
+	return value
+}
+
+func (a *apiConversion) objectQuery(r *model.Request, param, schema object, path string) {
+	style := str(param, "style", path)
+	if style != "" && style != "form" || hasKey(param, "explode") && !boolean(param, "explode", path) || boolean(param, "allowReserved", path) {
+		fail("unsupported_parameter", path)
+	}
+	value, present := param["example"]
+	if !present || value == "" {
+		value, present = schema["example"]
+	}
+	if !present || value == "" {
+		value, present = schema["default"]
+	}
+	if !present || value == "" {
+		value = a.sample(schema, path+".schema", 0)
+		present = false
+	}
+	value = a.example(value, schema, path)
+	fields := obj(value, path)
+	for _, key := range sortedKeys(fields) {
+		switch fields[key].(type) {
+		case map[string]any, []any:
+			fail("unsupported_parameter", path)
+		}
+		r.Params = append(r.Params, model.KV{Key: key, Value: lexical(fields[key]), Description: str(param, "description", path), Disabled: !boolean(param, "required", path) && !present})
+	}
+}
+
 func jsonMedia(media string) bool {
 	return media == "application/json" || strings.HasSuffix(media, "+json")
 }
@@ -581,6 +675,10 @@ func (a *apiConversion) requestBody(v any, path string) model.Body {
 	if nonempty(m["encoding"]) {
 		fail("unsupported_body", path+".content.encoding")
 	}
+	schema := object{}
+	if v, ok := m["schema"]; ok {
+		schema = a.resolveSchema(v, path+".content.schema")
+	}
 	value, exists := m["example"]
 	if !exists && hasKey(m, "examples") {
 		examples := obj(m["examples"], path+".content.examples")
@@ -596,8 +694,24 @@ func (a *apiConversion) requestBody(v any, path string) model.Body {
 			}
 		}
 	}
+	if empty, ok := value.(string); ok && empty == "" && str(schema, "type", path+".content.schema") != "string" {
+		exists = false
+	}
+	if media == "application/x-www-form-urlencoded" || media == "multipart/form-data" {
+		template := object{}
+		if exists {
+			template["example"] = value
+		}
+		return a.formBody(template, schema, media, path)
+	}
 	if !exists {
-		value = a.sample(obj(m["schema"], path+".content.schema"), path+".content.schema", 0)
+		// Empty placeholders are exported even for GETs with no request body.
+		if len(schema) == 0 && jsonMedia(media) {
+			return model.Body{Mode: model.BodyNone}
+		}
+		value = a.sample(schema, path+".content.schema", 0)
+	} else if jsonMedia(media) {
+		value = a.example(value, schema, path+".content.schema")
 	}
 	if jsonMedia(media) {
 		return model.Body{Mode: model.BodyJSON, Text: jsonText(value), ContentType: media}
@@ -605,31 +719,71 @@ func (a *apiConversion) requestBody(v any, path string) model.Body {
 	if strings.HasPrefix(media, "text/") {
 		return model.Body{Mode: model.BodyRaw, Text: lexical(value), ContentType: media}
 	}
-	if media == "application/x-www-form-urlencoded" || media == "multipart/form-data" {
-		fields := obj(value, path+".content")
-		out := model.Body{Mode: model.BodyURLEncoded}
-		if media == "multipart/form-data" {
-			out.Mode = model.BodyFormData
-		}
-		for _, key := range sortedKeys(fields) {
-			switch fields[key].(type) {
-			case []any, map[string]any:
-				fail("unsupported_body", path)
-			}
-			if out.Mode == model.BodyFormData {
-				out.Form = append(out.Form, model.FormField{Key: key, Value: lexical(fields[key])})
-			} else {
-				out.URLEncoded = append(out.URLEncoded, model.KV{Key: key, Value: lexical(fields[key])})
-			}
-		}
-		return out
-	}
 	fail("unsupported_body", path)
 	return model.Body{}
 }
 
-// sample generates a bounded request template. Composed/recursive schemas need
-// manual values rather than pretending to satisfy constraints or picking a branch.
+func (a *apiConversion) formBody(mediaObject, schema object, media, path string) model.Body {
+	out := model.Body{Mode: model.BodyURLEncoded}
+	if media == "multipart/form-data" {
+		out.Mode = model.BodyFormData
+	}
+	fields := object{}
+	example, explicit := mediaObject["example"]
+	if !explicit {
+		example, explicit = schema["example"]
+	}
+	if explicit {
+		fields = obj(a.example(example, schema, path), path+".content")
+	}
+	properties := object{}
+	if v, ok := schema["properties"]; ok {
+		properties = obj(v, path+".content.schema.properties")
+	}
+	if !explicit {
+		for i, key := range sortedKeys(properties) {
+			p := index(path+".content.schema.properties", i)
+			property := a.resolve(properties[key], p)
+			if boolean(property, "readOnly", p) {
+				continue
+			}
+			if str(property, "format", p) == "binary" {
+				value, ok := property["example"]
+				if !ok {
+					value = ""
+				}
+				fields[key] = value
+			} else {
+				fields[key] = a.sample(property, p, 0)
+			}
+		}
+	}
+	for i, key := range sortedKeys(fields) {
+		p := index(path+".content.schema.properties", i)
+		property := object{}
+		if v, ok := properties[key]; ok {
+			property = a.resolve(v, p)
+		}
+		switch fields[key].(type) {
+		case []any, map[string]any:
+			fail("unsupported_body", p)
+		}
+		file := str(property, "format", p) == "binary"
+		if file && out.Mode != model.BodyFormData {
+			fail("unsupported_body", p)
+		}
+		if out.Mode == model.BodyFormData {
+			out.Form = append(out.Form, model.FormField{Key: key, Value: lexical(fields[key]), File: file, Disabled: file})
+		} else {
+			out.URLEncoded = append(out.URLEncoded, model.KV{Key: key, Value: lexical(fields[key]), Description: str(property, "description", p)})
+		}
+	}
+	return out
+}
+
+// sample generates a bounded request template. Choice schemas use their first
+// branch with a notice; missing definitions produce a disclosed null placeholder.
+// This generates editable examples and does not validate schema constraints.
 func (a *apiConversion) sample(schema object, path string, depth int) any {
 	if depth > maxDepth {
 		fail("limit_exceeded", path)
@@ -645,7 +799,7 @@ func (a *apiConversion) sample(schema object, path string, depth int) any {
 		a.schemas[key] = true
 		defer delete(a.schemas, key)
 	}
-	schema = a.resolve(schema, path)
+	schema = a.resolveSchema(schema, path)
 	for _, key := range []string{"example", "default", "const"} {
 		if v, ok := schema[key]; ok {
 			a.sampleSize(v, path)
@@ -659,9 +813,17 @@ func (a *apiConversion) sample(schema object, path string, depth int) any {
 			return values[0]
 		}
 	}
-	for _, key := range []string{"allOf", "oneOf", "anyOf"} {
-		if nonempty(schema[key]) {
-			fail("unsupported_body", path)
+	if nonempty(schema["allOf"]) {
+		fail("unsupported_body", path)
+	}
+	for _, key := range []string{"oneOf", "anyOf"} {
+		if v, ok := schema[key]; ok {
+			choices := arr(v, path+"."+key)
+			if len(choices) == 0 {
+				fail("unsupported_body", path)
+			}
+			a.warn("openapi_schema_choice", path+"."+key)
+			return a.sample(obj(choices[0], index(path+"."+key, 0)), index(path+"."+key, 0), depth+1)
 		}
 	}
 	typeName := ""
@@ -678,7 +840,7 @@ func (a *apiConversion) sample(schema object, path string, depth int) any {
 			m := obj(properties, path+".properties")
 			for i, key := range sortedKeys(m) {
 				p := index(path+".properties", i)
-				child := a.resolve(m[key], p)
+				child := a.resolveSchema(m[key], p)
 				if boolean(child, "readOnly", p) {
 					continue
 				}

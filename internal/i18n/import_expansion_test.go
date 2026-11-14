@@ -26,6 +26,8 @@ func TestImportCopyCoversDiagnosticsAndCompatibilityRoutes(t *testing.T) {
 		"local_file_references": "LocalFileReferences", "form_metadata_omitted": "FormMetadataOmitted", "transport_flags_ignored": "TransportFlagsIgnored",
 		"har_response_omitted": "HARResponseOmitted", "har_cookies_omitted": "HARCookiesOmitted",
 		"openapi_review": "OpenAPIReview", "openapi_selection": "OpenAPISelection",
+		"openapi_empty_server": "OpenAPIEmptyServer", "openapi_schema_choice": "OpenAPISchemaChoice",
+		"openapi_schema_incomplete": "OpenAPISchemaIncomplete", "openapi_nonstandard_path": "OpenAPINonstandardPath",
 	}
 	// Discover emitted codes as well as checking the frozen contract: a new
 	// parser code must never silently use the generic untranslated fallback.

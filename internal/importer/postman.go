@@ -38,7 +38,14 @@ func (c *conversion) postman(m object) *model.Collection {
 	}
 	col := &model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: n}
 	col.Auth = c.postmanAuth(m["auth"], model.AuthNone, "$.auth")
-	col.Items = c.postmanItems(arr(m["item"], "$.item"), 0, "$.item")
+	// Apifox omits item when exporting an empty collection with a schema.
+	// Require that validated schema to distinguish it from incomplete input;
+	// an explicitly supplied item must still be an array.
+	if items, ok := m["item"]; ok {
+		col.Items = c.postmanItems(arr(items, "$.item"), 0, "$.item")
+	} else if str(info, "schema", "$.info") == "" {
+		fail("invalid_structure", "$.item")
+	}
 	if v, ok := m["variable"]; ok {
 		col.Variables = c.postmanRows(v, "$.variable")
 	}
@@ -287,6 +294,11 @@ func (c *conversion) postmanAuth(v any, inherited model.AuthType, path string) m
 	m, ok := v.(map[string]any)
 	if !ok {
 		fail("invalid_auth", path)
+	}
+	// Apifox uses {} for unconfigured auth. Preserve the same scope default as
+	// absent/null auth: none at the root and inheritance in folders/requests.
+	if len(m) == 0 {
+		return model.Auth{Type: inherited}
 	}
 	s, ok := m["type"].(string)
 	if !ok || s == "" {

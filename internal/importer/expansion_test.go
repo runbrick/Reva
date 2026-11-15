@@ -223,7 +223,7 @@ func TestImportUnsupportedSemanticsAreVisible(t *testing.T) {
 			parseFails(t, pmRequest("", `{"type":"`+scheme+`","token":"private-marker"}`), "unsupported_auth")
 		})
 	}
-	for _, a := range []string{`{}`, `{"type":""}`, `42`, `{"type":"apikey","apikey":{"key":"x","value":"private-marker","in":"cookie"}}`, `{"type":"bearer","bearer":[{"key":"token","value":"x"},{"key":"token","value":"y"}]}`, `{"type":"bearer","bearer":{"token":false}}`} {
+	for _, a := range []string{`{"token":"private-marker"}`, `{"type":""}`, `42`, `{"type":"apikey","apikey":{"key":"x","value":"private-marker","in":"cookie"}}`, `{"type":"bearer","bearer":[{"key":"token","value":"x"},{"key":"token","value":"y"}]}`, `{"type":"bearer","bearer":{"token":false}}`} {
 		parseFails(t, pmRequest("", a), "invalid_auth")
 	}
 	for _, b := range []string{`{"mode":"graphql","graphql":{"query":"private-marker"}}`, `{"mode":"future"}`, `{"mode":"raw","raw":"x","encoding":"base64"}`} {

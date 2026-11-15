@@ -641,6 +641,8 @@ func TestCollectionsLayoutBothThemesAndLanguages(t *testing.T) {
 				h.click(h.App.S.Collections.MultiSelect)
 				collectionsOption(h, fmt.Sprintf(h.App.S.Collections.SelectItem, r.Name))
 				check()
+				h.click(h.App.S.Collections.SelectAll)
+				check()
 			})
 		}
 	}
@@ -922,5 +924,72 @@ func TestCollectionsMultiSelectExitClearsSelectionAndDisablesDrag(t *testing.T) 
 	collectionsPaint(h)
 	if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
 		t.Fatal("external deletion left a stale selection")
+	}
+}
+
+func TestCollectionsSelectAllAndClearAcrossHiddenRows(t *testing.T) {
+	for _, tc := range []struct {
+		lang, selectAll, deselectAll string
+	}{
+		{"zh", "全选", "取消全选"},
+		{"en", "Select all", "Deselect all"},
+	} {
+		t.Run(tc.lang, func(t *testing.T) {
+			svc := fake.New()
+			col, _ := svc.Collections.Create("Payments")
+			folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+			r := model.NewRequest("invoice")
+			r.Name = "Invoice request"
+			_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
+			_, _ = svc.Collections.Create("Archive")
+			h := newHarness(t, svc)
+			settings := svc.Settings.Get()
+			settings.Language = tc.lang
+			h.App.ApplySettings(settings)
+			collectionsPaint(h)
+			text := h.App.S.Collections
+			h.click(text.CollapseAll)
+			h.typeInto(text.Filter, "Payments")
+			h.click(text.MultiSelect)
+			h.click(tc.selectAll)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 4)) || !h.shows(tc.deselectAll) {
+				t.Fatal("select all skipped folded or filtered nodes")
+			}
+			h.click(text.DeleteSelected)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.BulkDeletePrompt, 2)) {
+				t.Fatal("select all did not deduplicate collection descendants")
+			}
+			h.click(text.Cancel)
+			h.click(tc.deselectAll)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) || len(svc.Collections.List()) != 2 {
+				t.Fatal("deselect all retained hidden selections or deleted data")
+			}
+			h.click(text.DeleteSelected)
+			h.pump()
+			if h.App.collections.dialogOpen {
+				t.Fatal("deselect all left bulk deletion enabled")
+			}
+			h.click(tc.selectAll)
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Payments"))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 3)) || !h.shows(tc.selectAll) {
+				t.Fatal("partial selection did not restore the select all action")
+			}
+			h.click(tc.selectAll)
+			h.click(text.DeleteSelected)
+			collectionsOption(h, text.Delete)
+			h.pump()
+			if len(svc.Collections.List()) != 0 || h.App.collections.dialogOpen || h.shows(h.App.S.Common.Error) {
+				t.Fatal("confirmed select-all deletion did not remove every collection")
+			}
+			h.click(tc.selectAll)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
+				t.Fatal("select all on an empty tree created a selection")
+			}
+		})
 	}
 }

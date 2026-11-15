@@ -383,7 +383,22 @@ func (a *App) collectionsPane(c ui.C) {
 			}
 		})
 		if s.multiSelect {
-			ui.Text(c, fmt.Sprintf(text.SelectedCount, s.selectedCount())).Muted().FontSize(theme.Metrics.FontSizeS)
+			ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
+				count := s.selectedCount()
+				allSelected := len(s.all) > 0 && count == len(s.all)
+				label := text.SelectAll
+				if allSelected {
+					label = text.DeselectAll
+				}
+				if ui.Button(c, label).Ghost().Shrink(0).Disabled(len(s.all) == 0).Clicked() {
+					c.After(func() {
+						for _, checked := range s.checks {
+							*checked = !allSelected
+						}
+					})
+				}
+				ui.Text(c, fmt.Sprintf(text.SelectedCount, count)).Grow(1).Ellipsis().Muted().FontSize(theme.Metrics.FontSizeS)
+			})
 		}
 		if len(s.all) == 0 {
 			ui.Paragraph(c, text.Empty, 0).FillWidth().Muted().FontSize(theme.Metrics.FontSizeS)

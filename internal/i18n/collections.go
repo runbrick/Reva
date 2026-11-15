@@ -13,6 +13,7 @@ type Collections struct {
 	Add, Actions, Filter, NoMatches                              string
 	Variables, Export, VariablesSaved, Exported                  string
 	MultiSelect, ExitMultiSelect, SelectItem, SelectedCount      string
+	SelectAll, DeselectAll                                       string
 	DeleteSelected, BulkDeletePrompt, ExpandAll, CollapseAll     string
 }
 
@@ -30,6 +31,7 @@ var collectionsZh = Collections{
 	Variables: "集合变量", Export: "导出集合",
 	VariablesSaved: "集合变量已保存", Exported: "集合已导出",
 	MultiSelect: "多选", ExitMultiSelect: "退出多选", SelectItem: "选择 %s", SelectedCount: "已选 %d 项",
+	SelectAll: "全选", DeselectAll: "取消全选",
 	DeleteSelected: "批量删除", BulkDeletePrompt: "删除选中的 %d 项及其所有内容？", ExpandAll: "全部展开", CollapseAll: "全部折叠",
 }
 
@@ -47,5 +49,6 @@ var collectionsEn = Collections{
 	Variables: "Collection variables", Export: "Export collection",
 	VariablesSaved: "Collection variables saved", Exported: "Collection exported",
 	MultiSelect: "Select multiple", ExitMultiSelect: "Exit selection", SelectItem: "Select %s", SelectedCount: "%d selected",
+	SelectAll: "Select all", DeselectAll: "Deselect all",
 	DeleteSelected: "Delete selected", BulkDeletePrompt: "Delete the %d selected items and all their contents?", ExpandAll: "Expand all", CollapseAll: "Collapse all",
 }

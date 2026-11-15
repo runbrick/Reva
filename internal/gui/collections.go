@@ -231,8 +231,19 @@ func (a *App) refreshCollections() {
 	// Keep checkbox identities stable across folds and refreshes, but discard
 	// deleted nodes so a later import cannot inherit a stale selection.
 	live := make(map[string]bool, len(s.all))
+	checkedBelow := -1
 	for _, n := range s.all {
-		live[s.nodeKey(n)] = true
+		key := s.nodeKey(n)
+		live[key] = true
+		if checkedBelow >= 0 && n.depth > checkedBelow {
+			// Newly created or moved-in descendants inherit a checked parent.
+			*s.checks[key] = true
+		} else {
+			checkedBelow = -1
+			if n.branch && *s.checks[key] {
+				checkedBelow = n.depth
+			}
+		}
 	}
 	for key := range s.checks {
 		if !live[key] {
@@ -262,6 +273,33 @@ func (s *collectionsState) selectedCount() int {
 		}
 	}
 	return count
+}
+
+// Select the full subtree, using all rather than visible so filtering and
+// folding cannot leave descendants behind. An unchecked child also clears its
+// ancestors, preventing bulk deletion from including it through a checked parent.
+func (s *collectionsState) setChecked(target collectionNode, checked bool) {
+	for at, n := range s.all {
+		if s.nodeKey(n) != s.nodeKey(target) {
+			continue
+		}
+		for i := at; i < len(s.all); i++ {
+			if i > at && s.all[i].depth <= n.depth {
+				break
+			}
+			*s.checks[s.nodeKey(s.all[i])] = checked
+		}
+		if !checked {
+			depth := n.depth
+			for i := at - 1; i >= 0 && depth > 0; i-- {
+				if parent := s.all[i]; parent.depth < depth {
+					*s.checks[s.nodeKey(parent)] = false
+					depth = parent.depth
+				}
+			}
+		}
+		return
+	}
 }
 
 // The flattened tree is in parent-first order. Selecting a branch covers its
@@ -413,14 +451,20 @@ func (a *App) collectionsPane(c ui.C) {
 			row := ui.Row(rc).Grow(1).FillHeight().Gap(Space2).Items(ui.Center).Radius(theme.Metrics.RadiusControl).HitWith(s.tree.RowID(i), n.name, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected})
 			row.Children(func() {
 				if s.multiSelect {
-					ui.Checkbox(rc, s.checks[s.nodeKey(n)], "").Label(fmt.Sprintf(text.SelectItem, n.name)).Shrink(0)
+					if ui.Checkbox(rc, s.checks[s.nodeKey(n)], "").Label(fmt.Sprintf(text.SelectItem, n.name)).Shrink(0).Changed() {
+						checked := *s.checks[s.nodeKey(n)]
+						c.After(func() { s.setChecked(n, checked) })
+					}
 				}
 				if n.branch {
-					icon := icons.Folder
-					if !s.closed[s.nodeKey(n)] || s.filter != "" {
-						icon = icons.FolderOpen
+					icon, color := icons.Layers, theme.Primary
+					if n.id != "" {
+						icon, color = icons.Folder, theme.MutedForeground
+						if !s.closed[s.nodeKey(n)] || s.filter != "" {
+							icon = icons.FolderOpen
+						}
 					}
-					ui.Icon(rc, icon).Size(Space4, Space4).Color(theme.MutedForeground)
+					ui.Icon(rc, icon).Size(Space4, Space4).Color(color)
 				} else {
 					a.MethodBadge(rc, n.method)
 				}
@@ -455,8 +499,7 @@ func (a *App) collectionsPane(c ui.C) {
 			c.After(func() {
 				s.selected = n
 				if s.multiSelect {
-					checked := s.checks[s.nodeKey(n)]
-					*checked = !*checked
+					s.setChecked(n, !*s.checks[s.nodeKey(n)])
 				} else if !n.branch {
 					a.openCollectionRequest(n)
 				}

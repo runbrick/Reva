@@ -867,7 +867,7 @@ func TestCollectionsBulkDeleteKeepsHiddenSelections(t *testing.T) {
 	h.click(text.CollapseAll)
 	h.typeInto(text.Filter, "Keep request")
 	h.pump()
-	if h.shows("Payments") || !h.shows(fmt.Sprintf(text.SelectedCount, 2)) {
+	if h.shows("Payments") || !h.shows(fmt.Sprintf(text.SelectedCount, 3)) {
 		t.Fatal("filtering lost the hidden selection")
 	}
 	h.click(text.DeleteSelected)
@@ -975,8 +975,8 @@ func TestCollectionsSelectAllAndClearAcrossHiddenRows(t *testing.T) {
 			h.click(tc.selectAll)
 			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Payments"))
 			h.pump()
-			if !h.shows(fmt.Sprintf(text.SelectedCount, 3)) || !h.shows(tc.selectAll) {
-				t.Fatal("partial selection did not restore the select all action")
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 1)) || !h.shows(tc.selectAll) {
+				t.Fatal("deselecting a collection did not clear its descendants")
 			}
 			h.click(tc.selectAll)
 			h.click(text.DeleteSelected)
@@ -989,6 +989,136 @@ func TestCollectionsSelectAllAndClearAcrossHiddenRows(t *testing.T) {
 			h.pump()
 			if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
 				t.Fatal("select all on an empty tree created a selection")
+			}
+		})
+	}
+}
+
+func TestCollectionsParentSelectionCascadesToHiddenDescendants(t *testing.T) {
+	for _, lang := range []string{"zh", "en"} {
+		t.Run(lang, func(t *testing.T) {
+			svc := fake.New()
+			col, _ := svc.Collections.Create("Payments")
+			parent, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+			child, _ := svc.Collections.AddFolder(col.ID, parent.ID, "Archived")
+			first := model.NewRequest("first")
+			first.Name = "First invoice"
+			_, _ = svc.Collections.SaveRequest(col.ID, child.ID, first)
+			second := model.NewRequest("second")
+			second.Name = "Second invoice"
+			_, _ = svc.Collections.SaveRequest(col.ID, child.ID, second)
+			keep := model.NewRequest("keep")
+			keep.Name = "Keep request"
+			_, _ = svc.Collections.SaveRequest(col.ID, "", keep)
+			other, _ := svc.Collections.Create("Other")
+			h := newHarness(t, svc)
+			settings := svc.Settings.Get()
+			settings.Language = lang
+			h.App.ApplySettings(settings)
+			collectionsPaint(h)
+			text := h.App.S.Collections
+			h.click(text.CollapseAll)
+			h.typeInto(text.Filter, "Invoices")
+			h.click(text.MultiSelect)
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Invoices"))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 4)) {
+				t.Fatal("checking a folder did not select every hidden nested folder and request")
+			}
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Invoices"))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
+				t.Fatal("unchecking a folder retained selected descendants")
+			}
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Payments"))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 6)) {
+				t.Fatal("checking a collection did not select all its contents or affected another collection")
+			}
+			h.click(text.ExpandAll)
+			h.pump()
+			for _, name := range []string{"Payments", "Invoices", "Archived", first.Name, second.Name, keep.Name} {
+				found := false
+				for _, hit := range h.D.Snapshot().Hits {
+					if hit.Label == fmt.Sprintf(text.SelectItem, name) {
+						found = true
+						if !hit.Checked {
+							t.Errorf("descendant %q is not visibly checked", name)
+						}
+					}
+				}
+				if !found {
+					t.Fatalf("missing checkbox for %q", name)
+				}
+			}
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, "Payments"))
+			// Row selection must cascade just like checkbox selection.
+			b := collectionsRowHit(h, "Invoices").Bounds
+			if err := h.D.Click(b.X+b.Width-Space2, b.Y+b.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 4)) {
+				t.Fatal("choosing a folder row did not cascade selection")
+			}
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, first.Name))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 1)) {
+				t.Fatal("unchecking a request did not clear its checked ancestors")
+			}
+			h.click(text.DeleteSelected)
+			collectionsOption(h, text.Delete)
+			h.pump()
+			stored, ok := svc.Collections.Get(col.ID)
+			if !ok || model.FindItem(stored.Items, parent.ID) == nil || model.FindItem(stored.Items, child.ID) == nil || model.FindItem(stored.Items, first.ID) == nil || model.FindItem(stored.Items, keep.ID) == nil || model.FindItem(stored.Items, second.ID) != nil {
+				t.Fatal("deletion through a checked ancestor removed an unchecked request or kept a checked sibling")
+			}
+			if _, ok := svc.Collections.Get(other.ID); !ok {
+				t.Fatal("cascaded selection affected another collection")
+			}
+		})
+	}
+}
+
+func TestCollectionsCheckedParentsIncludeNewChildren(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		initial int
+	}{{"Payments", 2}, {"Invoices", 1}} {
+		t.Run(tc.name, func(t *testing.T) {
+			svc := fake.New()
+			col, _ := svc.Collections.Create("Payments")
+			_, _ = svc.Collections.AddFolder(col.ID, "", "Invoices")
+			h := newHarness(t, svc)
+			text := h.App.S.Collections
+			h.click(text.MultiSelect)
+			b := collectionsRowHit(h, tc.name).Bounds
+			if err := h.D.Click(b.X+b.Width-Space2, b.Y+b.Height/2); err != nil {
+				t.Fatal(err)
+			}
+			h.click(text.Add)
+			collectionsOption(h, text.NewRequest)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, tc.initial+1)) {
+				t.Fatal("new request did not inherit its checked parent's selection")
+			}
+			h.click(text.Add)
+			collectionsOption(h, text.NewFolder)
+			h.typeInto(text.Name, "New child folder")
+			collectionsOption(h, text.Create)
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, tc.initial+2)) {
+				t.Fatal("new folder did not inherit its checked parent's selection")
+			}
+			for _, hit := range h.D.Snapshot().Hits {
+				if hit.Label == fmt.Sprintf(text.SelectItem, "New child folder") && !hit.Checked {
+					t.Fatal("new folder is visibly unchecked under a checked parent")
+				}
+			}
+			collectionsOption(h, fmt.Sprintf(text.SelectItem, tc.name))
+			h.pump()
+			if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
+				t.Fatal("unchecking the parent did not clear new descendants")
 			}
 		})
 	}

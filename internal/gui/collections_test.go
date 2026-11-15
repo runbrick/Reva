@@ -638,6 +638,9 @@ func TestCollectionsLayoutBothThemesAndLanguages(t *testing.T) {
 				r.Name = "List invoices"
 				_, _ = h.Svc.Collections.SaveRequest(col.ID, folder.ID, r)
 				check()
+				h.click(h.App.S.Collections.MultiSelect)
+				collectionsOption(h, fmt.Sprintf(h.App.S.Collections.SelectItem, r.Name))
+				check()
 			})
 		}
 	}
@@ -710,5 +713,214 @@ func TestCollectionsFailedCrossCollectionMoveKeepsOriginal(t *testing.T) {
 	}
 	if !h.shows("disk unavailable") {
 		t.Fatal("failed move did not report error")
+	}
+}
+
+func TestCollectionsExpandAndCollapseAll(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	child, _ := svc.Collections.AddFolder(col.ID, folder.ID, "Archived")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, child.ID, r)
+	_, _ = svc.Collections.Create("Other")
+	h := newHarness(t, svc)
+	h.click("全部折叠")
+	h.pump()
+	if len(h.App.collections.visible) != 2 || h.shows(r.Name) {
+		t.Fatal("collapse all did not hide every collection's descendants")
+	}
+	h.click("Payments")
+	h.pump()
+	if !h.shows("Invoices") || h.shows("Archived") {
+		t.Fatal("collapse all left a hidden nested folder expanded")
+	}
+	h.click("全部展开")
+	h.pump()
+	if !h.shows("Archived") || !h.shows(r.Name) {
+		t.Fatal("expand all did not recursively reveal nested requests")
+	}
+	h.typeInto(h.App.S.Collections.Filter, r.Name)
+	h.pump()
+	h.click(h.App.S.Collections.CollapseAll)
+	h.pump()
+	if len(h.App.collections.visible) != 2 || h.shows(r.Name) || !h.shows("Other") {
+		t.Fatal("search prevented collapse all from showing only collection roots")
+	}
+	h.typeInto(h.App.S.Collections.Filter, r.Name)
+	h.pump()
+	h.click(h.App.S.Collections.ExpandAll)
+	h.pump()
+	if !h.shows(r.Name) || !h.shows("Other") {
+		t.Fatal("expand all did not restore the complete tree during search")
+	}
+}
+
+func TestCollectionsBulkDeleteConfirmCancelAndParentDeduplication(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	r := model.NewRequest("invoice")
+	r.Name = "List invoices"
+	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
+	keep := model.NewRequest("keep")
+	keep.Name = "Keep request"
+	_, _ = svc.Collections.SaveRequest(col.ID, "", keep)
+	other, _ := svc.Collections.Create("Archive")
+	h := newHarness(t, svc)
+	before := len(h.App.Tabs())
+	h.click("多选")
+	collectionsOption(h, "选择 "+r.Name)
+	// Click the row content, away from its disclosure and checkbox.
+	b := collectionsRowHit(h, "Invoices").Bounds
+	if err := h.D.Click(b.X+b.Width-Space2, b.Y+b.Height/2); err != nil {
+		t.Fatal(err)
+	}
+	collectionsOption(h, "选择 Archive")
+	h.pump()
+	if len(h.App.Tabs()) != before || !h.shows(r.Name) {
+		t.Fatal("selection opened a request or collapsed its folder")
+	}
+	h.click("批量删除")
+	h.pump()
+	if !h.shows("删除选中的 2 项及其所有内容？") {
+		t.Fatal("confirmation did not deduplicate a selected folder and child")
+	}
+	h.click(h.App.S.Collections.Cancel)
+	h.pump()
+	stored, _ := svc.Collections.Get(col.ID)
+	if model.FindItem(stored.Items, r.ID) == nil || len(svc.Collections.List()) != 2 {
+		t.Fatal("cancelled bulk deletion changed stored data")
+	}
+	h.click("批量删除")
+	h.click(h.App.S.Collections.Delete)
+	h.pump()
+	stored, _ = svc.Collections.Get(col.ID)
+	if model.FindItem(stored.Items, folder.ID) != nil || model.FindItem(stored.Items, keep.ID) == nil {
+		t.Fatal("bulk deletion removed an unselected request or kept the selected folder")
+	}
+	if _, ok := svc.Collections.Get(other.ID); ok {
+		t.Fatal("bulk deletion kept the selected collection")
+	}
+	if h.App.collections.dialogOpen || h.shows(h.App.S.Common.Error) {
+		t.Fatal("bulk deletion failed, possibly by deleting a selected child twice")
+	}
+}
+
+type collectionsFailingDelete struct {
+	service.CollectionService
+	failID string
+}
+
+func (s *collectionsFailingDelete) Delete(id string) error {
+	if id == s.failID {
+		return errors.New("disk unavailable")
+	}
+	return s.CollectionService.Delete(id)
+}
+
+func TestCollectionsBulkDeleteFailureRetainsRemainingSelectionForRetry(t *testing.T) {
+	svc := fake.New()
+	first, _ := svc.Collections.Create("First")
+	second, _ := svc.Collections.Create("Second")
+	failing := &collectionsFailingDelete{CollectionService: svc.Collections, failID: second.ID}
+	svc.Collections = failing
+	h := newHarness(t, svc)
+	h.click("多选")
+	collectionsOption(h, "选择 First")
+	collectionsOption(h, "选择 Second")
+	h.click("批量删除")
+	h.click(h.App.S.Collections.Delete)
+	h.pump()
+	if _, ok := svc.Collections.Get(first.ID); ok {
+		t.Fatal("successful deletion was not persisted before the failure")
+	}
+	if _, ok := svc.Collections.Get(second.ID); !ok || !h.App.collections.dialogOpen || !h.shows("disk unavailable") {
+		t.Fatal("failed deletion lost the remaining target or error feedback")
+	}
+	failing.failID = ""
+	collectionsOption(h, h.App.S.Collections.Delete)
+	h.pump()
+	if len(svc.Collections.List()) != 0 || h.App.collections.dialogOpen {
+		t.Fatal("retry did not delete only the remaining collection")
+	}
+}
+
+func TestCollectionsBulkDeleteKeepsHiddenSelections(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	r := model.NewRequest("shared-id")
+	r.Name = "Invoice request"
+	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
+	other, _ := svc.Collections.Create("Archive")
+	r.Name = "Keep request"
+	_, _ = svc.Collections.SaveRequest(other.ID, "", r)
+	h := newHarness(t, svc)
+	text := h.App.S.Collections
+	h.click(text.MultiSelect)
+	collectionsOption(h, fmt.Sprintf(text.SelectItem, "Invoice request"))
+	collectionsOption(h, fmt.Sprintf(text.SelectItem, "Payments"))
+	h.click(text.CollapseAll)
+	h.typeInto(text.Filter, "Keep request")
+	h.pump()
+	if h.shows("Payments") || !h.shows(fmt.Sprintf(text.SelectedCount, 2)) {
+		t.Fatal("filtering lost the hidden selection")
+	}
+	h.click(text.DeleteSelected)
+	h.pump()
+	if !h.shows(fmt.Sprintf(text.BulkDeletePrompt, 1)) {
+		t.Fatal("selected collection did not cover its hidden descendants")
+	}
+	h.click(text.Delete)
+	h.pump()
+	if _, ok := svc.Collections.Get(col.ID); ok {
+		t.Fatal("hidden selected collection was not deleted")
+	}
+	stored, ok := svc.Collections.Get(other.ID)
+	if !ok || model.FindItem(stored.Items, r.ID) == nil {
+		t.Fatal("selection leaked to another collection with the same item ID")
+	}
+}
+
+func TestCollectionsMultiSelectExitClearsSelectionAndDisablesDrag(t *testing.T) {
+	svc := fake.New()
+	col, _ := svc.Collections.Create("Payments")
+	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
+	r := model.NewRequest("invoice")
+	r.Name = "Invoice request"
+	_, _ = svc.Collections.SaveRequest(col.ID, "", r)
+	h := newHarness(t, svc)
+	text := h.App.S.Collections
+	h.click(text.MultiSelect)
+	collectionsOption(h, fmt.Sprintf(text.SelectItem, r.Name))
+	h.pump()
+	if !h.shows(fmt.Sprintf(text.SelectedCount, 1)) {
+		t.Fatal("checkbox did not update the selected count")
+	}
+	collectionsDrag(h, r.Name, "Invoices")
+	stored, _ := svc.Collections.Get(col.ID)
+	if len(model.FindItem(stored.Items, folder.ID).Items) != 0 {
+		t.Fatal("dragging during multi-selection moved a request")
+	}
+	h.click(text.ExitMultiSelect)
+	h.click(text.MultiSelect)
+	h.pump()
+	if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
+		t.Fatal("leaving selection mode retained old checkboxes")
+	}
+	h.click(text.DeleteSelected)
+	h.pump()
+	if h.App.collections.dialogOpen {
+		t.Fatal("empty selection opened a deletion confirmation")
+	}
+	collectionsOption(h, fmt.Sprintf(text.SelectItem, r.Name))
+	if err := svc.Collections.DeleteItem(col.ID, r.ID); err != nil {
+		t.Fatal(err)
+	}
+	collectionsPaint(h)
+	if !h.shows(fmt.Sprintf(text.SelectedCount, 0)) {
+		t.Fatal("external deletion left a stale selection")
 	}
 }

@@ -12,6 +12,8 @@ type Collections struct {
 	InlineCollection, CollectionName                             string
 	Add, Actions, Filter, NoMatches                              string
 	Variables, Export, VariablesSaved, Exported                  string
+	MultiSelect, ExitMultiSelect, SelectItem, SelectedCount      string
+	DeleteSelected, BulkDeletePrompt, ExpandAll, CollapseAll     string
 }
 
 var collectionsZh = Collections{
@@ -27,6 +29,8 @@ var collectionsZh = Collections{
 	Add: "添加集合项", Actions: "%s 的操作", Filter: "筛选集合与请求", NoMatches: "没有匹配的请求",
 	Variables: "集合变量", Export: "导出集合",
 	VariablesSaved: "集合变量已保存", Exported: "集合已导出",
+	MultiSelect: "多选", ExitMultiSelect: "退出多选", SelectItem: "选择 %s", SelectedCount: "已选 %d 项",
+	DeleteSelected: "批量删除", BulkDeletePrompt: "删除选中的 %d 项及其所有内容？", ExpandAll: "全部展开", CollapseAll: "全部折叠",
 }
 
 var collectionsEn = Collections{
@@ -42,4 +46,6 @@ var collectionsEn = Collections{
 	Add: "Create collection item", Actions: "Actions for %s", Filter: "Filter collections and requests", NoMatches: "No matching requests",
 	Variables: "Collection variables", Export: "Export collection",
 	VariablesSaved: "Collection variables saved", Exported: "Collection exported",
+	MultiSelect: "Select multiple", ExitMultiSelect: "Exit selection", SelectItem: "Select %s", SelectedCount: "%d selected",
+	DeleteSelected: "Delete selected", BulkDeletePrompt: "Delete the %d selected items and all their contents?", ExpandAll: "Expand all", CollapseAll: "Collapse all",
 }

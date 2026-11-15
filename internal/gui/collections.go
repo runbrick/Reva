@@ -32,6 +32,9 @@ type collectionsState struct {
 	addOpen, rowMenuOpen            bool
 	rowMenuID                       string
 	selected                        collectionNode
+	multiSelect                     bool
+	checks                          map[string]*bool
+	deleteTargets                   []collectionNode
 	activeCollection, activeRequest string
 	variablesOpen                   bool
 	variablesCollection             string
@@ -74,11 +77,16 @@ const (
 	collectionFolder
 	collectionRename
 	collectionDelete
+	collectionBulkDelete
 )
 
 func (s *collectionsState) node(i int) ui.TreeNode {
 	n := s.visible[i]
-	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: !n.branch && n.collectionID == s.activeCollection && n.id == s.activeRequest}
+	selected := !n.branch && n.collectionID == s.activeCollection && n.id == s.activeRequest
+	if s.multiSelect {
+		selected = *s.checks[s.nodeKey(n)]
+	}
+	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: selected}
 }
 
 func (s *collectionsState) nodeKey(n collectionNode) string { return n.collectionID + "/" + n.id }
@@ -128,6 +136,9 @@ func (s *collectionsState) matches(cols []model.Collection) bool {
 
 func (s *collectionsState) appendNode(n collectionNode) {
 	k := s.nodeKey(n)
+	if s.checks[k] == nil {
+		s.checks[k] = new(bool)
+	}
 	if _, ok := s.keys[k]; !ok {
 		s.nextKey++
 		s.keys[k] = s.nextKey
@@ -179,6 +190,7 @@ func (a *App) refreshCollections() {
 	s := &a.collections
 	if !s.ready {
 		s.closed, s.keys = make(map[string]bool), make(map[string]int)
+		s.checks = make(map[string]*bool)
 		s.tree.Node, s.tree.Key, s.label = s.node, s.rowKey, s.rowLabel
 		s.tree.CanDrop = s.canDrop
 		s.collectionLabel = func(id string) string { return s.collectionNames[id] }
@@ -216,7 +228,60 @@ func (a *App) refreshCollections() {
 		}
 	}
 	s.selected = selected
+	// Keep checkbox identities stable across folds and refreshes, but discard
+	// deleted nodes so a later import cannot inherit a stale selection.
+	live := make(map[string]bool, len(s.all))
+	for _, n := range s.all {
+		live[s.nodeKey(n)] = true
+	}
+	for key := range s.checks {
+		if !live[key] {
+			delete(s.checks, key)
+		}
+	}
 	s.flattenVisible()
+}
+
+func (s *collectionsState) expandAll(expanded bool) {
+	// Search reveals matching ancestry regardless of closed state. Global tree
+	// navigation leaves search so collapsing takes effect immediately.
+	s.filter = ""
+	for _, n := range s.all {
+		if n.branch {
+			s.closed[s.nodeKey(n)] = !expanded
+		}
+	}
+	s.flattenVisible()
+}
+
+func (s *collectionsState) selectedCount() int {
+	count := 0
+	for _, checked := range s.checks {
+		if *checked {
+			count++
+		}
+	}
+	return count
+}
+
+// The flattened tree is in parent-first order. Selecting a branch covers its
+// entire subtree, including descendants hidden by filtering or folding.
+func (s *collectionsState) bulkDeleteTargets() []collectionNode {
+	var targets []collectionNode
+	coveredBelow := -1
+	for _, n := range s.all {
+		if coveredBelow >= 0 && n.depth > coveredBelow {
+			continue
+		}
+		coveredBelow = -1
+		if *s.checks[s.nodeKey(n)] {
+			targets = append(targets, n)
+			if n.branch {
+				coveredBelow = n.depth
+			}
+		}
+	}
+	return targets
 }
 
 // collectionsPane shows the collection tree; choosing a request opens it.
@@ -285,6 +350,41 @@ func (a *App) collectionsPane(c ui.C) {
 		if s.appliedFilter != s.filter {
 			s.flattenVisible()
 		}
+		ui.Row(c).FillWidth().Gap(Space1).Items(ui.Center).Children(func() {
+			label, icon := text.MultiSelect, icons.Check
+			if s.multiSelect {
+				label, icon = text.ExitMultiSelect, icons.X
+			}
+			if ui.Button(c, label).Icon(icon).IconOnly().Ghost().Disabled(len(s.all) == 0 && !s.multiSelect).Clicked() {
+				c.After(func() {
+					s.multiSelect = !s.multiSelect
+					s.rowMenuOpen = false
+					for _, checked := range s.checks {
+						*checked = false
+					}
+				})
+			}
+			if ui.Button(c, text.ExpandAll).Icon(icons.ChevronDown).IconOnly().Ghost().Disabled(len(s.all) == 0).Clicked() {
+				c.After(func() { s.expandAll(true) })
+			}
+			if ui.Button(c, text.CollapseAll).Icon(icons.ChevronUp).IconOnly().Ghost().Disabled(len(s.all) == 0).Clicked() {
+				c.After(func() { s.expandAll(false) })
+			}
+			if s.multiSelect {
+				ui.Spacer(c).Grow(1)
+				if ui.Button(c, text.DeleteSelected).Icon(icons.Trash2).IconOnly().Ghost().Disabled(s.selectedCount() == 0).Clicked() {
+					c.After(func() {
+						s.deleteTargets = s.bulkDeleteTargets()
+						if len(s.deleteTargets) > 0 {
+							a.collectionNameDialog(collectionBulkDelete, collectionNode{})
+						}
+					})
+				}
+			}
+		})
+		if s.multiSelect {
+			ui.Text(c, fmt.Sprintf(text.SelectedCount, s.selectedCount())).Muted().FontSize(theme.Metrics.FontSizeS)
+		}
 		if len(s.all) == 0 {
 			ui.Paragraph(c, text.Empty, 0).FillWidth().Muted().FontSize(theme.Metrics.FontSizeS)
 		}
@@ -297,6 +397,9 @@ func (a *App) collectionsPane(c ui.C) {
 			selected := s.node(i).Selected
 			row := ui.Row(rc).Grow(1).FillHeight().Gap(Space2).Items(ui.Center).Radius(theme.Metrics.RadiusControl).HitWith(s.tree.RowID(i), n.name, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected})
 			row.Children(func() {
+				if s.multiSelect {
+					ui.Checkbox(rc, s.checks[s.nodeKey(n)], "").Label(fmt.Sprintf(text.SelectItem, n.name)).Shrink(0)
+				}
 				if n.branch {
 					icon := icons.Folder
 					if !s.closed[s.nodeKey(n)] || s.filter != "" {
@@ -310,6 +413,9 @@ func (a *App) collectionsPane(c ui.C) {
 				if selected {
 					label.Color(theme.Primary)
 				}
+				if s.multiSelect {
+					return
+				}
 				more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Shrink(0)
 				if !selected && !(s.rowMenuOpen && s.rowMenuID == s.nodeKey(n)) {
 					more.Opacity(0).StateFrom(row).Hover(ui.Look{}.Opacity(1)).Focus(ui.Look{}.Opacity(1))
@@ -321,7 +427,9 @@ func (a *App) collectionsPane(c ui.C) {
 					ui.Menu(rc, more, &s.rowMenuOpen, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
 				}
 			})
-			ui.ContextMenu(rc, row, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+			if !s.multiSelect {
+				ui.ContextMenu(rc, row, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+			}
 		}).FillWidth().Grow(1)
 		if i, ok := s.tree.Toggled(); ok {
 			n := s.visible[i]
@@ -331,7 +439,10 @@ func (a *App) collectionsPane(c ui.C) {
 			n := s.visible[i]
 			c.After(func() {
 				s.selected = n
-				if !n.branch {
+				if s.multiSelect {
+					checked := s.checks[s.nodeKey(n)]
+					*checked = !*checked
+				} else if !n.branch {
 					a.openCollectionRequest(n)
 				}
 			})
@@ -355,7 +466,7 @@ func (a *App) newGraphQLTab() {
 
 // Only an inside drop is accepted; collection roots cannot themselves be moved.
 func (s *collectionsState) canDrop(from, to int, where ui.TreeDrop) bool {
-	if from < 0 || to < 0 || from >= len(s.visible) || to >= len(s.visible) || from == to || where != ui.TreeDropInside {
+	if s.multiSelect || from < 0 || to < 0 || from >= len(s.visible) || to >= len(s.visible) || from == to || where != ui.TreeDropInside {
 		return false
 	}
 	source, target := s.visible[from], s.visible[to]
@@ -805,10 +916,14 @@ func (a *App) collectionEditDialog(c ui.C) {
 		title = text.NewFolder
 	case collectionRename:
 		title, action = text.Rename, text.Rename
-	case collectionDelete:
+	case collectionDelete, collectionBulkDelete:
 		title, action = text.DeleteTitle, text.Delete
 	}
 	ui.Modal(c, &s.dialogOpen, title, func() {
+		if s.dialog == collectionBulkDelete {
+			ui.Wrap(c, fmt.Sprintf(text.BulkDeletePrompt, len(s.deleteTargets)))
+			return
+		}
 		if s.dialog == collectionDelete {
 			ui.Text(c, fmt.Sprintf(text.DeletePrompt, s.target.name))
 			return
@@ -818,7 +933,7 @@ func (a *App) collectionEditDialog(c ui.C) {
 		if ui.Button(c, text.Cancel).Outline().Clicked() {
 			s.dialogOpen = false
 		}
-		if ui.Button(c, action).Disabled(s.dialog != collectionDelete && strings.TrimSpace(s.name) == "").Clicked() {
+		if ui.Button(c, action).Disabled(s.dialog != collectionDelete && s.dialog != collectionBulkDelete && strings.TrimSpace(s.name) == "").Clicked() {
 			c.After(a.applyCollectionEdit)
 		}
 	})
@@ -826,6 +941,10 @@ func (a *App) collectionEditDialog(c ui.C) {
 
 func (a *App) applyCollectionEdit() {
 	s := &a.collections
+	if s.dialog == collectionBulkDelete {
+		a.deleteSelectedCollectionItems()
+		return
+	}
 	n, name := s.target, strings.TrimSpace(s.name)
 	var err error
 	switch s.dialog {
@@ -864,6 +983,30 @@ func (a *App) applyCollectionEdit() {
 		}
 	}
 	s.dialogOpen = false
+	a.refreshCollections()
+}
+
+func (a *App) deleteSelectedCollectionItems() {
+	s := &a.collections
+	for i, n := range s.deleteTargets {
+		col, exists := a.Svc.Collections.Get(n.collectionID)
+		if !exists || n.id != "" && model.FindItem(col.Items, n.id) == nil {
+			continue // A target may have been removed while confirmation was open.
+		}
+		var err error
+		if n.id == "" {
+			err = a.Svc.Collections.Delete(n.collectionID)
+		} else {
+			err = a.Svc.Collections.DeleteItem(n.collectionID, n.id)
+		}
+		if a.collectionError(err) {
+			// Earlier successes stay deleted; retry only the remaining snapshot.
+			s.deleteTargets = s.deleteTargets[i:]
+			a.refreshCollections()
+			return
+		}
+	}
+	s.dialogOpen, s.deleteTargets = false, nil
 	a.refreshCollections()
 }
 

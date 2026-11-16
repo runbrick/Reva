@@ -1,0 +1,285 @@
+{
+  "slug": "hurl",
+  "project": "Hurl",
+  "repository": "https://github.com/Orange-OpenSource/hurl",
+  "category": "cli-test",
+  "license": {
+    "spdx": "Apache-2.0",
+    "scope": "Hurl 主仓库的命令行程序、解析核心和格式化器；属于 OSI 批准的开源许可证。依赖库及分发所含原生库仍各有许可证，不将主仓库许可推广为全部依赖许可。所核查的测试、报告、变量和认证能力均在公开代码中，未发现这些能力的商业版门槛；不据此保证不存在第三方收费服务。",
+    "source": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/LICENSE"
+  },
+  "retrieved_at": "2026-11-16T14:30:38+00:00",
+  "reva_baseline": "72bf5de0d58bbc08e49b4ef0254b1f5eeec4c910",
+  "summary": "Hurl 是以可提交到 Git 的文本描述 HTTP 会话及断言的 Rust 命令行测试工具。它适合作为 Reva 的持续集成和复杂会话测试搭档；Reva 已有脚本、GraphQL、WebSocket、原生导出和可选加密同步，不能将这些现有能力误列为缺失。抓取时最新正式版为 8.1.0，发布于 2026-10-28；报告的已实现判断以该标签和公开文档交叉验证。",
+  "architecture": "工作区分为 hurl_core（语法树、解析、格式化和类型）、hurl（HTTP 执行、查询、捕获、断言与报告）、hurlfmt（格式检查与转换）。HTTP 引擎通过 Rust 绑定调用 libcurl，并非执行 curl 子进程；XPath 等功能还涉及原生库。一个文件内顺序执行请求、共享该会话状态，测试模式以文件为并行单位。提供 Rust 库入口 runner::run，但将它直接嵌入 Go/Viva 会增加跨语言和原生依赖成本，优先考虑显式文件交换。",
+  "features": [
+    {
+      "name": "文本会话、响应捕获和请求串联",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md#passing-data-between-requests",
+      "detail": "一个 .hurl 文件可依次创建资源、用 JSONPath 或 XPath 捕获标识或令牌，再经模板用于后续请求；内置 Cookie 会话与 Cookie 文件读写。文件间的通用 INCLUDE 复用不属于此已实现能力，见议题 #115。"
+    },
+    {
+      "name": "面向 HTTP 内容与元数据的声明式断言",
+      "status": "已实现",
+      "evidence_url": "https://hurl.dev/docs/asserting-response.html",
+      "detail": "支持状态、协议版本、响应头、Cookie 属性、JSONPath、XPath、正则、证书、响应哈希和耗时查询及谓词；完整响应体隐式断言仍是精确比较，不能把开放中的语义 JSON 差异提案写成已发布能力。"
+    },
+    {
+      "name": "有类型的模板输入与日志秘密遮蔽",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md#templating-a-json-body",
+      "detail": "变量可来自命令行、变量文件、环境或请求配置；JSON 模板支持字符串、数值、布尔和空值，另有 newUuid 等动态函数。--secret、--secrets-file 可对指定秘密在日志和报告中遮蔽；这是输出控制，不是凭据保险库。"
+    },
+    {
+      "name": "围绕断言结果重试、延迟和重复",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md#polling-and-retry",
+      "detail": "retry 与 retry-interval 可在断言、捕获或运行出错时重试当前请求，适合等待异步任务完成；delay、repeat、skip 可配置执行。对有副作用请求重试需由测试作者设计，不能视为业务幂等保证。"
+    },
+    {
+      "name": "以测试文件为单位的并行执行器",
+      "status": "已实现",
+      "evidence_url": "https://hurl.dev/docs/running-tests.html",
+      "detail": "--test 支持多文件、递归目录与 --glob 选择；默认并行执行文件，--jobs 1 可顺序执行。单个文件内的多个请求保持顺序，不应把文件并行宣传为同一会话内任意请求并行。"
+    },
+    {
+      "name": "持续集成报告及明确退出码",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md#reports",
+      "detail": "提供 HTML、JSON 目录、JUnit、TAP 报告；JSON 目录包含各响应文件引用，与 --json 标准输出不同。退出码区分成功 0、选项错误 1、文件解析错误 2、运行错误 3、断言错误 4，便于持续集成判定失败。"
+    },
+    {
+      "name": "libcurl 协议、认证和 TLS 控制",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurl/src/http/client.rs",
+      "detail": "实现 HTTP 版本选择、Basic、Digest、NTLM、Negotiate、AWS SigV4、客户端证书及 TLS 上下限选项，Bearer/API Key 可用显式头或查询表达。HTTP/2、HTTP/3 及部分认证取决于实际 libcurl 构建；不能把库支持推广为所有发布包必然支持，也不等于实现 OAuth2 授权生命周期、WebSocket 或 gRPC 测试界面。"
+    },
+    {
+      "name": "格式检查与受限 curl 互通",
+      "status": "已实现",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurlfmt/src/cli/options/mod.rs",
+      "detail": "hurlfmt 支持格式检查、原地格式化、Curl/Hurl 输入和 Hurl/Json/Html 输出；Hurl 可用 --curl 输出调试命令。格式化器的 JSON 输出不是 Postman 集合导出；未验证任意 curl 选项或第三方集合可无损互转。"
+    },
+    {
+      "name": "分层默认配置",
+      "status": "已实现并核实发布",
+      "evidence_url": "https://github.com/Orange-OpenSource/hurl/releases/tag/8.1.0",
+      "detail": "8.1.0 交付默认配置文件；实际文档路径是 $XDG_CONFIG_HOME/hurl/config 或 $HOME/.config/hurl/config，不是提案最初的 ~/.hurlrc。发布文档中的覆盖优先级从低到高为配置文件、环境变量、命令行、请求 Options。"
+    },
+    {
+      "name": "耗时门槛和结构化网络阶段指标",
+      "status": "已实现",
+      "evidence_url": "https://hurl.dev/docs/running-tests.html#stress-and-performance-tests",
+      "detail": "duration 可断言毫秒门槛；--json 可导出 DNS、连接、TLS、首字节和总耗时，结合 --repeat 与 --jobs 做轻量性能回归。未验证分布式施压、稳定到达率、负载模型或分位数统计，不能据此代替专业压测平台。"
+    }
+  ],
+  "differences": [
+    {
+      "area": "产品定位与架构",
+      "project_capability": "Rust 与 libcurl 驱动的文本会话测试，适合 Git 审阅和持续集成；另提供 Rust 库。",
+      "reva_capability": "Go/Viva 原生桌面应用、服务接口与单请求发送工作台，无账户为默认使用方式。",
+      "reva_evidence": "cmd/reva/main.go:main；cmd/reva/services.go:services；internal/gui/app.go:Send；README.md",
+      "opportunity": "保留交互式探索，使用显式文件交换连接 Hurl，避免引入 Rust/libcurl 到主程序。"
+    },
+    {
+      "area": "协议与传输",
+      "project_capability": "HTTP/1.x、HTTP/2、条件性 HTTP/3，GraphQL 和 SOAP 经 HTTP 文本正文发送。",
+      "reva_capability": "HTTP 基于 net/http，HTTPS 下可由标准传输协商 HTTP/2；有 GraphQL 查询/变量编辑器和独立 WebSocket 客户端。未发现 HTTP/3、gRPC 发送入口。",
+      "reva_evidence": "internal/service/request/request.go:Send；internal/service/request/options.go:client；internal/gui/graphql.go；internal/websocket/client.go:Dial；internal/gui/websocket.go",
+      "opportunity": "Reva 的 WebSocket 是现有优势；专用 HTTP/3 验证可交由外部 Hurl，不因竞品选项增大应用依赖。"
+    },
+    {
+      "area": "认证与 TLS",
+      "project_capability": "Basic、Digest、NTLM、Negotiate、AWS SigV4、客户端证书和 TLS 版本边界；部分依赖 libcurl 构建。",
+      "reva_capability": "请求、文件夹、集合的 Bearer/Basic/API Key 继承和禁止继承边界；有 TLS 校验开关、超时、重定向控制和跨源认证剥离。S3 同步的 SigV4 不等于通用请求认证。",
+      "reva_evidence": "internal/model/model.go:AuthType；internal/auth/auth.go；internal/service/request/request.go:protectRedirects；internal/service/request/options.go；internal/s3/sigv4.go",
+      "opportunity": "先清楚展示现有认证作用域；企业认证或客户端证书只有出现明确用户场景时再单独实现。"
+    },
+    {
+      "area": "变量、捕获与会话 Cookie",
+      "project_capability": "类型化变量与响应捕获串联请求，同文件保留 Cookie，会话可通过 Cookie 文件延续。",
+      "reva_capability": "集合/环境变量及 {{name}} 替换已存在；pm.environment.set 与 pm.variables.set 在当前脚本/发送副本内工作，RunTests 不返回更新变量；响应展示 Cookie，但 HTTP 客户端未配置 CookieJar。",
+      "reva_evidence": "internal/vars/vars.go:Lookup/Apply；internal/script/script.go:RunPre/RunTests；internal/script/api.js:variableAPI；internal/gui/scripts.go:afterResponse；internal/service/request/options.go:client",
+      "opportunity": "补充显式临时会话变量，并将 Cookie 会话视为另一个需用户控制的能力，不能把 Cookie 展示当作自动登录会话。"
+    },
+    {
+      "area": "脚本与断言",
+      "project_capability": "声明式 JSONPath、XPath、正则、哈希、证书等查询/谓词，没有证据表明提供通用前置/后置 JavaScript 运行时。",
+      "reva_capability": "Otto 有时间限制的前置/响应脚本、pm.test/pm.expect、JSON 解析、深比较和耗时断言；响应脚本变量隔离，异步测试回调不支持。",
+      "reva_evidence": "internal/script/script.go；internal/script/api.js；internal/gui/scripts.go；internal/script/script_test.go:TestRunTestsResponseAndAssertions/TestRunTestsRejectsAsyncCallbacks",
+      "opportunity": "先基于现有脚本生成可审阅的断言片段，不必另造查询语言或宣称 Postman 运行时完整兼容。"
+    },
+    {
+      "area": "批量执行、重试和 CI",
+      "project_capability": "文件级并行、目录筛选、失败重试、重复、JUnit/TAP/HTML/JSON 报告和断言失败退出码。",
+      "reva_capability": "发送管线围绕活动标签页和单个 sendJob；cmd/reva 只启动 GUI。检查命令入口、集合菜单和服务接口后未发现用户集合批量执行器、通用重试编排或无窗口测试报告导出。仓库自身 CI 已有，不等于用户 API 测试 CLI。",
+      "reva_evidence": "cmd/reva/main.go；internal/gui/app.go:Send/declareSends；internal/gui/collections.go:collectionMenu；internal/service/service.go；.github/workflows/ci.yml",
+      "opportunity": "优先受限 Hurl 导出，让专业工具承担 CI 执行与报告；后续桌面批量运行可复用相同语义。"
+    },
+    {
+      "area": "导入导出与可移植性",
+      "project_capability": "以 .hurl 为执行输入，hurlfmt 可读 curl、检查格式和导出语法表示；--curl 可生成命令。未核实 Postman/OpenAPI/HAR 的通用导入。",
+      "reva_capability": "已实现原生、Postman、HAR、curl、Swagger/OpenAPI JSON 的有界审阅导入，原生集合 JSON 导出和 curl 复制；并非全部格式都支持双向导出，未实现 Hurl 适配器。",
+      "reva_evidence": "internal/importer/result.go:ParseWithOptions；internal/importer/openapi.go；internal/gui/importer.go；internal/gui/collections.go:exportCollection；internal/gui/request.go:requestCURLChecked",
+      "opportunity": "导出前列出脚本、继承认证、重复头、选项和文件路径的转换边界，禁止默默丢弃测试语义。"
+    },
+    {
+      "area": "Mock 与 Schema 校验",
+      "project_capability": "已核查的 CLI、查询文档和执行源码中未确认内置 Mock 服务或 OpenAPI/JSON Schema 响应契约校验；JSONPath 断言不是完整 Schema 验证。",
+      "reva_capability": "OpenAPI 转换明确只生成请求示例、不验证 Schema 约束；脚本 API 没有 Schema 校验器，生产命令/服务中未发现 Mock 监听服务，测试用 fake 和 httptest 不算产品能力。",
+      "reva_evidence": "internal/importer/openapi.go:sample；internal/script/api.js；cmd/reva；internal/service/service.go；internal/service/fake/fake.go",
+      "opportunity": "这不是 Hurl 已交付的可直接对齐差异；完整契约校验和 Mock 更适合按需接入专用工具。"
+    },
+    {
+      "area": "性能观测",
+      "project_capability": "耗时断言、结构化网络阶段指标、文件并行与重复，可做轻量负载及性能回归。",
+      "reva_capability": "已记录请求总耗时、响应大小、截断状态、DNS/连接/TLS/下载时间线，并能在脚本中断言 responseTime；未发现持续施压调度和性能汇总报告。",
+      "reva_evidence": "internal/service/request/trace.go:timeline；internal/service/request/request.go:Send；internal/model/model.go:Response；internal/script/api.js:pm.response",
+      "opportunity": "利用已有时间线诊断单请求；大规模或统计严谨的压测交由专业工具。"
+    },
+    {
+      "area": "协作与本地数据",
+      "project_capability": "文本文件可随 Git 审阅，CLI 与本地报告无需 Hurl 账户；未确认托管团队工作区、权限审批或商业协作版本。",
+      "reva_capability": "本地缩进 JSON 与 REVA_HOME；有密码加密备份及 WebDAV、S3、GitHub/Gitee 片段同步。可选外部同步可能需要外部服务凭据，但本地核心不需要账户；同步不是实时多人编辑或权限系统。",
+      "reva_evidence": "internal/storage/storage.go:Dir/WriteJSON；internal/syncing/sync.go:Seal/Shared/Merge；internal/gui/sync.go:makeRemote；README.md",
+      "opportunity": "保持本地文件为中心，优先完善可审阅的测试交换与秘密处理，不引入强制云账户。"
+    }
+  ],
+  "issues": [
+    {
+      "number": 115,
+      "title": "Feature Requests: Imports",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/115",
+      "state": "open",
+      "labels": ["enhancement", "topic: import"],
+      "updated_at": "2026-10-20T10:01:43Z",
+      "need": "复用登录等跨文件片段，支持传参、捕获重命名及准确失败定位，避免预处理生成文件造成命名冲突。这里的 Imports 指测试片段包含，不是 Postman 集合迁移。",
+      "delivery_status": "开放提案；有外部分支原型，未核实主线交付",
+      "delivery_evidence": "议题 2026-10-20 评论提供作者分支比较链接，并明确不期待直接合并；页面无关联开发 PR。8.1.0 文档未列出 INCLUDE，不能将原型列为产品能力。"
+    },
+    {
+      "number": 1907,
+      "title": "include response bodies in the json output",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/1907",
+      "state": "open",
+      "labels": ["enhancement", "topic: reports"],
+      "updated_at": "2026-11-05T10:57:59Z",
+      "need": "脚本消费整个会话的响应体，不想解析调试 stderr，也不只需要最后一次响应。",
+      "delivery_status": "原提案仍开放；替代的目录报告能力已实现",
+      "delivery_evidence": "维护者 2026-01-16 评论说明为避免破坏兼容性和放大输出，保留 --json，采用 --report-json。https://hurl.dev/docs/running-tests.html#generating-report 说明 report.json 引用落盘的响应文件；这证明替代路径，不能证明内联响应体或 --json-full 已交付。"
+    },
+    {
+      "number": 3219,
+      "title": "Support curl ;type magic string in multipart/form-data request",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/3219",
+      "state": "open",
+      "labels": ["enhancement", "topic: multipart"],
+      "updated_at": "2026-11-05T10:58:06Z",
+      "need": "单次上传二进制文件和带 application/json 类型的文本元数据，避免为了文本分段类型额外创建文件。",
+      "delivery_status": "开放提案；文件分段类型已有，文本分段扩展未核实交付",
+      "delivery_evidence": "维护者 2025-04-23 评论认可应扩展 multipart；当前里程碑 9.0.0，页面无关联 PR。https://hurl.dev/docs/request.html#multipart-form-data 的文件分段类型示例只是现有替代办法，不证明文本 ;type 语法支持。"
+    },
+    {
+      "number": 5397,
+      "title": "implicit body placeholders",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/5397",
+      "state": "open",
+      "labels": ["enhancement"],
+      "updated_at": "2026-10-30T19:16:38Z",
+      "need": "比较 JSON 业务字段时忽略变化的时间戳，同时避免空白或字段顺序造成失败。",
+      "delivery_status": "开放提案；语义 JSON 差异和省略字段语法尚未核实交付",
+      "delivery_evidence": "维护者 2026-10-30 评论用未来时描述语义 JSON 差异和省略语法，并明确当前隐式正文比较包含空白；该评论晚于 8.1.0 发布。不能把计划中的问号占位符或省略语法写成现有语法。"
+    },
+    {
+      "number": 3629,
+      "title": "Add default config file feature",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/3629",
+      "state": "closed",
+      "labels": ["enhancement"],
+      "updated_at": "2026-10-24T17:33:48Z",
+      "need": "不修改每份测试文件或启动命令就能复用默认选项，明确配置优先级。",
+      "delivery_status": "已关闭且核实交付；最终路径与初始提案不同",
+      "delivery_evidence": "https://github.com/Orange-OpenSource/hurl/releases/tag/8.1.0 明列 Add Hurl config file 并关联 #3629；https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md#configuration 记载实际路径及优先级。关联 https://github.com/Orange-OpenSource/hurl/pull/4927 已合并，但它主要更新规范，不能单独当作完整实现证据。"
+    },
+    {
+      "number": 5335,
+      "title": "Add --tlsv1.0 --tlsv1.1 --tlsv1.2 --tlsv1.3",
+      "url": "https://github.com/Orange-OpenSource/hurl/issues/5335",
+      "state": "closed",
+      "labels": ["enhancement", "open-to-contribution", "topic: curl options"],
+      "updated_at": "2026-10-22T18:21:01Z",
+      "need": "验证端点满足最低 TLS 版本策略，并控制兼容性测试的握手范围。",
+      "delivery_status": "已关闭且核实交付；最终选项为 --tls-min",
+      "delivery_evidence": "https://github.com/Orange-OpenSource/hurl/pull/5352 于 2026-10-22 合并；https://github.com/Orange-OpenSource/hurl/releases/tag/8.1.0 明列该功能；8.1.0 packages/hurl/src/http/client.rs 将 tls_min/tls_max 传给 ssl_min_max_version。不能按初始标题声称那四个别名均存在。"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "提供显式、仅内存的响应捕获变量",
+      "priority": "P1",
+      "scenario": "开发者发送登录或创建资源请求，把 token 或 id 用到下一次手工发送，关闭会话后不保留该值。",
+      "gap": "Reva 的响应脚本变量不回传，环境变量主要是持久配置；目前无法直接复用 Hurl 式捕获到后续请求的工作流。",
+      "smallest_pr": "为响应 JSON 提供显式 JSON Pointer 提取动作和命名临时变量面板；首版仅接受标量，使用 json.Number 保持数字精度，临时作用域覆盖集合/环境但不落盘。捕获失败不得覆盖旧值，提供清空动作，不增设脚本网络权限或自动 Cookie 会话。",
+      "dependencies": "已有响应正文、变量 Lookup/Apply 与 GUI 发送快照；需要单独约定临时作用域生命周期及其与前置脚本副本的覆盖顺序，无第三方依赖。",
+      "acceptance": "用 httptest 登录端点返回 token 与大整数 id，显式捕获后下一请求收到正确替换值；缺失路径、非标量、截断正文和无效 JSON 均保持旧值并提示；取消发送不污染会话；关闭后重建 App 无临时值，磁盘集合/环境和历史不出现解析后的秘密值。"
+    },
+    {
+      "title": "导出受限 Hurl 测试文件，把 CI 执行交给专用工具",
+      "priority": "P1",
+      "scenario": "开发者在 Reva 调通若干 HTTP 请求，希望将可审阅的文件提交 Git，补充期待结果与断言后由现有 CI 调用 Hurl 并收集 JUnit。",
+      "gap": "Reva 有丰富导入与原生导出，但没有 Hurl 交换、无窗口集合测试或 CI 报告入口。",
+      "smallest_pr": "新增集合或所选请求的 .hurl 导出预览；首版仅承诺方法、URL、启用的参数/头、JSON/文本正文和经既有解析器求值后的认证作用域。保留变量占位符、审阅后才写文件；遇到脚本、文件上传、WebSocket、无法转换的选项或重复语义即明确阻止并定位。不得在未指定期待结果时默加 HTTP 200；不自动展开环境秘密、不执行外部命令、不捆绑 Hurl。",
+      "dependencies": "已有 auth 继承解析、集合遍历、vars 与导出对话框；需确定 Hurl 转义和变量命名兼容规则，无法表达的名称必须阻止。可用导出后的文件在用户自己的环境调用 Hurl，仓库测试不下载或安装它。",
+      "acceptance": "离线金样测试覆盖引号、换行、重复查询、中文、空头值、继承 None 边界及变量；支持集合导出顺序稳定，未配置状态断言时不新增状态预期；脚本或未知选项阻止写入且报告请求路径，环境 token 不出现在文件。另在有预装 Hurl 的可选集成环境，针对 httptest 执行导出文件并核对服务器收到的请求；断言转换不在首版承诺内。"
+    },
+    {
+      "title": "基于现有 pm.test 生成语义 JSON 断言片段",
+      "priority": "P2",
+      "scenario": "开发者需要断言业务字段，忽略时间戳及对象字段顺序，不愿手写或复制整份动态响应。",
+      "gap": "Reva 已有 JSON.parse 和深比较，但编辑器主要提供状态、耗时、变量片段，缺少从实际响应选字段生成语义断言的路径。",
+      "smallest_pr": "提供选定 JSON Pointer 后预览 pm.test/pm.expect(...).to.eql(...) 片段的动作，由用户确认插入 TestScript；默认仅比较所选字段，不改模型 Schema、不引入另一种断言语言。首版阻止可能因 JavaScript 数字精度而失真的预期值，并正确转义属性名和字符串。",
+      "dependencies": "已有 internal/script/api.js 深比较、脚本编辑器与片段菜单；可复用上一建议的 JSON Pointer 读取器，但无需依赖 Hurl 导出。",
+      "acceptance": "以真实脚本运行器验证字段重排和未选择的时间戳变化仍通过，选中值或类型变化失败且显示断言名；含斜线、波浪号、引号的键、数组索引、null 和中文均生成正确片段；超出安全整数范围、无效 JSON 和截断正文被拒绝，预览取消不改变原脚本。"
+    }
+  ],
+  "sources": [
+    {"url": "https://github.com/Orange-OpenSource/hurl", "title": "规范仓库与项目身份"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/LICENSE", "title": "8.1.0 的 Apache-2.0 许可正文"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/releases/tag/8.1.0", "title": "抓取时最新正式发布及交付清单"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/README.md", "title": "固定版本的定位、用例、CLI 手册与安装依赖"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/Cargo.toml", "title": "工作区的三个组件"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurl_core/src/lib.rs", "title": "解析核心的实际模块边界"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurl/src/runner/mod.rs", "title": "执行器、捕获、断言与 Rust 库入口"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurl/src/http/client.rs", "title": "libcurl 调用、能力探测、认证与 TLS 实现"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurlfmt/src/cli/options/mod.rs", "title": "格式化器输入输出类型与实际 CLI"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/blob/8.1.0/packages/hurlfmt/src/main.rs", "title": "格式检查、格式化和转换执行分支"},
+    {"url": "https://hurl.dev/docs/manual.html", "title": "官方 CLI 手册"},
+    {"url": "https://hurl.dev/docs/asserting-response.html", "title": "官方响应断言文档"},
+    {"url": "https://hurl.dev/docs/capturing-response.html", "title": "官方响应捕获文档"},
+    {"url": "https://hurl.dev/docs/templates.html", "title": "官方变量及模板文档"},
+    {"url": "https://hurl.dev/docs/running-tests.html", "title": "官方执行、报告和性能测试文档"},
+    {"url": "https://hurl.dev/docs/request.html", "title": "官方请求格式、正文和 multipart 文档"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/115", "title": "Feature Requests: Imports"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/1907", "title": "include response bodies in the json output"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/3219", "title": "Support curl ;type magic string in multipart/form-data request"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/5397", "title": "implicit body placeholders"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/3629", "title": "Add default config file feature"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/issues/5335", "title": "Add --tlsv1.0 --tlsv1.1 --tlsv1.2 --tlsv1.3"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/pull/4927", "title": "Add Hurl config file"},
+    {"url": "https://github.com/Orange-OpenSource/hurl/pull/5352", "title": "Add --tls-min option to set the minimum allowed TLS version"},
+    {"url": "https://api.github.com/repos/Orange-OpenSource/hurl/issues?state=all&per_page=100&sort=updated&direction=desc", "title": "一次抓取的最近更新议题及 PR 元数据；从中排除 PR 并抽取功能议题"},
+    {"url": "https://api.github.com/repos/Orange-OpenSource/hurl/releases/latest", "title": "最新正式发布身份、发布时间和说明"},
+    {"url": "https://api.github.com/repos/Orange-OpenSource/hurl", "title": "仓库规范名称、默认分支和许可证元数据；以许可正文复核"}
+  ],
+  "limitations": [
+    "检索截止为实际抓取结束时间 2026-11-16T14:30:38+00:00；上游议题和在线文档可在此后改变，已实现事实尽量固定到 8.1.0。",
+    "只请求一次最近更新的 100 条 issue/PR 混合列表，再读取六个功能议题及两个关联 PR 页面；四条开放、两条关闭，不是全量需求统计，也不推断长期交付率。",
+    "未安装、编译或运行 Hurl，也未实测 HTTP/3、认证后端和性能；分发差异与原生依赖按文档及源码说明，不能承诺所有平台一致。",
+    "未发现商业门槛的范围仅限核查的公开仓库和官方文档，不是商业合同审计；没有将外部付费服务或其他产品能力算入社区实现。",
+    "对 Mock、完整 Schema 校验、OAuth2 生命周期和 gRPC 等缺项使用限定性未确认表述；对 Reva 则同时检查命令、模型、服务、GUI 和脚本，未仅凭 README 缺失下结论。",
+    "官方猜测路径 ci-integration.html、integration.html 及若干 hurlfmt 文档路径返回 404，未作为功能证据；改用实际可访问的 running-tests 文档、固定版本 README 和格式化器源码。",
+    "当前主机实际 Go 为 go1.27.3 windows/amd64，与仓库说明的 Go 1.26 不同；四项要求检查均在此实际环境通过，未声称已重跑 Go 1.26 或 macOS。",
+    "本次只新增两份文档，无行为测试、代码、依赖、图标或远端 PR；尚未实现三个建议，亦未推送或合并。"
+  ]
+}

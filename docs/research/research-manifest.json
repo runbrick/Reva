@@ -1,0 +1,179 @@
+{
+  "reva_baseline": "72bf5de0d58bbc08e49b4ef0254b1f5eeec4c910",
+  "assembled_at": "2026-11-16T15:00:34.266757+00:00",
+  "projects": [
+    {
+      "slug": "bruno",
+      "project": "Bruno",
+      "branch": "runbrick/research-bruno",
+      "worker_commit": "a94ae46765559ce7823d92de559703269e870e1b",
+      "report": "api-tools/bruno.md",
+      "data": "api-tools/bruno.json",
+      "retrieved_at": "2026-11-16T22:29:29+08:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "insomnia",
+      "project": "Insomnia",
+      "branch": "runbrick/research-insomnia",
+      "worker_commit": "77353a2ed23590def549cb43e9a88be6b2b435d9",
+      "report": "api-tools/insomnia.md",
+      "data": "api-tools/insomnia.json",
+      "retrieved_at": "2026-11-16T22:29:46+08:00",
+      "features": 9,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "hoppscotch",
+      "project": "Hoppscotch",
+      "branch": "runbrick/research-hoppscotch",
+      "worker_commit": "d18dfe45902c93376b3d6bdd56ad098682ea7037",
+      "report": "api-tools/hoppscotch.md",
+      "data": "api-tools/hoppscotch.json",
+      "retrieved_at": "2026-11-16T14:30:47Z",
+      "features": 10,
+      "issues": 8,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "yaak",
+      "project": "Yaak",
+      "branch": "runbrick/research-yaak",
+      "worker_commit": "20bcaeed813ecbabc109236f52e74febdc382c41",
+      "report": "api-tools/yaak.md",
+      "data": "api-tools/yaak.json",
+      "retrieved_at": "2026-11-16T14:33:27Z",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "httpie",
+      "project": "HTTPie CLI",
+      "branch": "runbrick/research-httpie",
+      "worker_commit": "3e10c2541eba4b37a712c254fc992ee540dbfb57",
+      "report": "api-tools/httpie.md",
+      "data": "api-tools/httpie.json",
+      "retrieved_at": "2026-11-16T22:29:59+08:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "hurl",
+      "project": "Hurl",
+      "branch": "runbrick/research-hurl",
+      "worker_commit": "abbb285643b705797db993a8aa49925d9b913878",
+      "report": "api-tools/hurl.md",
+      "data": "api-tools/hurl.json",
+      "retrieved_at": "2026-11-16T14:30:38+00:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "karate",
+      "project": "Karate",
+      "branch": "runbrick/research-karate",
+      "worker_commit": "9aff5f37face2f71e394d33e864baf891637b1f8",
+      "report": "api-tools/karate.md",
+      "data": "api-tools/karate.json",
+      "retrieved_at": "2026-11-16T22:41:28+08:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "rest-assured",
+      "project": "REST Assured",
+      "branch": "runbrick/research-rest-assured",
+      "worker_commit": "57c601d1d847968179d84cbb575cfaca8461d8c9",
+      "report": "api-tools/rest-assured.md",
+      "data": "api-tools/rest-assured.json",
+      "retrieved_at": "2026-11-16T22:37:40+08:00",
+      "features": 10,
+      "issues": 7,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "schemathesis",
+      "project": "Schemathesis",
+      "branch": "runbrick/research-schemathesis",
+      "worker_commit": "fbfd00f7c7601a085a30bffc5a7fed543a43b331",
+      "report": "api-tools/schemathesis.md",
+      "data": "api-tools/schemathesis.json",
+      "retrieved_at": "2026-11-16T22:38:10.316001+08:00",
+      "features": 10,
+      "issues": 7,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "k6",
+      "project": "Grafana k6",
+      "branch": "runbrick/research-k6",
+      "worker_commit": "d12d07b5f7f00cacd1c365367a6f0bc52107f3b4",
+      "report": "api-tools/k6.md",
+      "data": "api-tools/k6.json",
+      "retrieved_at": "2026-11-16T22:38:00+08:00",
+      "features": 9,
+      "issues": 5,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "jmeter",
+      "project": "Apache JMeter",
+      "branch": "runbrick/research-jmeter",
+      "worker_commit": "67590a8dcd2f95b7c81505676df102c00ac19575",
+      "report": "api-tools/jmeter.md",
+      "data": "api-tools/jmeter.json",
+      "retrieved_at": "2026-11-16T22:34:32.485862+08:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    },
+    {
+      "slug": "wiremock",
+      "project": "WireMock",
+      "branch": "runbrick/research-wiremock",
+      "worker_commit": "929c7d644954464a87272ffc668d6d8732970967",
+      "report": "api-tools/wiremock.md",
+      "data": "api-tools/wiremock.json",
+      "retrieved_at": "2026-11-16T22:34:29+08:00",
+      "features": 10,
+      "issues": 6,
+      "checks": "四项仓库检查均由 worker 报告 exit 0；命令尾部见项目 Markdown"
+    }
+  ],
+  "aggregate_validation": {
+    "checks": [
+      {
+        "command": "gofmt -l .",
+        "exit": 0
+      },
+      {
+        "command": "go vet ./...",
+        "exit": 0
+      },
+      {
+        "command": "go tool viva vet ./...",
+        "exit": 0
+      },
+      {
+        "command": "go test ./... -count=1",
+        "exit": 0
+      }
+    ],
+    "docx_pages": 31,
+    "docx_sha256": "9890fbb6b73a5a67219b757081c7d86063ce25568aa7c02722239f3f74dc9242",
+    "visual_qa": "全部 31 页已查看；最后两处调整后重渲染，变化页为 2 与 14，已复核，其余 29 页 PNG 哈希一致",
+    "renderer": "packaged render_docx.py with isolated LibreOffice 26.8.3 Windows runtime and Poppler 24.08",
+    "authorship_runtime": "uv managed Python 3.12.11 and isolated python-docx 1.2.0; isolated Node 22.14.0 marker",
+    "source_integrity": "24 个项目文件与 12 个 worker 原始提交逐字节一致",
+    "hyperlinks": "全部 75 条议题/反馈及每个项目六项 Word 功能来源的链接存在",
+    "go_version": "go version go1.27.3 windows/amd64",
+    "scope": "文档研究；未执行上游产品/性能基准，未新增行为测试；无推送或 main 合并"
+  }
+}

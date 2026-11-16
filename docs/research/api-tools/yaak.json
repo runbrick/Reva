@@ -1,0 +1,413 @@
+{
+  "slug": "yaak",
+  "project": "Yaak",
+  "repository": "https://github.com/mountain-loop/yaak",
+  "category": "desktop-client",
+  "license": {
+    "spdx": "MIT",
+    "scope": "当前仓库源码使用 MIT（OSI 批准的开源许可证），官方明确允许自行构建后个人及商业使用；官方预编译二进制另按商业使用条款分发，个人免费、工作用途须购买许可。不能把二进制使用限制说成源码的非商业许可证，也不能把源码 MIT 推导为官方商业版免费。未逐一审计所有第三方组件许可证。",
+    "source": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/LICENSE"
+  },
+  "retrieved_at": "2026-11-16T14:33:27Z",
+  "reva_baseline": "72bf5de0d58bbc08e49b4ef0254b1f5eeec4c910",
+  "summary": "本地优先、无需账号的多协议 API 桌面客户端，适合交互式调试、模板化请求链和 Git 文件协作。与 Reva 方向接近，但运行栈与商业分发不同；其 gRPC、SSE、OAuth2、秘密字段保护比当前 Reva 完整，而 Reva 已有的任意前置脚本和响应断言并非 Yaak 已实现能力。当前 GitHub 禁用普通 issue，检索为零；以下问题条目来自官方反馈站并保留 YK 编号，不冒充 GitHub issue。",
+  "architecture": "桌面为 Tauri/Rust/React；Rust 工作区拆分 HTTP、gRPC、SSE、WebSocket、模板、同步、Git 等模块，SQLite 保存本地请求、环境和响应历史，目录同步另生成每资源一份 YAML。TypeScript 插件在附带的 Node.js 运行时中扩展认证、模板及菜单动作；Rust CLI 与桌面共用本地数据库。仓库还包含网页及代理端，本报告主要评估桌面，不能将桌面直连与网页代理混为一谈。观察到的上游 main 提交为 b9127dcca4c06c1cc495ca2a3ad78807110b291a；最近稳定发行版为 v2026.9.1，最近预发行版为 v2026.10.0-beta.2，二者均于 2026-11-01 发布。",
+  "features": [
+    {
+      "name": "gRPC 反射、proto 编辑与四种调用模式",
+      "status": "已实现（桌面；不适用于 CLI 发送）",
+      "evidence_url": "https://yaak.app/docs/request-types/grpc-requests",
+      "detail": "支持服务反射或手选 proto/import 目录、按 schema 补全与实时错误提示；支持一元、服务端流、客户端流及双向流，时间线展示消息。当前 CLI 源码仍明确拒绝 gRPC/WebSocket 发送。"
+    },
+    {
+      "name": "SSE 与渐进响应展示",
+      "status": "已实现（官方桌面文档）",
+      "evidence_url": "https://yaak.app/docs/request-types/server-sent-events",
+      "detail": "通过 text/event-stream 自动识别 SSE；响应头到达即显示状态，逐事件更新体积、耗时与内容，并支持取消。区别于等待整个响应读完再显示。"
+    },
+    {
+      "name": "OAuth2 生命周期及继承认证",
+      "status": "已实现（文档及内置插件）",
+      "evidence_url": "https://yaak.app/docs/authentication/oauth2",
+      "detail": "支持授权码及 PKCE、客户端凭证等四种授权流程，获取及刷新令牌，可在文件夹/工作区继承；源码含独立授权流程与刷新实现。认证插件还覆盖 JWT、AWS SigV4、Digest、NTLM 等，具体提供方兼容性未实测。"
+    },
+    {
+      "name": "响应引用模板形成请求链",
+      "status": "已实现；不是任意请求脚本",
+      "evidence_url": "https://yaak.app/docs/templating/request-chaining-scripting",
+      "detail": "response 模板用 JSONPath/XPath 提取另一请求的响应；没有已有响应时可先发送被引用请求。模板可放在环境变量中复用；另有 UUID、时间、文件、哈希等动态函数。官方明确没有通用前置/后置脚本。"
+    },
+    {
+      "name": "工作区、子环境与文件夹变量",
+      "status": "已实现（官方文档）",
+      "evidence_url": "https://yaak.app/docs/templating/environments-and-variables",
+      "detail": "全局环境、可切换子环境和文件夹变量构成作用域，编辑器可补全；活动环境支持颜色标记。模板语法为 ${[ NAME ]}，不是 Reva 的 {{name}}。"
+    },
+    {
+      "name": "秘密字段加密与操作系统密钥链",
+      "status": "已实现；保护选定字段而非完整数据库",
+      "evidence_url": "https://yaak.app/docs/collaboration/secrets-encryption",
+      "detail": "启用后敏感字段默认加密，也可用 secure 函数显式保护；XChaCha20-Poly1305 工作区密钥由系统密钥链中的主密钥保护。环境默认不参与目录同步，可分享环境含明文时提示。共享接收者需工作区密钥，响应历史不因此整体加密。"
+    },
+    {
+      "name": "目录双向同步及可视化 Git 操作",
+      "status": "已实现（官方文档）",
+      "evidence_url": "https://yaak.app/docs/collaboration/local-directory-git-sync",
+      "detail": "每资源一个 yaak.<id>.yaml，应用更改自动落盘、目录传入更改先汇总确认；可初始化 Git、建分支、提交、拉取、推送和审阅差异。不等于服务端实时共同编辑，也不是按嵌套目录保存每个文件夹。"
+    },
+    {
+      "name": "多格式批量迁移和导入预览",
+      "status": "已实现；Bruno/多文件在 v2026.9.0 有稳定发布证据",
+      "evidence_url": "https://github.com/mountain-loop/yaak/releases/tag/v2026.9.0",
+      "detail": "导入 Postman、Insomnia、OpenAPI/Swagger、curl 及 Bruno；支持文件、目录、URL 和批量来源，可预览后导入新工作区或现有工作区。导出原生工作区 JSON，复制 curl；不能据此声称支持导出 OpenAPI 或无损迁移第三方脚本。"
+    },
+    {
+      "name": "共享本地数据的 HTTP 批量 CLI",
+      "status": "已实现（当前源码/文档）；不是完整测试报告运行器",
+      "evidence_url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/crates-cli/yaak-cli/src/commands/send.rs",
+      "detail": "yaak send 接收请求/文件夹/工作区 ID，默认顺序执行 HTTP 请求，支持 --parallel、--fail-fast、环境选择与发送成功/失败统计；非 HTTP 在批量中跳过。桌面 Send All 并发执行；无 CSV 数据驱动或内置断言报告 UI，不应把发送成功计数说成业务断言通过。"
+    },
+    {
+      "name": "插件化认证、模板与菜单动作",
+      "status": "已实现（仓库内置插件及运行时）",
+      "evidence_url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/packages/plugin-runtime/src/index.ts",
+      "detail": "认证、导入、模板函数、复制 curl/grpcurl、文件夹 Send All 等可由插件提供。自定义函数具备 Node.js 访问能力，不能当成隔离的纯表达式沙箱；插件目前不能任意渲染自己的界面面板。"
+    }
+  ],
+  "differences": [
+    {
+      "area": "协议与响应流",
+      "project_capability": "桌面支持 HTTP、GraphQL、WebSocket、SSE 和 gRPC；gRPC 支持反射、proto 及双向流。",
+      "reva_capability": "HTTP 已实现，GraphQL 有 query/variables 编辑器并通过 HTTP POST 发送，RFC6455 WebSocket 客户端可收发；未找到 gRPC 或增量 SSE 事件实现。HTTP Send 返回前读取完整响应流，不能实时显示 SSE。",
+      "reva_evidence": "internal/gui/graphql.go:initGraphQLBody/graphQLBodySection；internal/websocket/client.go:Dial/ReadMessage；internal/gui/websocket.go；internal/service/request/request.go:Send；internal/service/service.go:RequestService",
+      "opportunity": "先为 SSE 提供受限事件流；复杂 gRPC 回归及流序列优先接 grpcurl/专业工具，避免引入大型协议栈改变纯 Go/Viva 方向。"
+    },
+    {
+      "area": "认证与会话",
+      "project_capability": "OAuth2 获取/刷新/PKCE、JWT、AWS、Digest/NTLM 插件、客户端证书，以及 Cookie Jar。",
+      "reva_capability": "Bearer、Basic、header/query API key 与集合/文件夹继承已实现；跨源跳转保护生成认证。模型无 OAuth2 生命周期或客户端证书配置。解析并展示 Set-Cookie，但 HTTP client 未设置 Jar，不是持久会话管理；internal/s3/sigv4.go 用于同步后端，并非请求编辑器 AWS 认证。",
+      "reva_evidence": "internal/model/model.go:AuthTypes；internal/model/tree.go；internal/auth/auth.go；internal/service/request/request.go:protectRedirects；internal/service/request/options.go:client/responseCookies；internal/s3/sigv4.go",
+      "opportunity": "如未来补 OAuth，先限定客户端凭证流程并复用现有认证继承；不要把现有 S3 同步签名包装成已支持任意 AWS API 请求。"
+    },
+    {
+      "area": "变量与请求链",
+      "project_capability": "文件夹作用域、动态模板函数、JSONPath/XPath 响应引用和缺少响应时自动请求上游。",
+      "reva_capability": "集合变量与当前环境合并，后者覆盖；{{name}} 单次替换，未知名称保留；前置脚本可为本次发送设置变量。文件夹仅有认证字段，响应脚本修改变量不会持久化为下一请求的环境。",
+      "reva_evidence": "internal/gui/env.go:VarsFor；internal/vars/vars.go:Lookup/Expand；internal/model/model.go:Item；internal/script/script.go:RunPre/RunTests",
+      "opportunity": "请求链应先定义显式输出绑定、作用域和失效规则；不建议直接复制另一套模板语言或隐式发起依赖网络请求。"
+    },
+    {
+      "area": "脚本与断言",
+      "project_capability": "官方明确尚不支持任意 pre/post 请求脚本；模板及 Node.js 插件满足部分动态场景。",
+      "reva_capability": "Otto 执行前置和测试 JavaScript，提供 pm.test、pm.expect、响应 JSON/headers、变量及请求头修改，支持超时；异步测试不支持，且不是完整 Postman SDK。GUI 展示每次发送测试结果。",
+      "reva_evidence": "internal/script/script.go:RunPre/RunTests；internal/script/api.js；internal/gui/scripts.go:prepareSend/afterResponse；internal/gui/scripts_test.go",
+      "opportunity": "保留 Reva 已有优势；批量执行应复用同一脚本语义，不为追求 Yaak 模板而削弱断言能力。"
+    },
+    {
+      "area": "运行器与 CI",
+      "project_capability": "CLI 可顺序/并行批量发送 HTTP，桌面 Send All 并发；无内置 CSV 迭代及完整测试报告 UI，CLI gRPC/WS 发送仍未实现。",
+      "reva_capability": "只有 cmd/reva GUI 入口；脚本运行器是单请求脚本执行器，未发现集合执行命令、JUnit 报告或数据驱动批量运行。仓库 CI 只验证 Reva 软件自身，不等于用户 API 的 CI 运行器。",
+      "reva_evidence": "cmd/reva/main.go；cmd/reva/services.go；internal/gui/app.go:Send/run；internal/gui/scripts.go；.github/workflows/ci.yml",
+      "opportunity": "小型离线 CLI 顺序运行集合并输出稳定 JSON/退出码；大规模矩阵和专用测试框架应通过导出或命令接口集成。"
+    },
+    {
+      "area": "导入与导出",
+      "project_capability": "支持 Insomnia/Bruno 等多种来源和批量导入；原生 JSON 导出及 curl 复制，OpenAPI 导出仍为 Backlog。",
+      "reva_capability": "已有预览确认式原生、Postman、HAR、curl、Swagger2/OpenAPI3.0/3.1 JSON 导入及显式 URL 获取，可追加至集合；原生集合/环境 JSON 导出、加密备份已实现。YAML、Insomnia/Bruno 原生、OpenAPI 导出未实现；导入 schema 不执行约束验证。",
+      "reva_evidence": "internal/importer/result.go；internal/importer/openapi.go；internal/importer/fetch.go；internal/gui/importer.go；internal/gui/collections.go:exportCollection；internal/gui/env.go；internal/syncing/sync.go",
+      "opportunity": "优先改进共享前的字段审阅和兼容性说明；继续沿第三方 Postman/OpenAPI 导出路线迁移，避免宣称所有格式无损兼容。"
+    },
+    {
+      "area": "Mock、schema 验证与压测",
+      "project_capability": "gRPC 编辑器有 protobuf schema 检查，CLI schema 命令描述 Yaak 自身模型；本次资料未证实通用 OpenAPI 响应契约验证、Mock 服务或负载压测运行器。",
+      "reva_capability": "JSON 格式检查、脚本业务断言、OpenAPI 请求模板生成均存在；未发现自动响应 schema 验证、用户 Mock 服务器或负载发生器。internal/service/fake 仅为测试替身。",
+      "reva_evidence": "internal/importer/openapi.go:sample；internal/format/format.go；internal/script/api.js；internal/service/fake/fake.go；internal/service/service.go",
+      "opportunity": "契约测试交由 Schemathesis 一类工具、Mock 交由 Prism/WireMock 一类工具、压测交由 k6/Vegeta 一类工具；后续集成前另核对各工具许可和格式边界，不在 Reva 重建这些引擎。"
+    },
+    {
+      "area": "协作与本地数据",
+      "project_capability": "SQLite 本地主库，目录 YAML 双向同步、可视化 Git，环境默认不分享，选定秘密字段受密钥链保护。无需账号操作本地数据；商业许可管理账号与云端请求存储是不同概念。",
+      "reva_capability": "纯 Go/Viva 无 WebView，数据为本地 JSON，可设置 REVA_HOME；已有 AES-GCM 加密备份和 WebDAV/S3/Gist 同步、合并及冲突检查。原始 JSON/原生导出含配置凭据，屏幕遮罩不是字段加密，也没有内置 Git 协作界面。",
+      "reva_evidence": "internal/storage/storage.go；internal/service/store/collections.go；internal/gui/collections.go:exportCollection；internal/syncing/sync.go:Seal/Shared/Merge；internal/gui/sync.go；internal/cloudsync/cloudsync.go",
+      "opportunity": "先增加可分享副本的秘密排除和预览，再考虑系统密钥链；无需为协作引入账号服务或替换当前存储架构。"
+    },
+    {
+      "area": "性能与网络隐私",
+      "project_capability": "Tauri/Rust/React，加附带 Node.js/protoc，宣称轻量；桌面请求直连，但更新、通知、插件和许可检查仍会发起服务请求。不能将无分析追踪说成绝对离线或没有网络元数据。",
+      "reva_capability": "Go/Viva 原生绘制；HTTP 重用连接池，默认保留最多 10 MiB 响应体并统计总大小，有阶段时间线。README 记录某次 Windows 成品约 15 MB，不能用其开头约 5 MB 的历史文案做公平对照。",
+      "reva_evidence": "go.mod；internal/service/request/request.go:DefaultMaxBodyBytes/Send；internal/service/request/options.go:client；internal/service/request/trace.go；README.md:Packaging",
+      "opportunity": "先定义同主机大响应、长流、空闲内存与安装体积测量方案；本报告没有实际双端性能数据，不能下快慢结论。"
+    }
+  ],
+  "issues": [
+    {
+      "number": 1110,
+      "title": "Yaakcli to support GRPC",
+      "url": "https://yaak.app/feedback/posts/yaakcli-to-support-grpc",
+      "state": "Backlog",
+      "labels": [
+        "Feature Request",
+        "Improvement"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-1110，非 GitHub issue；团队希望 GUI 中维护的 gRPC 工作区成为自动化/智能体共用来源，含依赖变量与消息序列。页面没有更新时间字段，最后可见评论为 2026-11-03T08:44:44Z，不冒充记录更新时间。",
+      "delivery_status": "开放提议；当前 CLI 明确未实现 gRPC 发送，GUI gRPC 已实现不能代替此项交付。",
+      "delivery_evidence": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/crates-cli/yaak-cli/src/commands/request.rs#L619"
+    },
+    {
+      "number": 104,
+      "title": "Multi-tab Support",
+      "url": "https://yaak.app/feedback/posts/multi-tab-support",
+      "state": "Under Consideration",
+      "labels": [
+        "Feature Request"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-104；需要多个频繁使用请求之间保留上下文、快速切换，但也有用户坚持无标签页，体现可选交互的需求。页面无更新时间字段，最后可见评论为 2026-11-16T05:38:11Z。",
+      "delivery_status": "开放提议；未发现该请求标签页功能的发布证明，不能将多个工作区窗口当成已完成。Reva 已有请求标签页。",
+      "delivery_evidence": "https://yaak.app/feedback/posts/multi-tab-support"
+    },
+    {
+      "number": 211,
+      "title": "Automated Testing : scripting, collection run and report",
+      "url": "https://yaak.app/feedback/posts/automated-testing-scripting-collection-run-and-report",
+      "state": "Needs Triage",
+      "labels": [
+        "Feature Request"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-211；用户需要前后置脚本、集合执行和汇总测试报告，单纯 Send All 不足。无更新时间字段、无评论；页面创建时间为 2024-09-15T21:49:06Z，不是更新时间。",
+      "delivery_status": "开放的组合需求；CLI 批量 HTTP 发送已实现，但任意脚本和完整断言报告未交付，不能整体标为完成。",
+      "delivery_evidence": "https://yaak.app/docs/advanced/running-multiple-requests ; https://yaak.app/docs/templating/pre-post-request-scripting"
+    },
+    {
+      "number": 186,
+      "title": "Export to OpenAPI",
+      "url": "https://yaak.app/feedback/posts/export-to-openapi",
+      "state": "Backlog",
+      "labels": [
+        "Feature Request"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-186；团队使用不同客户端，需要中立的 OpenAPI 输出协作，不能只导出厂商原生数据。页面无更新时间字段，最后可见评论为 2026-08-05T12:20:20Z。",
+      "delivery_status": "开放提议；评论提及 PR #324 只是线索，本次未验证其合并/发布，不能作为已交付证据；当前文档只承诺原生 JSON 和 curl 导出。",
+      "delivery_evidence": "https://yaak.app/docs/collaboration/import-and-export-data"
+    },
+    {
+      "number": 71,
+      "title": "import from bruno",
+      "url": "https://yaak.app/feedback/posts/import-from-bruno",
+      "state": "Released",
+      "labels": [
+        "Feature Request"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-71；Bruno 经 Postman/OpenAPI 中转会丢环境，需要原生迁移。页面无更新时间字段；最后可见状态活动为 2026-10-10T17:17:54Z。",
+      "delivery_status": "已验证交付 v2026.9.0，经发行说明关联 PR #706 和 importer-bruno 源码交叉确认。曾在 2025-09-17 以中转方案关闭、2026-08-17 重新打开；历史关闭本身并不代表当时已实现原生导入。",
+      "delivery_evidence": "https://github.com/mountain-loop/yaak/releases/tag/v2026.9.0 ; https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/plugins/importer-bruno/src/index.ts"
+    },
+    {
+      "number": 413,
+      "title": "Support for Importing zip or multiple files and only allow importable file formats.",
+      "url": "https://yaak.app/feedback/posts/support-for-importing-zip-or-multiple-files-and-only-allow-importable-file-forma",
+      "state": "Released",
+      "labels": [
+        "Feature Request",
+        "Bug",
+        "Improvement"
+      ],
+      "updated_at": null,
+      "need": "官方反馈 YK-413；多工作区/多环境迁移逐文件导入成本高，需要 ZIP/目录/多文件来源及清楚的导入失败反馈。虽有 Bug 标签，核心是批量迁移能力而非常规缺陷。无更新时间字段，最后可见状态活动为 2026-10-10T17:17:54Z。",
+      "delivery_status": "核心批量导入已验证交付 v2026.9.0，发行说明引用 PR #706；官方文档确认文件/目录/URL 批量入口。未逐项实测文件选择器过滤和所有 ZIP 变体，不能把整个原始愿望清单视为逐项验收。",
+      "delivery_evidence": "https://github.com/mountain-loop/yaak/releases/tag/v2026.9.0 ; https://yaak.app/docs/collaboration/import-and-export-data"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "增加默认排除秘密的可分享集合导出",
+      "priority": "P0",
+      "scenario": "开发者要把本地集合交给同事或提交到 Git，同时保留自己的可用凭据。",
+      "gap": "现有原生导出完整序列化集合，变量、继承认证、Authorization/Cookie 等都可能含秘密；加密备份适合自己恢复，不能替代可审阅、无凭据的协作副本。",
+      "smallest_pr": "在现有导出旁新增明确的分享副本模式：先列出将包含的变量、认证和敏感头；默认移除所有认证具体值、集合变量值及已知敏感头值，保留键、作用域和结构并用可编辑占位符替代；允许用户额外选中任意字段排除。只转换导出副本，不改变原始集合；说明无法自动识别任意 body/URL 中的秘密，确认前提供完整结果预览。原有精确备份路径继续使用。",
+      "dependencies": "复用集合深拷贝或序列化副本、原生导入/导出及现有确认弹窗；新增纯转换帮助函数和中英文文案即可，无账号、无网络、无第三方依赖，不先建设密钥链。",
+      "acceptance": "使用含集合/文件夹/请求认证、同名变量、重复敏感头、URL/body 自定义秘密的样本；默认输出不含已知凭据明文，用户勾选的任意秘密也消失；未勾选的 URL/body 风险清楚展示；导入分享副本仍保留继承边界且原始内存/磁盘字节不变；取消与保存失败均不改本地集合。"
+    },
+    {
+      "title": "复用现有脚本语义提供最小 HTTP 集合 CLI",
+      "priority": "P1",
+      "scenario": "开发者在桌面维护登录或健康检查用例，提交代码后想在本地或 CI 顺序运行同一批请求并获得真实断言结果。",
+      "gap": "Reva 已有单请求脚本和断言，但只在 GUI 流程编排，没有集合顺序执行、机器可读结果或断言失败退出码；Yaak 的发送统计也不能代替业务断言。",
+      "smallest_pr": "提取无 UI 的单次执行编排，按现有树顺序运行指定集合 HTTP 请求，选一个环境，复用认证继承、Options.Resolve、RunPre、RunTests 和发送服务；支持取消、--fail-fast、JSON 报告和非零失败退出码。首版不并行、不读 CSV、不写环境或历史；各请求变量修改仅限本次请求，与当前语义一致，显式说明暂不支持自动 token 链。",
+      "dependencies": "需要小幅拆分 gui/scripts.go/app.go 的编排到独立包，并新增命令入口；复用 storage/store、auth、vars、request、script，不引入浏览器或账号。只读加载配置并允许 REVA_HOME 指定 CI 沙盒。",
+      "acceptance": "httptest 提供三个端点，记录实际顺序和继承头；包含 HTTP 200 但 pm.test 失败的用例，报告必须计为失败并返回非零；--fail-fast 后第三端点不应收到调用，取消应中止；请求脚本死循环应超时；报告稳定可解析且不输出原始凭据/正文，集合、环境和历史文件逐字节不变。"
+    },
+    {
+      "title": "为 SSE 增加有界事件查看与即时取消",
+      "priority": "P2",
+      "scenario": "用户调试通知或模型输出流，需要第一条事件到达就看到内容，而不是等待连接关闭或超时。",
+      "gap": "当前 HTTP Send 读完响应后返回；长连接即使收到大量事件也无法实时显示。已有 WebSocket UI 说明流式交互可行，但不能直接代替 SSE 的 HTTP 解析。",
+      "smallest_pr": "新增可选的流式发送服务接口，复用 HTTP 认证、变量、TLS/重定向及取消；按 SSE 帧解析 data/event/id 和多行 data，以有界缓冲保留最近事件并显示丢弃计数。UI 用 Viva 的 ui.Effect 接收服务侧批次；第一版仅事件展示，不自动重连、不自动重放，避免静默重复业务操作。",
+      "dependencies": "需扩展 service 契约与请求/响应 UI，服务侧负责网络与缓冲，UI 不新增 goroutine、定时器或轮询；共享现有 HTTP 请求构造以免绕过跨源认证保护，增加中英文文案。",
+      "acceptance": "httptest 发送并 Flush 第一条 SSE 后保持连接不关闭，无窗口 GUI 必须在第二条发送前展示第一条；覆盖分片 UTF-8、多行 data、注释和 CRLF，验证容量上限及丢弃提示；取消后服务器观察到 context 结束；普通 JSON 请求及跨源认证剥离行为保持原测试通过，全程不访问互联网。"
+    }
+  ],
+  "sources": [
+    {
+      "url": "https://github.com/mountain-loop/yaak",
+      "title": "规范仓库与主分支"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/README.md",
+      "title": "上游说明与源码/二进制许可边界"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/LICENSE",
+      "title": "MIT 许可证原文"
+    },
+    {
+      "url": "https://yaak.app/pricing",
+      "title": "官方商业分发、个人/商业用途及团队管理条款"
+    },
+    {
+      "url": "https://yaak.app/docs/getting-started/security-and-privacy",
+      "title": "桌面本地数据、网络请求及密钥保护边界"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/Cargo.toml",
+      "title": "Rust 工作区与协议模块"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/crates-tauri/yaak-app-client/tauri.conf.json",
+      "title": "桌面 Tauri 配置与附带 Node/protoc 资源"
+    },
+    {
+      "url": "https://yaak.app/docs/request-types/grpc-requests",
+      "title": "gRPC 反射、proto 和流模式"
+    },
+    {
+      "url": "https://yaak.app/docs/request-types/server-sent-events",
+      "title": "SSE 渐进响应"
+    },
+    {
+      "url": "https://yaak.app/docs/authentication/oauth2",
+      "title": "OAuth2 流程、继承和令牌刷新"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/plugins/auth-oauth2/src/index.ts",
+      "title": "内置 OAuth2 插件实现"
+    },
+    {
+      "url": "https://yaak.app/docs/templating/request-chaining-scripting",
+      "title": "响应模板请求链"
+    },
+    {
+      "url": "https://yaak.app/docs/templating/pre-post-request-scripting",
+      "title": "明确尚无通用请求脚本"
+    },
+    {
+      "url": "https://yaak.app/docs/templating/environments-and-variables",
+      "title": "工作区、子环境和文件夹变量"
+    },
+    {
+      "url": "https://yaak.app/docs/collaboration/secrets-encryption",
+      "title": "秘密字段加密与环境分享"
+    },
+    {
+      "url": "https://yaak.app/docs/collaboration/local-directory-git-sync",
+      "title": "目录同步与内置 Git"
+    },
+    {
+      "url": "https://yaak.app/docs/collaboration/import-and-export-data",
+      "title": "导入预览、支持格式与原生导出"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/releases/tag/v2026.9.0",
+      "title": "稳定版本批量导入及 Bruno 交付证据（关联 PR #706）"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/releases/tag/v2026.9.1",
+      "title": "最近稳定发行版及分发许可说明"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/releases/tag/v2026.10.0-beta.2",
+      "title": "最近预发行版；MCP 移至 CLI，不当成稳定版能力"
+    },
+    {
+      "url": "https://yaak.app/docs/advanced/running-multiple-requests",
+      "title": "CLI 顺序执行、桌面并发、CSV/报告边界"
+    },
+    {
+      "url": "https://yaak.app/docs/getting-started/cli-usage",
+      "title": "CLI 与本地数据库和自动化"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/crates-cli/yaak-cli/src/commands/send.rs",
+      "title": "批量 HTTP 发送与非 HTTP 跳过源码"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/crates-cli/yaak-cli/src/commands/request.rs",
+      "title": "CLI gRPC/WebSocket 尚不可发送的源码"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/packages/plugin-runtime/src/index.ts",
+      "title": "插件运行时"
+    },
+    {
+      "url": "https://api.github.com/repos/mountain-loop/yaak",
+      "title": "仓库元数据：has_issues=false"
+    },
+    {
+      "url": "https://api.github.com/search/issues?q=repo:mountain-loop/yaak+is:issue&per_page=100&sort=updated&order=desc",
+      "title": "普通 GitHub issue 检索为零且结果完整"
+    },
+    {
+      "url": "https://yaak.app/feedback",
+      "title": "当前官方功能反馈与路线图入口"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/yaakcli-to-support-grpc",
+      "title": "YK-1110 原始需求"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/multi-tab-support",
+      "title": "YK-104 原始需求"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/automated-testing-scripting-collection-run-and-report",
+      "title": "YK-211 原始需求"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/export-to-openapi",
+      "title": "YK-186 原始需求"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/import-from-bruno",
+      "title": "YK-71 关闭、重开与发布记录"
+    },
+    {
+      "url": "https://yaak.app/feedback/posts/support-for-importing-zip-or-multiple-files-and-only-allow-importable-file-forma",
+      "title": "YK-413 批量迁移需求与发布记录"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/plugins/importer-bruno/src/index.ts",
+      "title": "Bruno 导入实现"
+    },
+    {
+      "url": "https://github.com/mountain-loop/yaak/blob/b9127dcca4c06c1cc495ca2a3ad78807110b291a/CONTRIBUTING.md",
+      "title": "功能贡献需事先通过反馈项获得维护者同意"
+    },
+    {
+      "url": "https://yaak.app/docs/authentication/cookies",
+      "title": "Cookie Jar"
+    }
+  ],
+  "limitations": [
+    "GitHub has_issues=false，普通 issue 搜索 total_count=0 且 incomplete_results=false；issues 列表里为 PR，不能用 PR 编号或 YK 编号伪造 GitHub issue。未能提供至少五个 GitHub feature issue 或两开两关的 GitHub 分布；改为六个官方反馈，四项开放、两项 Released，Released 不等于 GitHub closed。",
+    "官方反馈 HTML 未暴露可靠 updated_at 字段，六项 JSON 均为 null；需求说明中记录最后可见评论/状态活动或创建时间，明确不是记录更新时间。保留 exact title、标签和原始状态，不虚构 API 元数据。",
+    "当前源码和官方文档证明实现存在，未安装或启动 Yaak，未实测 OAuth 提供方、ZIP 兼容性或所有平台；源码 main、稳定版本和预发行版本分别标识，不把 beta/MCP 变化当成稳定功能。",
+    "未做完整第三方许可证或商用条款法律审计；结论只覆盖根 LICENSE、官方 README、发行说明及定价页面的明确表述。没有发现核心功能按个人/商业版锁定的证据，业务许可管理、SSO/用户配置属于商业团队管理边界。",
+    "Mock、通用 schema 验证和压测的缺失结论限定在本次官方文档及相关源码审阅，不能排除外部插件；protobuf 编辑验证、CLI 模型 schema 和 OpenAPI 导入不等于 API 响应契约测试。",
+    "Reva 的不存在判断来自实际入口、模型、服务、执行流和全仓关键词检索；TASK.md 与本地 Viva 技能确实不存在，本任务没有改 GUI 或生产代码。",
+    "未做双端性能基准，没有内存、延迟或安装体积优劣结论；未将 HTTPie 桌面能力套用于 HTTPie CLI，本文也未比较 HTTPie。"
+  ]
+}

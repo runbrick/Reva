@@ -129,7 +129,7 @@ func (a *App) saveCollectionSettings(t *Tab) {
 	a.Toast(a.S.Collections.SettingsSaved, "", ui.ToastSuccess)
 }
 
-func (a *App) collectionSettingsTitle(t *Tab) string {
+func (a *App) collectionSettingsName(t *Tab) string {
 	d := a.collections.settings[t.ID]
 	name := d.savedName
 	col, item, ok := a.collectionSettingsTarget(t)
@@ -139,11 +139,15 @@ func (a *App) collectionSettingsTitle(t *Tab) string {
 			name = item.Name
 		}
 	}
+	return name
+}
+
+func (a *App) collectionSettingsTitle(t *Tab) string {
 	format := a.S.Collections.SettingsTitle
 	if t.TargetID != "" {
 		format = a.S.Collections.FolderSettingsTitle
 	}
-	return fmt.Sprintf(format, name)
+	return fmt.Sprintf(format, a.collectionSettingsName(t))
 }
 
 func (a *App) collectionSettingsSectionLabel(section collectionSettingsSection) string {
@@ -159,24 +163,26 @@ func (a *App) collectionSettingsSectionLabel(section collectionSettingsSection) 
 
 func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 	d, labels, theme := a.collections.settings[t.ID], &a.S.Collections, c.Theme()
-	col, _, ok := a.collectionSettingsTarget(t)
+	col, item, ok := a.collectionSettingsTarget(t)
 	d.missing = !ok
 	a.syncCollectionSettingsDirty(t)
-	ui.Column(c).FillWidth().Grow(1).MinHeight(0).Pad(Space4).Gap(Space3).Children(func() {
+	width := max(c.Bounds().Width-RailWidth-a.sideSplit.Pos-Space2, 0)
+	ui.Column(c).Width(width).Grow(1).MinHeight(0).PadX(Space4).PadTop(Space2).Gap(Space2).Children(func() {
 		ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-			ui.Icon(c, icons.Folder).Size(Space6, Space6).Color(theme.Primary)
-			ui.Text(c, a.collectionSettingsTitle(t)).Bold().Ellipsis().Grow(1)
-		})
-		ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-			if t.Dirty {
-				ui.Text(c, labels.Unsaved).Color(theme.Primary).Grow(1).Ellipsis()
+			ui.Icon(c, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
+			if d.section == collectionSettingsGeneral {
+				ui.TextField(c, &d.name, labels.Name, "").Grow(1).MinWidth(0).MaxWidth(15 * Space6).Disabled(d.missing)
+				ui.Row(c).Basis(0).Grow(1)
 			} else {
-				ui.Row(c).Grow(1)
+				ui.Text(c, a.collectionSettingsName(t)).Bold().Ellipsis().Grow(1).MinWidth(0)
 			}
-			if ui.Button(c, labels.DiscardReload).Outline().Disabled(d.missing).Clicked() {
+			if t.Dirty {
+				ui.Text(c, labels.Unsaved).Color(theme.Primary).FontSize(theme.Metrics.FontSizeS)
+			}
+			if ui.Button(c, labels.DiscardReload).Small().Ghost().Tooltip(labels.DiscardHelp).Shrink(0).Disabled(d.missing).Clicked() {
 				c.After(func() { a.reloadCollectionSettings(t) })
 			}
-			if ui.Button(c, labels.Save).Icon(icons.Save).Disabled(d.missing || !t.Dirty || strings.TrimSpace(d.name) == "").Clicked() {
+			if ui.Button(c, labels.Save).Small().Icon(icons.Save).Shrink(0).Disabled(d.missing || !t.Dirty || strings.TrimSpace(d.name) == "").Clicked() {
 				c.After(func() { a.saveCollectionSettings(t) })
 			}
 		})
@@ -186,18 +192,36 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 		if d.saveFailed {
 			ui.Wrap(c, labels.SettingsSaveFailed).Color(theme.Danger)
 		}
-		sections := []collectionSettingsSection{collectionSettingsGeneral, collectionSettingsAuthentication}
+		sections := []collectionSettingsSection{collectionSettingsGeneral}
 		if t.TargetID == "" {
 			sections = append(sections, collectionSettingsVariables)
 		}
-		ui.Choice(c, &d.section, sections, a.collectionSettingsSectionLabel).Label(labels.SettingsNavigation).FillWidth()
+		sections = append(sections, collectionSettingsAuthentication)
+		ui.Row(c).FillWidth().Gap(Space2).FocusGroup(ui.FocusHorizontal).Children(func() {
+			for _, section := range sections {
+				tab := ui.TabBase(c.KeyInt(int(section)), &d.section, section, a.collectionSettingsSectionLabel(section)).
+					Height(theme.Metrics.ControlHeight + Space2).PadX(Space2).
+					Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
+				fg := theme.MutedForeground
+				if d.section == section {
+					fg = theme.Primary
+				}
+				tab.Children(func() {
+					ui.Text(c, a.collectionSettingsSectionLabel(section)).Color(fg)
+					if d.section == section {
+						ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Height(Space1 / 2).Background(theme.Primary)
+					}
+				})
+			}
+		})
 		ui.Divider(c)
+		if d.section == collectionSettingsGeneral {
+			a.collectionOverview(c, t, col, item, ok)
+			return
+		}
 		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Scrollbars().Label(labels.SettingsContent).Children(func() {
 			ui.Column(c).FillWidth().Gap(Space3).Children(func() {
 				switch d.section {
-				case collectionSettingsGeneral:
-					ui.Wrap(c, labels.SettingsHelp).Muted()
-					ui.TextField(c, &d.name, labels.Name, "").FillWidth()
 				case collectionSettingsAuthentication:
 					folder := t.TargetID != ""
 					a.authEditor(c, &d.auth, &d.editor, folder, folder)
@@ -216,4 +240,122 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 	if ui.Shortcut(c, ui.Primary, "s") {
 		c.After(func() { a.saveCollectionSettings(t) })
 	}
+}
+
+// Count saved request nodes, including HTTP GraphQL bodies, but never folders.
+// The overview and tree use the same definition and never include editor drafts.
+func collectionRequestCounts(items []model.Item) (http, websocket int) {
+	for _, item := range items {
+		if item.Type == model.ItemRequest && item.Request != nil {
+			if isWebSocket(*item.Request) {
+				websocket++
+			} else {
+				http++
+			}
+		}
+		h, w := collectionRequestCounts(item.Items)
+		http, websocket = http+h, websocket+w
+	}
+	return
+}
+
+func (a *App) collectionOverview(c ui.C, t *Tab, col model.Collection, item *model.Item, exists bool) {
+	// C.Bounds is the window, so subtract the shell's actual sidebar allocation.
+	// Wide panes have independent scroll areas; narrow panes keep one reading order.
+	width := c.Bounds().Width - RailWidth - a.sideSplit.Pos - Space2 - 2*Space4
+	if width < 30*Space6 {
+		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Scrollbars().Label(a.S.Collections.SettingsContent).Children(func() {
+			ui.Column(c).FillWidth().Gap(Space6).PadBottom(Space4).Children(func() {
+				a.collectionOverviewActions(c, t, col, item, exists)
+				a.collectionOverviewGuide(c, t.TargetID != "")
+			})
+		})
+		return
+	}
+	ui.Row(c).FillWidth().Grow(1).MinHeight(0).Gap(2 * Space6).Children(func() {
+		ui.Scroll(c.Key("api")).Basis(0).Grow(1).MinWidth(0).FillHeight().Scrollbars().Label(a.S.Collections.APISection).Children(func() {
+			a.collectionOverviewActions(c, t, col, item, exists)
+		})
+		ui.Scroll(c.Key("guide")).Basis(0).Grow(1).MinWidth(0).FillHeight().Scrollbars().Label(a.S.Collections.GuideSection).Children(func() {
+			a.collectionOverviewGuide(c, t.TargetID != "")
+		})
+	})
+}
+
+func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, item *model.Item, exists bool) {
+	s, theme := a.S.Collections, c.Theme()
+	items := col.Items
+	if item != nil {
+		items = item.Items
+	}
+	http, ws := collectionRequestCounts(items)
+	n := collectionNode{collectionID: t.CollectionID, id: t.TargetID, branch: true}
+	ui.Column(c).FillWidth().Gap(Space2).PadBottom(Space4).Children(func() {
+		ui.Text(c, s.APISection).Muted().FontSize(theme.Metrics.FontSizeS)
+		ui.Divider(c)
+		for i, count := range []int{http, ws} {
+			ui.Row(c.KeyInt(i)).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
+				icon, protocol, action := icons.Send, "HTTP", s.NewRequest
+				if i == 1 {
+					icon, protocol, action = icons.Activity, "WebSocket", s.NewWebSocket
+				}
+				ui.Icon(c, icon).Size(Space6, Space6).Color(theme.MutedForeground)
+				ui.Column(c).Grow(1).MinWidth(0).Gap(Space1).Children(func() {
+					ui.Text(c, protocol)
+					ui.Text(c, fmt.Sprintf(s.RequestCount, count)).Muted().FontSize(theme.Metrics.FontSizeS)
+				})
+				if ui.Button(c, action).Icon(icons.Plus).IconOnly().Ghost().Disabled(!exists).Clicked() {
+					c.After(func() {
+						if i == 1 {
+							a.newWebSocket(n)
+						} else {
+							a.newCollectionRequest(n)
+						}
+					})
+				}
+			})
+		}
+		ui.Text(c, s.OrganizeSection).Muted().FontSize(theme.Metrics.FontSizeS).PadTop(Space4)
+		ui.Divider(c)
+		ui.Row(c).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
+			ui.Icon(c, icons.Folder).Size(Space6, Space6).Color(theme.MutedForeground)
+			ui.Text(c, s.NewFolder).Grow(1)
+			if ui.Button(c, s.NewFolder).Icon(icons.Plus).IconOnly().Ghost().Disabled(!exists).Clicked() {
+				c.After(func() { a.collectionNameDialog(collectionFolder, n) })
+			}
+		})
+		if t.TargetID == "" {
+			ui.Text(c, s.ExportSection).Muted().FontSize(theme.Metrics.FontSizeS).PadTop(Space4)
+			ui.Divider(c)
+			ui.Row(c).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
+				ui.Icon(c, icons.Download).Size(Space6, Space6).Color(theme.MutedForeground)
+				ui.Column(c).Grow(1).MinWidth(0).Gap(Space1).Children(func() {
+					ui.Text(c, s.NativeJSON)
+					ui.Wrap(c, s.NativeJSONHelp).Muted().FontSize(theme.Metrics.FontSizeS)
+				})
+				if ui.Button(c, s.Export).Icon(icons.ChevronRight).IconOnly().Ghost().Disabled(!exists).Clicked() {
+					c.After(func() { a.exportCollection(t.CollectionID) })
+				}
+			})
+		}
+	})
+}
+
+func (a *App) collectionOverviewGuide(c ui.C, folder bool) {
+	s, theme := a.S.Collections, c.Theme()
+	ui.Column(c).FillWidth().Gap(Space3).PadBottom(Space4).Children(func() {
+		ui.Text(c, s.GuideSection).Muted().FontSize(theme.Metrics.FontSizeS)
+		ui.Divider(c)
+		ui.Wrap(c, s.GuideIntro)
+		for i, section := range [][2]string{{s.GuideScopeTitle, s.GuideScope}, {s.GuideVariablesTitle, s.GuideVariables}, {s.GuideAuthTitle, s.GuideAuth}, {s.GuideEditingTitle, s.GuideEditing}} {
+			ui.Column(c.KeyInt(i)).FillWidth().Gap(Space2).Children(func() {
+				ui.Text(c, section[0]).Bold().FontSize(theme.Metrics.FontSizeM + Space1)
+				body := section[1]
+				if folder && i == 0 {
+					body = s.GuideFolderScope
+				}
+				ui.Wrap(c, body).Color(theme.MutedForeground)
+			})
+		}
+	})
 }

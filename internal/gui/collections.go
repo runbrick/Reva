@@ -33,6 +33,7 @@ type collectionsState struct {
 	rowMenuID                       string
 	selected                        collectionNode
 	activeCollection, activeRequest string
+	activeSettings                  bool
 	settings                        map[int]*collectionSettingsDraft
 
 	dialogOpen bool
@@ -54,8 +55,10 @@ type collectionsState struct {
 type collectionNode struct {
 	collectionID, id, parentID, name string
 	actions                          string
+	settings                         string
 	method                           model.Method
 	depth, key                       int
+	requests                         int
 	branch                           bool
 }
 
@@ -70,7 +73,7 @@ const (
 
 func (s *collectionsState) node(i int) ui.TreeNode {
 	n := s.visible[i]
-	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: !n.branch && n.collectionID == s.activeCollection && n.id == s.activeRequest}
+	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: n.branch == s.activeSettings && n.collectionID == s.activeCollection && n.id == s.activeRequest}
 }
 
 func (s *collectionsState) nodeKey(n collectionNode) string { return n.collectionID + "/" + n.id }
@@ -132,6 +135,10 @@ func (s *collectionsState) appendNode(n collectionNode) {
 func (s *collectionsState) appendItems(colID, parentID string, items []model.Item, depth int) {
 	for _, item := range items {
 		n := collectionNode{collectionID: colID, id: item.ID, parentID: parentID, name: item.Name, depth: depth, branch: item.Type == model.ItemFolder}
+		if n.branch {
+			h, w := collectionRequestCounts(item.Items)
+			n.requests = h + w
+		}
 		if item.Request != nil {
 			n.method = item.Request.Method
 		}
@@ -195,8 +202,25 @@ func (a *App) refreshCollections() {
 	for _, col := range cols {
 		s.collectionIDs = append(s.collectionIDs, col.ID)
 		s.collectionNames[col.ID] = col.Name
-		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true})
+		h, w := collectionRequestCounts(col.Items)
+		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true, requests: h + w})
 		s.appendItems(col.ID, "", col.Items, 1)
+	}
+	// Duplicate display names still need distinct gear controls for accessibility.
+	branchNames := make(map[string]int)
+	for _, n := range s.all {
+		if n.branch {
+			branchNames[n.name]++
+		}
+	}
+	for i := range s.all {
+		n := &s.all[i]
+		if n.branch {
+			n.settings = fmt.Sprintf(a.S.Collections.SettingsFor, n.name)
+			if branchNames[n.name] > 1 {
+				n.settings = fmt.Sprintf(a.S.Collections.SettingsForTarget, n.name, s.nodeKey(*n))
+			}
+		}
 	}
 	s.folderCollection = "" // invalidate the save dialog's folder choices too
 	// Deletion and external imports can invalidate the creation menu's target.
@@ -216,7 +240,11 @@ func (a *App) collectionsPane(c ui.C) {
 	a.refreshCollections()
 	s, text, theme := &a.collections, a.S.Collections, c.Theme()
 	s.activeCollection, s.activeRequest = a.Active().CollectionID, a.Active().Request.ID
-	ui.Column(c).Fill().Pad(Space3).Gap(Space2).Children(func() {
+	s.activeSettings = a.Active().Kind == collectionSettingsTabKind
+	if s.activeSettings {
+		s.activeRequest = a.Active().TargetID
+	}
+	ui.Column(c).Fill().Pad(Space2).Gap(Space2).Children(func() {
 		ui.Row(c).FillWidth().Items(ui.Center).Children(func() {
 			ui.Text(c, text.Title).Bold().Grow(1)
 			add := ui.Button(c, text.Add).Icon(icons.Plus).IconOnly().Ghost()
@@ -288,6 +316,9 @@ func (a *App) collectionsPane(c ui.C) {
 			rc := c.KeyInt(n.key)
 			selected := s.node(i).Selected
 			row := ui.Row(rc).Grow(1).FillHeight().Gap(Space2).Items(ui.Center).Radius(theme.Metrics.RadiusControl).HitWith(s.tree.RowID(i), n.name, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected})
+			if n.branch {
+				row.Gap(Space1)
+			}
 			row.Children(func() {
 				if n.branch {
 					icon := icons.Folder
@@ -302,15 +333,26 @@ func (a *App) collectionsPane(c ui.C) {
 				if selected {
 					label.Color(theme.Primary)
 				}
-				more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Shrink(0)
-				if !selected && !(s.rowMenuOpen && s.rowMenuID == s.nodeKey(n)) {
-					more.Opacity(0).StateFrom(row).Hover(ui.Look{}.Opacity(1)).Focus(ui.Look{}.Opacity(1))
+				if n.branch {
+					ui.Text(rc, fmt.Sprintf(text.SidebarCount, n.requests)).Muted().FontSize(theme.Metrics.FontSizeS).Shrink(0)
 				}
-				if more.Clicked() {
-					s.selected, s.rowMenuID, s.rowMenuOpen = n, s.nodeKey(n), true
+				if !n.branch {
+					more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Size(Space6, Space6).Shrink(0)
+					if !selected && !(s.rowMenuOpen && s.rowMenuID == s.nodeKey(n)) {
+						more.Opacity(0).StateFrom(row).Hover(ui.Look{}.Opacity(1)).Focus(ui.Look{}.Opacity(1))
+					}
+					if more.Clicked() {
+						s.selected, s.rowMenuID, s.rowMenuOpen = n, s.nodeKey(n), true
+					}
+					if s.rowMenuID == s.nodeKey(n) {
+						ui.Menu(rc, more, &s.rowMenuOpen, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+					}
 				}
-				if s.rowMenuID == s.nodeKey(n) {
-					ui.Menu(rc, more, &s.rowMenuOpen, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+				if n.branch {
+					gearName := n.settings
+					if ui.Button(rc, gearName).Tooltip(gearName).Icon(icons.Settings).IconOnly().Ghost().Size(Space6, Space6).Shrink(0).Clicked() {
+						c.After(func() { s.selected = n; a.openCollectionSettings(n, collectionSettingsGeneral) })
+					}
 				}
 			})
 			ui.ContextMenu(rc, row, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })

@@ -2,9 +2,14 @@ package i18n
 
 // Collections holds the strings of the collections sidebar and save dialog. Owned by that feature's PR.
 type Collections struct {
-	Settings, FolderSettings, SettingsTitle, FolderSettingsTitle       string
-	General, DiscardReload, Unsaved, SettingsSaved, SettingsSaveFailed string
-	SettingsMissing, SettingsHelp, SettingsNavigation, SettingsContent string
+	Settings, FolderSettings, SettingsTitle, FolderSettingsTitle            string
+	General, DiscardReload, Unsaved, SettingsSaved, SettingsSaveFailed      string
+	SettingsMissing, SettingsHelp, SettingsNavigation, SettingsContent      string
+	DiscardHelp, SettingsFor, SettingsForTarget, RequestCount, SidebarCount string
+	APISection, OrganizeSection, ExportSection, NativeJSON, NativeJSONHelp  string
+	GuideSection, GuideIntro, GuideScopeTitle, GuideScope, GuideFolderScope string
+	GuideVariablesTitle, GuideVariables, GuideAuthTitle, GuideAuth          string
+	GuideEditingTitle, GuideEditing                                         string
 
 	Authentication, AuthSaved, AuthSaveFailed, AuthTargetMissing string
 	Title, NewCollection, NewFolder, NewRequest                  string
@@ -20,7 +25,15 @@ type Collections struct {
 
 var collectionsZh = Collections{
 	Settings: "集合设置", FolderSettings: "文件夹设置", SettingsTitle: "%s · 集合设置", FolderSettingsTitle: "%s · 文件夹设置",
-	General: "常规", DiscardReload: "放弃更改并重新加载", Unsaved: "有未保存的更改", SettingsSaved: "设置已保存", SettingsSaveFailed: "无法保存设置，请重试。",
+	General: "概览", DiscardReload: "放弃", DiscardHelp: "放弃更改并重新加载", Unsaved: "有未保存的更改", SettingsSaved: "设置已保存", SettingsSaveFailed: "无法保存设置，请重试。",
+	SettingsFor: "%s 的设置", SettingsForTarget: "%s 的设置（%s）", RequestCount: "共 %d 个请求", SidebarCount: "(%d)",
+	APISection: "API", OrganizeSection: "组织", ExportSection: "导出", NativeJSON: "Reva JSON 文件", NativeJSONHelp: "导出已保存的集合，包含变量、共享认证和请求。",
+	GuideSection: "集合指南", GuideIntro: "在同一工作区中组织 API、配置共享变量与认证。此指南说明配置的作用范围及保存方式。",
+	GuideScopeTitle: "集合概览", GuideScope: "左侧统计包含集合及所有子文件夹中已保存的请求。HTTP 包含 GraphQL 请求；空文件夹不计入请求总数。使用加号在当前集合中创建请求。",
+	GuideFolderScope:    "左侧统计仅包含当前文件夹及其子文件夹中已保存的请求。HTTP 包含 GraphQL 请求；空文件夹不计入总数。使用加号在当前文件夹中创建请求。",
+	GuideVariablesTitle: "共享变量", GuideVariables: "在“集合变量”中维护键值。请求可通过 {{变量名}} 引用；启用的环境变量会覆盖同名集合变量。文件夹使用所属集合的变量。",
+	GuideAuthTitle: "认证与继承", GuideAuth: "集合和文件夹可以配置共享认证。设为继承的 HTTP 请求使用最近的文件夹或集合认证；“无认证”会停止继承。WebSocket 使用手动请求头。",
+	GuideEditingTitle: "编辑与保存", GuideEditing: "名称、变量和认证的修改会保留在当前标签页草稿中。切换分区不会丢失草稿；点击“保存”后才对请求生效。“放弃”会重新加载已保存的值。导出使用已保存的数据，可能包含凭据。",
 	SettingsMissing: "集合或文件夹已不存在。无法保存，请关闭此标签页。", SettingsHelp: "在此管理名称、共享认证和集合变量。更改仅在保存后生效。", SettingsNavigation: "设置导航", SettingsContent: "配置内容",
 
 	Authentication: "身份认证", AuthSaved: "认证已保存", AuthSaveFailed: "无法保存认证，请重试。", AuthTargetMissing: "集合或文件夹已不存在，无法保存认证。",
@@ -39,7 +52,15 @@ var collectionsZh = Collections{
 
 var collectionsEn = Collections{
 	Settings: "Collection settings", FolderSettings: "Folder settings", SettingsTitle: "%s · Collection settings", FolderSettingsTitle: "%s · Folder settings",
-	General: "General", DiscardReload: "Discard and reload", Unsaved: "Unsaved changes", SettingsSaved: "Settings saved", SettingsSaveFailed: "Could not save settings. Please try again.",
+	General: "Overview", DiscardReload: "Discard", DiscardHelp: "Discard changes and reload", Unsaved: "Unsaved changes", SettingsSaved: "Settings saved", SettingsSaveFailed: "Could not save settings. Please try again.",
+	SettingsFor: "Settings for %s", SettingsForTarget: "Settings for %s (%s)", RequestCount: "%d requests", SidebarCount: "(%d)",
+	APISection: "API", OrganizeSection: "Organize", ExportSection: "Export", NativeJSON: "Reva JSON file", NativeJSONHelp: "Export the saved collection, including variables, shared authentication and requests.",
+	GuideSection: "Collection guide", GuideIntro: "Organize APIs and configure shared variables and authentication in one workspace. This guide explains their scope and how changes are saved.",
+	GuideScopeTitle: "Collection overview", GuideScope: "The API counts include saved requests in this collection and all its folders. HTTP includes GraphQL requests; empty folders do not count as requests. Use the plus buttons to create requests in this collection.",
+	GuideFolderScope:    "The API counts include saved requests in this folder and its descendants only. HTTP includes GraphQL requests; empty folders do not count. Use the plus buttons to create requests in this folder.",
+	GuideVariablesTitle: "Shared variables", GuideVariables: "Maintain key/value pairs in Collection variables. Requests can reference them with {{name}}; enabled environment variables override collection values with the same name. Folders use their collection's variables.",
+	GuideAuthTitle: "Authentication and inheritance", GuideAuth: "Collections and folders can configure shared authentication. HTTP requests set to inherit use the nearest folder or collection configuration; None stops inheritance. WebSocket uses manual headers.",
+	GuideEditingTitle: "Editing and saving", GuideEditing: "Name, variable and authentication edits stay in this tab's draft when you switch sections. Save applies them to requests; Discard reloads saved values. Export uses saved data and can include credentials.",
 	SettingsMissing: "The collection or folder no longer exists. Close this tab; its changes cannot be saved.", SettingsHelp: "Manage names, shared authentication and collection variables here. Changes take effect only when saved.", SettingsNavigation: "Settings navigation", SettingsContent: "Configuration content",
 
 	Authentication: "Authentication", AuthSaved: "Authentication saved", AuthSaveFailed: "Could not save authentication. Please try again.", AuthTargetMissing: "The collection or folder no longer exists. Authentication could not be saved.",

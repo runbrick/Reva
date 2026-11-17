@@ -76,8 +76,11 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 		a.request.tabs = make(map[int]*requestTabState)
 	}
 	s := a.request.tabs[t.ID]
-	// OpenRequest can replace the request in an existing empty tab. Its query
-	// rows need the same initialization as a request opened in a new tab.
+	// OpenRequest can replace the request in an existing empty tab. Preserve
+	// its authored URL and Params: sending merges them after expansion, where
+	// raw placeholders may become equal or introduce URL delimiters. Parsing
+	// or materializing query rows here could silently change that behavior.
+	// Only explicit URL/table edits synchronize the two representations.
 	if s == nil || s.requestID != t.Request.ID {
 		s = &requestTabState{url: t.Request.URL, requestID: t.Request.ID, timeoutValue: t.Request.Options.TimeoutMs}
 		if s.timeoutValue > 0 {
@@ -88,12 +91,6 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 			return struct{}{}, os.WriteFile(job.path, job.body, 0600)
 		})
 		a.request.tabs[t.ID] = s
-		if len(t.Request.Params) == 0 {
-			requestParamsFromURL(&t.Request)
-		} else {
-			requestURLFromParams(&t.Request)
-			s.url = t.Request.URL
-		}
 	}
 	// Closing a tab releases its editor state on the next declaration.
 	for id := range a.request.tabs {

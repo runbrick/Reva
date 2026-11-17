@@ -471,7 +471,7 @@ func TestRequestLoadedParamsAndIncompleteQueryEscape(t *testing.T) {
 	tab.Request.URL = "https://{{host}}/path#fragment"
 	tab.Request.Params = []model.KV{{Key: "q", Value: "{{ term }} space"}, {Key: "off", Value: "hidden", Disabled: true}}
 	requestEnglish(h)
-	if tab.Dirty || tab.Request.URL != "https://{{host}}/path?q={{ term }}+space#fragment" {
+	if tab.Dirty || tab.Request.URL != "https://{{host}}/path#fragment" {
 		t.Fatalf("loaded request = %#v, dirty %v", tab.Request, tab.Dirty)
 	}
 	requestType(h, "URL", "https://{{host}}/path?q=%", true)
@@ -498,8 +498,8 @@ func TestRequestOpenIntoExistingTabPreservesParams(t *testing.T) {
 	if !reflect.DeepEqual(original.Request.Params, req.Params) {
 		t.Fatalf("opening request discarded params: %#v", original.Request.Params)
 	}
-	if original.Request.URL != "https://example.test/users?q=active" {
-		t.Fatalf("opening request did not rebuild query: %q", original.Request.URL)
+	if original.Request.URL != req.URL {
+		t.Fatalf("opening request rewrote the authored URL: %q", original.Request.URL)
 	}
 	if original.Dirty {
 		t.Fatal("opening request marked it dirty")

@@ -1,6 +1,6 @@
 # R4：变量来源与发送前只读预览
 
-分支：`runbrick/research-request-preview`。这是独立本地功能提交的 PR 说明和验收记录；未推送、未创建远程 PR、未合并父分支或 main。
+分支：`runbrick/research-request-preview`。这是独立本地功能提交的 PR 说明和验收记录；未推送、未创建远程 PR、未向父分支或 main 合并。经协调者明确授权，将父分支当前基线合入本子分支以适配最新执行管线；依赖合并与功能修正分开提交。
 
 ## PR 描述
 
@@ -28,14 +28,14 @@ Viva 的窗口快照包含模态窗口下方的文字和命中区域名称。请
 
 原有标签栏把完整 URL 用作标签标题和可访问名称，所以仅遮住编辑区仍不足以保护默认快照。协调者在问题 `msg_066ebf11ce66` 的回复中明确批准扩展 `internal/gui/tabs.go` 所有权，**仅用于预览打开期间的标题遮盖**。现有 `requestTabTitle` 在预览打开时对所有标签统一返回本地化预览标题，覆盖绘制、可访问名称及溢出菜单；关闭预览立即恢复原始标题。标签 ID、脏标记、关闭和切换行为保持原有实现，并有行为测试覆盖。
 
-其他修改均在原始授权范围：
+原始授权范围：
 
 - 新增 `internal/preview/preview.go`、`internal/preview/preview_test.go`。
 - 新增 `internal/gui/preview.go`、`internal/gui/preview_test.go`。
 - 修改 `internal/gui/request.go` 和 `internal/i18n/request.go`。
 - 新增 `internal/i18n/preview_test.go` 和本文档。
 
-未修改 app.go、scripts.go、env.go、auth.go、model、service 或共享 harness。复用现有 `icons.Eye`，无新增图标、依赖或 schema 变更。缺失的 TASK.md / 本地 Viva skill 按调度规格处理；Modal、Scroll、Driver API 来自真实 Viva v0.6.0 模块缓存源码。
+后续 QA 发现环境标题、集合 / 请求名称及先前响应 / 脚本输出可能重复已知秘密。协调者明确扩展 `internal/gui/env.go` 所有权，仅用于预览期间的标题栏 / 菜单显示脱敏；扩展 `internal/gui/app.go` 所有权，仅用于预览期间的背景渲染门控。未修改 scripts.go、auth.go、model、service 或共享 harness。复用现有 `icons.Eye`，无新增图标、依赖或 schema 变更。缺失的 TASK.md / 本地 Viva skill 按调度规格处理；Modal、Scroll、Driver API 来自真实 Viva v0.6.0 模块缓存源码。
 
 ## 行为测试
 
@@ -57,6 +57,7 @@ GUI / 本地化测试：
 - `TestPreviewLayoutsChineseEnglishLightDarkAtMinimumWindow`：960×600 下中英、明暗四组合均可打开，模态关闭操作完整处于窗口内。验证使用现有 headless Driver 的文字和控件边界，不是原生窗口截图或像素级设计验收。
 - `TestPreviewIsScopedToHTTPAndClosesOnTabChange`：HTTP 与 WebSocket 之间的状态和操作边界。
 - `TestPreviewAllowsPreviouslyAuthorizedDownloadToComplete`：通过真实“发送并下载”菜单及 headless 保存文件对话框授权一次下载；分别在响应尚未返回和写入 Effect 已运行时打开预览，保持模态打开直到文件写入及结果消费完成。使用可控释放的发送 fake 与实际临时文件写入，验证 Effect 不被取消或重启、没有新增发送或写入、草稿和脏状态不变；无先前下载时打开预览仍不发起工作。
+- `TestPreviewHidesSensitiveBackgroundAndRestoresOnClose`：在真实 headless 快照的文字及命中标签中检查环境标题 / 所有菜单候选、集合 / 请求名称、既有响应或脚本错误 / 断言 / 控制台、搜索和 toast 的秘密副本。打开时全部脱敏或隐藏，关闭后恢复原始背景；独立菜单 / 搜索状态、草稿、脏状态及保存数据不被修改，发送和保存入口有失败保护。
 - `TestPreviewTranslationsPresentInBothLanguages`：新增 Request 预览文案完整，明确前置脚本时间点及隐藏标记解释。
 
 ### 下载声明顺序修正
@@ -64,6 +65,24 @@ GUI / 本地化测试：
 对初始提交 `e3836ac1477c691662b10093a718ff27f753c4fd` 的复审发现，预览提前返回位于原有 `requestDownloads(c)` 之前，会阻止待返回响应进入下载写入，并停止声明已经运行的写入 Effect。新回归在修正前的两个子用例均失败（分别超时等待写入开始、下载完成），修正后均通过。
 
 修正只将原有 `requestDownloads(c)` 调用移动到预览判断之前，仍使用原来的 `c`、同一个 EffectState 和同一个任务 key，保证 UI Effect 的作用域与身份不变。没有扩大文件所有权，未修改发送管线或模态实现。
+
+### 初次打开保留 URL / Params 原始语义
+
+初次打开请求不再解析 URL 来填充 Params，也不把已有 Params 写回 URL。两种原始表示都完整保留，包括 URL 独有参数、重复值、禁用行、空名称、占位符和 Description；不展开秘密，不标记脏状态，不修改保存的集合。表格展示保存的 Params，URL 独有的查询仍显示在 URL 中；用户明确编辑 URL 后由 URL 更新表格，明确编辑或删除表格行后由表格重建 URL，原有编辑权威规则不变。
+
+单次原始文本合并无法保持任意变量展开后的相等性：`URL ?x={{v}}` 加 `Params x=a` 在 `v=a` 时应只发送一项，原始合并会变成两项；无查询 URL 若提前拼入参数 `{{key}}=a` 且 key 为 `x&y`，会把本应编码的名称误解释为 URL 分隔符。反向解析 URL 也不安全：URL 中变量值 `a&y=b` 与 Params 中相同变量有不同编码边界，百分号编码的 `{{v}}` 在原 URL 中甚至不应展开。因此采用保留原始表示，而非在加载时猜测变量值或尝试归一化。
+
+协调者明确批准新增 `internal/gui/request_load_test.go`，并仅为纠正原有初始物化假设而扩展 `internal/gui/request_test.go` 所有权。新增 `TestRequestLoadPreservesAuthoredURLParamsAndStoredMetadata`、`TestRequestLoadPreservesExpandedHTTPQuerySemantics` 和 `TestRequestLoadKeepsLaterTableEditsAndDeletionsAuthoritative`；真实本地 HTTP 服务验证 URL 独有项、重复项、展开后相等、参数键 / 值中的分隔符、URL 自身变量分隔符和已转义占位符。修正前这些边界均复现原始 URL 改写或实际 HTTP 参数漂移，修正后通过。
+
+该修正独立提交为 `eb1a21d8af46fce1087f5250a235df0c452ea23d`。合入最新基线后的全量测试另外发现 `TestImportCurlOpensRequest` 的中英文断言也依赖初次绘制改写 URL；协调者在 `msg_951cd264b544` 中明确授权仅修改 `internal/gui/importer_test.go` 的这项初始加载断言。现在检查导入器原本生成的 URL `https://example.test/users` 和完整 Params 行 `q=active`，保留方法、请求体、请求头和未保存草稿的原有检查，无导入器生产改动。
+
+### 预览期间隐藏敏感背景
+
+窗口快照仍可包含模态底层的数据，因此预览期间不声明侧栏集合 / 请求列表、响应 / 脚本诊断内容、其他原始数据对话框、搜索结果及 toast。保留原有布局容器、请求编辑器及下载声明的作用域，保留 Page 中发送 / WebSocket Effect 的原始声明位置；没有修改执行管线。环境标题及菜单候选使用 `preview.Build` 的同一脱敏规则：候选环境值与活动环境值均进入只读副本，仍保持活动环境的展开优先级；不复制秘密名称判定规则，不修改保存数据。未知变量提示也使用脱敏快照中的名称。
+
+关闭预览恢复原始内容与正常名称；切换标签、WebSocket、环境管理或其他主页面时清除预览打开状态，避免对已离开的请求视图继续宣称预览保护。先前独立操作的状态不因背景隐藏而清空，发送 / WebSocket / 下载 Effects 保持原有作用域和身份；下载回归在背景门控后仍通过。此保护范围是预览打开期间的界面声明，关闭后恢复普通编辑器的原始数据展示，不承诺普通编辑模式隐藏秘密。
+
+新背景回归在修正前的响应和脚本诊断两种情形均失败，快照可见上述秘密副本；修正后均通过。它也覆盖非活动环境菜单名称中同时出现活动与候选环境秘密的情形，以及关闭后的内容恢复。
 
 ## 四项必需检查
 
@@ -80,21 +99,24 @@ GUI / 本地化测试：
 (empty)
 
 > go test ./... -count=1
-ok   github.com/runbrick/reva/internal/gui              13.628s
-ok   github.com/runbrick/reva/internal/i18n              1.857s
-ok   github.com/runbrick/reva/internal/preview           3.154s
+ok   github.com/runbrick/reva/cmd/reva-run                6.431s
+ok   github.com/runbrick/reva/internal/execution         4.482s
+ok   github.com/runbrick/reva/internal/gui              15.227s
+ok   github.com/runbrick/reva/internal/i18n              0.836s
+ok   github.com/runbrick/reva/internal/preview           2.776s
+ok   github.com/runbrick/reva/internal/runner            2.407s
 ...
-ok   github.com/runbrick/reva/internal/service/request   4.242s
-ok   github.com/runbrick/reva/internal/service/store     3.860s
-ok   github.com/runbrick/reva/internal/storage           1.907s
-ok   github.com/runbrick/reva/internal/syncing           3.983s
-ok   github.com/runbrick/reva/internal/update            3.003s
-ok   github.com/runbrick/reva/internal/vars              1.217s
-ok   github.com/runbrick/reva/internal/websocket         2.740s
+ok   github.com/runbrick/reva/internal/service/request   3.842s
+ok   github.com/runbrick/reva/internal/service/store     2.761s
+ok   github.com/runbrick/reva/internal/storage           0.876s
+ok   github.com/runbrick/reva/internal/syncing           3.917s
+ok   github.com/runbrick/reva/internal/update            2.806s
+ok   github.com/runbrick/reva/internal/vars              0.803s
+ok   github.com/runbrick/reva/internal/websocket         2.467s
 ```
 
 `git diff --check` 无输出。完整套件还覆盖原有响应 HTML 预览，新的操作名使用 Request preview / 请求预览，避免与响应 Preview / 预览冲突。
 
 ## 父分支集成
 
-本功能保持 `request.go` 原有 `sendJob.req` / `sendJob.vars` 使用方式，未引入对 R1 新执行管线的依赖。当前无额外文件适配请求；协调者合入并行 R1 后按总体验收规则再次执行四项检查。实际目标值的隐藏、无 reveal、无线上报文精确性承诺为本 PR 的有意边界。
+本功能保持 `request.go` 原有 `sendJob.req` / `sendJob.vars` 使用方式。协调者明确授权将 `runbrick/onboarding-orchestration` 基线 `3fd1643` 合入本子分支，依赖合并提交为 `f9ee05962189f7b3f1a6ab4f34bbc806e901aad4`；预览背景适配在该基线之上单独提交，没有向父分支或 main 合并。当前无额外文件适配请求，最终父分支集成由协调者执行。实际目标值的隐藏、无 reveal、无线上报文精确性承诺为本 PR 的有意边界；初次加载的 Params 表仅展示原本保存的行，合并后的发送查询由发送服务及预览计算，用户明确编辑后仍按原来的编辑权威规则同步。

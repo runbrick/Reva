@@ -94,9 +94,13 @@ func (a *App) UnresolvedVars() []string {
 func (a *App) envSelector(c ui.C) {
 	s, theme := &a.env, c.Theme()
 	s.activeID = a.Svc.Settings.Get().ActiveEnvID
+	previewing := a.requestPreviewOpen()
 	name := a.S.Env.NoEnvironment
 	if env, ok := a.Svc.Environments.Get(s.activeID); ok {
 		name = env.Name
+		if previewing {
+			name = a.requestPreviewEnvironmentName(env)
+		}
 	}
 	trigger := ui.ButtonBase(c, a.S.Env.Title).Height(Space4 * 2).MaxWidth(Space6 * 10).
 		PadX(Space3).Gap(Space2).Radius(theme.Metrics.RadiusControl).
@@ -114,7 +118,11 @@ func (a *App) envSelector(c ui.C) {
 			c.After(func() { a.setActiveEnvironment("") })
 		}
 		for _, env := range a.Svc.Environments.List() {
-			if menu.Item(env.Name).Chosen(env.ID == s.activeID).Clicked() {
+			name := env.Name
+			if previewing {
+				name = a.requestPreviewEnvironmentName(env)
+			}
+			if menu.Item(name).Chosen(env.ID == s.activeID).Clicked() {
 				c.After(func() { a.setActiveEnvironment(env.ID) })
 			}
 		}
@@ -123,7 +131,11 @@ func (a *App) envSelector(c ui.C) {
 			c.After(a.openEnvironments)
 		}
 	})
-	if missing := a.UnresolvedVars(); len(missing) > 0 {
+	missing := a.UnresolvedVars()
+	if previewing {
+		missing = a.requestPreviewSnapshot(a.Active()).Unresolved
+	}
+	if len(missing) > 0 {
 		label := fmt.Sprintf(a.S.Env.Unresolved, len(missing))
 		ui.Row(c).Size(Space2, Space2).Radius(Space1).Background(a.palette.Warning).
 			Hit(ui.ID(c), label).Tooltip(a.S.Env.UnresolvedTip + strings.Join(missing, ", "))

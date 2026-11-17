@@ -4,9 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runbrick/reva/internal/model"
-	"github.com/runbrick/reva/internal/script"
-	"github.com/runbrick/reva/internal/vars"
+	"github.com/runbrick/reva/internal/execution"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -54,46 +52,38 @@ func (a *App) scriptTab(t *Tab) *scriptTabState {
 	return s
 }
 
-// prepareSend runs t's pre-request script, which may change the request
-// and variables, just before sending. It runs on the UI thread.
-func (a *App) prepareSend(t *Tab, req model.Request, vars []model.KV) (model.Request, []model.KV) {
+// resetScripts clears the previous run before starting the asynchronous effect.
+func (a *App) resetScripts(t *Tab) {
 	s := a.scriptTab(t)
 	s.preError, s.logs = "", nil
-	if strings.TrimSpace(req.PreScript) != "" {
-		var err error
-		vars, s.logs, err = script.RunPre(req.PreScript, &req, vars, 0)
-		if err != nil {
-			s.preError = err.Error()
-		}
-	}
-	return req, vars
 }
 
-// afterResponse runs t's test script against resp and stores t.Tests.
-func (a *App) afterResponse(t *Tab, resp *model.Response) {
+// applyScripts only presents results; all JavaScript runs inside the effect.
+func (a *App) applyScripts(t *Tab, result execution.Result) {
 	s := a.scriptTab(t)
 	t.Tests = nil
-	if s.preError != "" {
+	s.logs = append(append([]string(nil), result.Pre.Logs...), result.Tests.Logs...)
+	if result.Pre.Err != nil {
+		s.preError = result.Pre.Err.Error()
 		t.Tests = append(t.Tests, TestResult{Name: a.S.Scripts.PreScriptError, Error: s.preError})
 	}
-	if resp == nil {
-		return
-	}
-	req, values := t.Request.Clone(), a.Vars()
-	if t.job != nil {
-		req, values = t.job.req, t.job.vars
-	}
-	if strings.TrimSpace(req.TestScript) == "" {
-		return
-	}
-	results, logs, err := script.RunTests(req.TestScript, vars.Apply(req, values), *resp, values, 0)
-	s.logs = append(s.logs, logs...)
-	for _, result := range results {
+	for _, result := range result.Tests.Assertions {
 		t.Tests = append(t.Tests, TestResult{Name: result.Name, Passed: result.Passed, Error: result.Error})
 	}
-	if err != nil {
-		t.Tests = append(t.Tests, TestResult{Name: a.S.Scripts.TestScriptError, Error: err.Error()})
+	if result.Tests.Err != nil {
+		t.Tests = append(t.Tests, TestResult{Name: a.S.Scripts.TestScriptError, Error: result.Tests.Err.Error()})
 	}
+}
+
+// scriptFailurePane makes pre-script diagnostics available without inventing a
+// response/status or a successful history entry for an aborted send.
+func (a *App) scriptFailurePane(c ui.C, t *Tab) {
+	ui.Column(c).Fill().Pad(Space3).Gap(Space2).Children(func() {
+		if t.Err != "" {
+			ui.Wrap(c, t.Err).Color(c.Theme().Danger)
+		}
+		a.testsSection(c, t)
+	})
 }
 
 // scriptsSection declares the editors for t's pre-request and test

@@ -22,13 +22,12 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/execution"
 	"github.com/runbrick/reva/internal/gui/icons"
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
 	"github.com/runbrick/reva/internal/storage"
-	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -64,11 +63,12 @@ type TestResult struct {
 type sendJob struct {
 	req  model.Request
 	vars []model.KV
+	plan *execution.Plan
 }
 
 type sendResult struct {
-	resp model.Response
-	err  error
+	job    *sendJob
+	result execution.Result
 }
 
 // Section is what the left rail selects: the list shown in the sidebar.
@@ -223,21 +223,23 @@ func (a *App) CloseTab(i int) {
 // Send starts sending t's request with the current variables. The result
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
-	req := t.Request.Clone()
-	cfg, _, err := a.effectiveAuth(t)
+	col, _ := a.Svc.Collections.Get(t.CollectionID)
+	plan, err := execution.New(execution.Input{
+		Request: t.Request, Collection: col, Variables: a.VarsFor(t), Settings: a.Svc.Settings.Get(),
+	})
 	if err != nil {
 		a.authFailure(t, true)
 		return
 	}
-	req.Auth = cfg
-	req.Options = req.Options.Resolve(a.Svc.Settings.Get())
-	req, values := a.prepareSend(t, req, a.VarsFor(t))
-	if err := auth.Validate(vars.Apply(req, values).Auth); err != nil {
+	// Preserve immediate feedback and the previous response for script-free
+	// invalid auth. Scripts can change auth variables, so those validate in Run.
+	if t.Request.PreScript == "" && plan.ValidateAuth() != nil {
 		a.authFailure(t, false)
 		return
 	}
-	t.job = &sendJob{req: req, vars: values}
+	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
+	a.resetScripts(t)
 }
 
 // Cancel stops t's request in flight.
@@ -254,8 +256,7 @@ func (a *App) Toast(title, description string, kind ui.ToastKind) {
 }
 
 func (a *App) run(ctx context.Context, job *sendJob) (sendResult, error) {
-	resp, err := a.Svc.Requests.Send(ctx, job.req, job.vars)
-	return sendResult{resp: resp, err: err}, nil
+	return sendResult{job: job, result: job.plan.Run(ctx, a.Svc.Requests)}, nil
 }
 
 // declareSends declares each sending tab's effect and applies results.
@@ -264,22 +265,29 @@ func (a *App) declareSends(c ui.C) {
 		if !t.Sending {
 			continue
 		}
-		ui.Effect(c, t.send, t.job)
+		ui.Effect(c.KeyInt(t.ID), t.send, t.job)
 		res, _, ok := t.send.Take()
-		if !ok {
+		if !ok || res.job != t.job {
 			continue
 		}
 		t.Sending = false
-		entry := model.HistoryEntry{At: time.Now(), Request: t.Request.Clone()}
-		entry.Request.Auth = t.job.req.Auth
-		if res.err != nil {
-			t.Err = res.err.Error()
+		r := res.result
+		a.applyScripts(t, r)
+		entry := model.HistoryEntry{At: time.Now(), Request: r.HistoryRequest}
+		if r.Err != nil {
+			t.Err = r.Err.Error()
+			if r.Stage == execution.StageValidation {
+				a.authFailure(t, false)
+			}
 			entry.Error = t.Err
-		} else {
-			resp := res.resp
-			t.Response = &resp
-			entry.StatusCode, entry.Duration = resp.StatusCode, resp.Duration
-			a.afterResponse(t, &resp)
+		} else if r.Pre.Err != nil {
+			t.Err = a.S.Scripts.PreScriptError
+		} else if r.Response != nil {
+			t.Response = r.Response
+			entry.StatusCode, entry.Duration = r.Response.StatusCode, r.Response.Duration
+		}
+		if !r.TransportStarted {
+			continue
 		}
 		if err := a.Svc.History.Add(entry); err != nil {
 			a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
@@ -433,7 +441,11 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 		})
 		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
 		ui.Column(c).FillWidth().Grow(1).Children(func() {
-			a.responsePane(c.KeyInt(t.ID), t)
+			if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
+				a.scriptFailurePane(c.KeyInt(t.ID), t)
+			} else {
+				a.responsePane(c.KeyInt(t.ID), t)
+			}
 		})
 	})
 }

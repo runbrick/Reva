@@ -17,6 +17,7 @@
 - 查询参数值全部隐藏，包括通常非敏感的值。用户直接填写的参数名称可见；变量生成的名称隐藏。由变量值注入的额外参数名称也隐藏，防止通过 `&secret=value` 泄露部分变量内容。
 - 请求头值全部隐藏，包括 Authorization、Proxy-Authorization、Cookie；Basic 用户名和密码、Bearer、API-key 配置值均不进入显示结果。URL 用户信息和片段全部隐藏。已知变量 / 认证值在可见路由和元数据中出现的字面或转义副本也隐藏；因此某些普通文字可能被保守遮盖。
 - 请求体只显示模式。文本、表单内容、文件路径及文件内容均不展示，不打开上传文件。不执行脚本、不发送请求、不保存集合、环境、设置或历史。
+- 上述只读保证描述的是预览自身。用户此前已经明确发起的独立工作可以继续完成，包括“发送并下载”已经开始的网络请求、历史记录及下载文件写入；打开预览不会暂停或取消这些工作，也不会额外发起发送或写入。
 - URL 解析失败只返回安全状态，不把包含 URL 或认证信息的解析错误拼入界面。
 - 这是**前置脚本之前**的说明性预览，不是精确线上报文。脚本结果、网络库自动生成的请求头、请求体编码、上传文件内容和重定向结果不计算。中英文界面明确说明这些限制。
 - WebSocket 编辑器不提供 HTTP 请求预览。切到其他请求或直接切到 WebSocket 时清除预览打开状态。
@@ -55,7 +56,14 @@ GUI / 本地化测试：
 - `TestPreviewMasksAllTabNamesAndRestoresTitlesOnClose`：其他标签的名称 / URL 同样隐藏，关闭后恢复；正常切换、关闭及脏状态保留。
 - `TestPreviewLayoutsChineseEnglishLightDarkAtMinimumWindow`：960×600 下中英、明暗四组合均可打开，模态关闭操作完整处于窗口内。验证使用现有 headless Driver 的文字和控件边界，不是原生窗口截图或像素级设计验收。
 - `TestPreviewIsScopedToHTTPAndClosesOnTabChange`：HTTP 与 WebSocket 之间的状态和操作边界。
+- `TestPreviewAllowsPreviouslyAuthorizedDownloadToComplete`：通过真实“发送并下载”菜单及 headless 保存文件对话框授权一次下载；分别在响应尚未返回和写入 Effect 已运行时打开预览，保持模态打开直到文件写入及结果消费完成。使用可控释放的发送 fake 与实际临时文件写入，验证 Effect 不被取消或重启、没有新增发送或写入、草稿和脏状态不变；无先前下载时打开预览仍不发起工作。
 - `TestPreviewTranslationsPresentInBothLanguages`：新增 Request 预览文案完整，明确前置脚本时间点及隐藏标记解释。
+
+### 下载声明顺序修正
+
+对初始提交 `e3836ac1477c691662b10093a718ff27f753c4fd` 的复审发现，预览提前返回位于原有 `requestDownloads(c)` 之前，会阻止待返回响应进入下载写入，并停止声明已经运行的写入 Effect。新回归在修正前的两个子用例均失败（分别超时等待写入开始、下载完成），修正后均通过。
+
+修正只将原有 `requestDownloads(c)` 调用移动到预览判断之前，仍使用原来的 `c`、同一个 EffectState 和同一个任务 key，保证 UI Effect 的作用域与身份不变。没有扩大文件所有权，未修改发送管线或模态实现。
 
 ## 四项必需检查
 
@@ -72,17 +80,17 @@ GUI / 本地化测试：
 (empty)
 
 > go test ./... -count=1
-ok   github.com/runbrick/reva/internal/gui              16.958s
-ok   github.com/runbrick/reva/internal/i18n              1.180s
-ok   github.com/runbrick/reva/internal/preview           3.574s
+ok   github.com/runbrick/reva/internal/gui              13.628s
+ok   github.com/runbrick/reva/internal/i18n              1.857s
+ok   github.com/runbrick/reva/internal/preview           3.154s
 ...
-ok   github.com/runbrick/reva/internal/service/request   3.403s
-ok   github.com/runbrick/reva/internal/service/store     2.859s
-ok   github.com/runbrick/reva/internal/storage           1.103s
-ok   github.com/runbrick/reva/internal/syncing           2.682s
-ok   github.com/runbrick/reva/internal/update            1.340s
-ok   github.com/runbrick/reva/internal/vars              1.132s
-ok   github.com/runbrick/reva/internal/websocket         3.300s
+ok   github.com/runbrick/reva/internal/service/request   4.242s
+ok   github.com/runbrick/reva/internal/service/store     3.860s
+ok   github.com/runbrick/reva/internal/storage           1.907s
+ok   github.com/runbrick/reva/internal/syncing           3.983s
+ok   github.com/runbrick/reva/internal/update            3.003s
+ok   github.com/runbrick/reva/internal/vars              1.217s
+ok   github.com/runbrick/reva/internal/websocket         2.740s
 ```
 
 `git diff --check` 无输出。完整套件还覆盖原有响应 HTML 预览，新的操作名使用 Request preview / 请求预览，避免与响应 Preview / 预览冲突。

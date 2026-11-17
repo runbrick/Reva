@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/runbrick/reva/internal/i18n"
@@ -13,6 +14,7 @@ import (
 	"github.com/runbrick/reva/internal/service"
 	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/ui"
 )
 
 type previewReadOnlyCollections struct{ service.CollectionService }
@@ -297,5 +299,125 @@ func TestPreviewIsScopedToHTTPAndClosesOnTabChange(t *testing.T) {
 	requestRepaint(h)
 	if h.App.requestTab(first).previewOpen || h.App.requestTabTitle(h.App.Active()) == h.App.S.Request.PreviewTitle {
 		t.Fatal("HTTP preview title masking persisted in the WebSocket editor")
+	}
+}
+
+func TestPreviewAllowsPreviouslyAuthorizedDownloadToComplete(t *testing.T) {
+	for _, phase := range []string{"response pending", "write pending"} {
+		t.Run(phase, func(t *testing.T) {
+			h := newHarness(t)
+			requestEnglish(h)
+			tab := h.App.Active()
+			tab.Request.URL = "https://example.test/download"
+			tab.Request.Body = model.Body{Mode: model.BodyRaw, Text: "unsaved draft"}
+			tab.Dirty = true
+			requestRepaint(h)
+			before, _ := json.Marshal(tab.Request)
+			state := h.App.requestTab(tab)
+			path := filepath.Join(t.TempDir(), "response.bin")
+			body := []byte{0, 1, 2, 255}
+			responseStarted, responseRelease := make(chan struct{}), make(chan struct{})
+			writeStarted, writeRelease := make(chan struct{}), make(chan struct{})
+			defer func() {
+				for _, gate := range []chan struct{}{responseRelease, writeRelease} {
+					select {
+					case <-gate:
+					default:
+						close(gate)
+					}
+				}
+			}()
+			var sends, writes, cancelledWrites atomic.Int32
+			h.Svc.Requests.(*fake.Requests).Fn = func(ctx context.Context, _ model.Request) (model.Response, error) {
+				if sends.Add(1) == 1 {
+					close(responseStarted)
+				}
+				select {
+				case <-responseRelease:
+					return model.Response{StatusCode: 200, Body: body}, nil
+				case <-ctx.Done():
+					return model.Response{}, ctx.Err()
+				}
+			}
+			// Hold the actual file write so the second case can open preview
+			// after this Effect has already been declared and begun running.
+			writeEffect := ui.NewEffectKeyed(func(ctx context.Context, job *requestDownload) (struct{}, error) {
+				if writes.Add(1) == 1 {
+					close(writeStarted)
+				}
+				select {
+				case <-writeRelease:
+					return struct{}{}, os.WriteFile(job.path, job.body, 0600)
+				case <-ctx.Done():
+					cancelledWrites.Add(1)
+					return struct{}{}, ctx.Err()
+				}
+			})
+			state.write = writeEffect
+			// Opening preview without previously authorized work initiates
+			// neither a send nor a write, even with a download Effect installed.
+			h.click(h.App.S.Request.Preview)
+			requestRepaint(h)
+			if sends.Load() != 0 || writes.Load() != 0 {
+				t.Fatal("preview initiated a send or write")
+			}
+			h.click(h.App.S.Request.PreviewClose)
+			if err := h.D.QueueSaveFile(path, nil); err != nil {
+				t.Fatal(err)
+			}
+			h.click(h.App.S.Request.SendMenu)
+			h.click(h.App.S.Request.SendDownload)
+			h.waitFor("authorized send to start", func() bool {
+				select {
+				case <-responseStarted:
+					return true
+				default:
+					return false
+				}
+			})
+			if phase == "write pending" {
+				close(responseRelease)
+				h.waitFor("authorized write to start", func() bool { return writes.Load() == 1 })
+			}
+			h.click(h.App.S.Request.Preview)
+			requestRepaint(h)
+			if phase == "response pending" {
+				close(responseRelease)
+			}
+			h.waitFor("authorized write while preview is open", func() bool {
+				select {
+				case <-writeStarted:
+					return true
+				default:
+					return false
+				}
+			})
+			// Release the write only after preview has had another paint with
+			// the same Effect declaration, to catch disappearance cancellation.
+			requestRepaint(h)
+			close(writeRelease)
+			h.waitFor("download to complete while preview stays open", func() bool {
+				data, err := os.ReadFile(path)
+				return err == nil && string(data) == string(body) && state.writeJob == nil
+			})
+			requestRepaint(h)
+			if !state.previewOpen || !h.shows(h.App.S.Request.PreviewTitle) {
+				t.Fatal("download completion closed the preview")
+			}
+			if sends.Load() != 1 || writes.Load() != 1 || cancelledWrites.Load() != 0 || state.write != writeEffect {
+				t.Fatalf("preview restarted or cancelled authorized work: sends %d, writes %d, cancelled %d", sends.Load(), writes.Load(), cancelledWrites.Load())
+			}
+			after, _ := json.Marshal(tab.Request)
+			if string(before) != string(after) || !tab.Dirty {
+				t.Fatal("preview or download completion changed the draft")
+			}
+			entries, err := os.ReadDir(filepath.Dir(path))
+			if err != nil || len(entries) != 1 || entries[0].Name() != filepath.Base(path) {
+				t.Fatal("preview created an additional download")
+			}
+			if len(h.Svc.History.List()) != 1 {
+				t.Fatal("preview initiated another send/history entry")
+			}
+		})
 	}
 }

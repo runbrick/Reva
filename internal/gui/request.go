@@ -106,11 +106,13 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 
 func (a *App) requestPane(c ui.C, t *Tab) {
 	s := a.requestTab(t)
+	// Keep previously authorized downloads declared in their existing scope,
+	// including a write already running when the user opens preview.
+	a.requestDownloads(c)
 	if a.requestPreviewOpen() {
 		a.requestPreview(c, t, s)
 		return
 	}
-	a.requestDownloads(c)
 	if s.url != t.Request.URL {
 		requestParamsFromURL(&t.Request)
 		s.url = t.Request.URL

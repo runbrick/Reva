@@ -65,6 +65,14 @@ GUI / 本地化测试：
 
 修正只将原有 `requestDownloads(c)` 调用移动到预览判断之前，仍使用原来的 `c`、同一个 EffectState 和同一个任务 key，保证 UI Effect 的作用域与身份不变。没有扩大文件所有权，未修改发送管线或模态实现。
 
+### 初次打开保留 URL / Params 原始语义
+
+初次打开请求不再解析 URL 来填充 Params，也不把已有 Params 写回 URL。两种原始表示都完整保留，包括 URL 独有参数、重复值、禁用行、空名称、占位符和 Description；不展开秘密，不标记脏状态，不修改保存的集合。表格展示保存的 Params，URL 独有的查询仍显示在 URL 中；用户明确编辑 URL 后由 URL 更新表格，明确编辑或删除表格行后由表格重建 URL，原有编辑权威规则不变。
+
+单次原始文本合并无法保持任意变量展开后的相等性：`URL ?x={{v}}` 加 `Params x=a` 在 `v=a` 时应只发送一项，原始合并会变成两项；无查询 URL 若提前拼入参数 `{{key}}=a` 且 key 为 `x&y`，会把本应编码的名称误解释为 URL 分隔符。反向解析 URL 也不安全：URL 中变量值 `a&y=b` 与 Params 中相同变量有不同编码边界，百分号编码的 `{{v}}` 在原 URL 中甚至不应展开。因此采用保留原始表示，而非在加载时猜测变量值或尝试归一化。
+
+协调者明确批准新增 `internal/gui/request_load_test.go`，并仅为纠正原有初始物化假设而扩展 `internal/gui/request_test.go` 所有权。新增 `TestRequestLoadPreservesAuthoredURLParamsAndStoredMetadata`、`TestRequestLoadPreservesExpandedHTTPQuerySemantics` 和 `TestRequestLoadKeepsLaterTableEditsAndDeletionsAuthoritative`；真实本地 HTTP 服务验证 URL 独有项、重复项、展开后相等、参数键 / 值中的分隔符、URL 自身变量分隔符和已转义占位符。修正前这些边界均复现原始 URL 改写或实际 HTTP 参数漂移，修正后通过。
+
 ## 四项必需检查
 
 在本子工作树最终 Go 变更上执行，全部退出 0：

@@ -141,6 +141,7 @@ func TestPreviewRefreshesEnvironmentDraftAndAuthContext(t *testing.T) {
 	previewFailOnSend(t, svc)
 	r := model.NewRequest("request")
 	r.URL = "https://example.test/{{host}}?one=first"
+	r.Params = []model.KV{{Key: "one", Value: "first"}}
 	r.Auth.Type = model.AuthInherit
 	col := model.Collection{ID: "collection", Variables: []model.KV{{Key: "host", Value: "collection-host"}}, Auth: model.Auth{Type: model.AuthBearer, Token: "parent-token"}, Items: []model.Item{{ID: r.ID, Type: model.ItemRequest, Request: &r}}}
 	if err := svc.Collections.Save(col); err != nil {

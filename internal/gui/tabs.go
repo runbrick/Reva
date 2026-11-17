@@ -237,6 +237,11 @@ func (a *App) tabBar(c ui.C) {
 }
 
 func (a *App) requestTabTitle(t *Tab) string {
+	// Tabs sit behind the preview modal. Their accessible names and overflow
+	// menu labels must not retain raw URLs or request names containing secrets.
+	if a.requestPreviewOpen() {
+		return a.S.Request.PreviewTitle
+	}
 	if t.Request.Name != "" {
 		return t.Request.Name
 	}

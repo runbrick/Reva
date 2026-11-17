@@ -40,7 +40,8 @@ go build -o bin/reva-run ./cmd/reva-run
 
 For automation, use the built `bin/reva-run` (`bin/reva-run.exe` on Windows):
 `go run` wraps nonzero program exits and may add its own `exit status` diagnostic.
-Use `-h` or `--help` for usage; help succeeds without reading data.
+Use `-h` or `--help` for usage in Chinese followed by English; help succeeds
+without reading data or selecting a language from saved settings.
 
 `--collection ID` is required and selects `collections/<ID>.json`; IDs are the
 native stored IDs, not display names or input file paths. `--data-dir` overrides

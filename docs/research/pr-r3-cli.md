@@ -20,7 +20,11 @@ bin/reva-run --collection 0123456789abcdef --environment fedcba9876543210 --stop
 An explicitly empty data-dir or environment flag is an argument error. Selected
 IDs are filename components, checked for traversal, platform path/stream syntax,
 control characters, and Windows reserved device names. IDs and paths never appear
-in emitted diagnostics or reports. Help (`-h` / `--help`) succeeds without data.
+in emitted diagnostics or reports. Help (`-h` / `--help`) prints Chinese followed
+by English and succeeds without data. Human-facing help lives in the typed
+`internal/i18n/runner.go` Runner section, with `RunnerFor` access independent of
+GUI settings and no change to the root i18n string table. Fixed JSON and
+diagnostic codes remain stable machine tokens.
 
 Only the selected collection, optional explicit environment, and settings file
 are read. The GUI's `ActiveEnvID` is deliberately ignored. Unselected malformed
@@ -134,6 +138,7 @@ Added tests:
 - `TestCLIFailureContinuationStopAndHTTPStatus`
 - `TestCLISafeReportsForScriptAndTransportFailures`
 - `TestCLIUsageAndHelpNeverLoadOrCreateData`
+- `TestCLIHelpIsBilingualAndIgnoresNativeData`
 - `TestCLIInvalidNativeInputNeverSendsOrMutates`
 - `TestCLICancellationProducesPartialSafeReport`
 - `TestCLIEmptyCollectionAndReportWriterFailure`
@@ -141,6 +146,7 @@ Added tests:
 - `TestCLIStrictJSONRejectsAmbiguousMalformedAndFutureData`
 - `TestCLIBoundedNativeInput`
 - `TestCLIStrictNestedSchemaAndNonregularFiles`
+- `TestRunnerHelpExplainsBehaviorInBothLanguages`
 
 The binary test invokes `go list -deps .` and rejects **all** dependencies under
 `github.com/vivaui/viva` or `github.com/runbrick/reva/internal/gui`, including
@@ -149,13 +155,17 @@ help/usage/failure exits and safe output. Context cancellation is tested during
 real HTTP after one completed request, and again before the first request;
 this Windows run does not inject an OS Ctrl+C event into the subprocess.
 
-Branch: `runbrick/research-runner-cli`. Commit hash is supplied in the worker
-completion report. Files changed only within R3 ownership:
+Branch: `runbrick/research-runner-cli`. Initial implementation commit:
+`ade01fbdf3e901f4f9ac4bade1f8137ad200376f`; the bilingual-help followup commit
+is supplied in the worker completion report. Files changed only within R3
+ownership, including the explicitly approved Runner i18n section:
 
 - `cmd/reva-run/main.go`
 - `cmd/reva-run/load.go`
 - `cmd/reva-run/main_test.go`
 - `cmd/reva-run/load_test.go`
+- `internal/i18n/runner.go`
+- `internal/i18n/runner_test.go`
 - `README.md` (CLI section only)
 - `docs/research/pr-r3-cli.md`
 
@@ -163,7 +173,8 @@ No requested cross-owner API changes, new dependencies, icons, persistent schema
 changes or unresolved blockers. Parent integration remains the coordinator's
 task; no push, remote PR, main merge or parent merge was performed.
 
-Actual required check output from this Windows worktree (all exit codes 0):
+Actual required check output after the bilingual-help followup from this Windows
+worktree (all exit codes 0):
 
 ```text
 $ gofmt -l .
@@ -174,27 +185,27 @@ $ go tool viva vet ./...
 [empty output]
 $ go test ./... -count=1
 ?    github.com/runbrick/reva/cmd/reva [no test files]
-ok   github.com/runbrick/reva/cmd/reva-run 7.159s
-ok   github.com/runbrick/reva/internal/auth 1.314s
+ok   github.com/runbrick/reva/cmd/reva-run 8.905s
+ok   github.com/runbrick/reva/internal/auth 0.844s
 ?    github.com/runbrick/reva/internal/cloudsync [no test files]
-ok   github.com/runbrick/reva/internal/execution 4.614s
-ok   github.com/runbrick/reva/internal/format 0.902s
-ok   github.com/runbrick/reva/internal/gist 2.169s
-ok   github.com/runbrick/reva/internal/gui 12.136s
+ok   github.com/runbrick/reva/internal/execution 4.634s
+ok   github.com/runbrick/reva/internal/format 0.684s
+ok   github.com/runbrick/reva/internal/gist 2.906s
+ok   github.com/runbrick/reva/internal/gui 12.806s
 ?    github.com/runbrick/reva/internal/gui/icons [no test files]
-ok   github.com/runbrick/reva/internal/i18n 1.522s
-ok   github.com/runbrick/reva/internal/importer 6.664s
-ok   github.com/runbrick/reva/internal/model 1.737s
-ok   github.com/runbrick/reva/internal/runner 2.952s
-ok   github.com/runbrick/reva/internal/s3 2.668s
-ok   github.com/runbrick/reva/internal/script 2.625s
+ok   github.com/runbrick/reva/internal/i18n 1.224s
+ok   github.com/runbrick/reva/internal/importer 6.826s
+ok   github.com/runbrick/reva/internal/model 1.232s
+ok   github.com/runbrick/reva/internal/runner 2.634s
+ok   github.com/runbrick/reva/internal/s3 3.213s
+ok   github.com/runbrick/reva/internal/script 2.497s
 ?    github.com/runbrick/reva/internal/service [no test files]
 ?    github.com/runbrick/reva/internal/service/fake [no test files]
-ok   github.com/runbrick/reva/internal/service/request 4.400s
-ok   github.com/runbrick/reva/internal/service/store 4.223s
-ok   github.com/runbrick/reva/internal/storage 1.914s
-ok   github.com/runbrick/reva/internal/syncing 4.975s
-ok   github.com/runbrick/reva/internal/update 3.387s
-ok   github.com/runbrick/reva/internal/vars 1.164s
-ok   github.com/runbrick/reva/internal/websocket 2.729s
+ok   github.com/runbrick/reva/internal/service/request 4.621s
+ok   github.com/runbrick/reva/internal/service/store 3.559s
+ok   github.com/runbrick/reva/internal/storage 1.198s
+ok   github.com/runbrick/reva/internal/syncing 4.937s
+ok   github.com/runbrick/reva/internal/update 3.533s
+ok   github.com/runbrick/reva/internal/vars 1.148s
+ok   github.com/runbrick/reva/internal/websocket 3.277s
 ```

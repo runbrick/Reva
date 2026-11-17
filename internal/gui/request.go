@@ -42,6 +42,7 @@ type requestState struct {
 }
 
 type requestTabState struct {
+	previewOpen                    bool
 	auth                           authEditorState
 	section                        requestSection
 	params, headers, encoded, form kvTableState
@@ -105,6 +106,10 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 
 func (a *App) requestPane(c ui.C, t *Tab) {
 	s := a.requestTab(t)
+	if a.requestPreviewOpen() {
+		a.requestPreview(c, t, s)
+		return
+	}
 	a.requestDownloads(c)
 	if s.url != t.Request.URL {
 		requestParamsFromURL(&t.Request)
@@ -455,6 +460,9 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				a.Send(t)
 			}
 		})
+		if ui.Button(c, labels.Preview).Icon(icons.Eye).Outline().Height(height).Clicked() {
+			c.After(func() { s.previewOpen = true })
+		}
 		ui.Row(c).Height(height).Items(ui.Center).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).Children(func() {
 			if t.Sending {
 				if ui.Button(c, labels.Cancel).Icon(icons.X).Height(height).Clicked() {

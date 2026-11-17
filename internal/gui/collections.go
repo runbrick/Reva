@@ -33,15 +33,7 @@ type collectionsState struct {
 	rowMenuID                       string
 	selected                        collectionNode
 	activeCollection, activeRequest string
-	variablesOpen                   bool
-	variablesCollection             string
-	variables                       []model.KV
-	variablesTable                  kvTableState
-	authOpen                        bool
-	authTarget                      collectionNode
-	authDraft                       model.Auth
-	authEditor                      authEditorState
-	authError                       string
+	settings                        map[int]*collectionSettingsDraft
 
 	dialogOpen bool
 	dialog     collectionDialog
@@ -446,8 +438,15 @@ func (a *App) moveCollectionItem(from, to collectionNode) {
 func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 	s := a.S.Collections
 	if n.branch {
+		settingsLabel := s.Settings
+		if n.id != "" {
+			settingsLabel = s.FolderSettings
+		}
+		if menu.Item(settingsLabel).Icon(icons.Settings).Clicked() {
+			c.After(func() { a.openCollectionSettings(n, collectionSettingsGeneral) })
+		}
 		if menu.Item(s.Authentication).Clicked() {
-			c.After(func() { a.collectionAuthDialog(n) })
+			c.After(func() { a.openCollectionAuth(n) })
 		}
 		if menu.Item(s.NewFolder).Clicked() {
 			c.After(func() { a.collectionNameDialog(collectionFolder, n) })
@@ -463,14 +462,7 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		}
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {
-				c.After(func() {
-					if col, ok := a.Svc.Collections.Get(n.collectionID); ok {
-						state := &a.collections
-						state.variablesCollection, state.variablesOpen = col.ID, true
-						state.variables = append([]model.KV(nil), col.Variables...)
-						state.variablesTable = kvTableState{}
-					}
-				})
+				c.After(func() { a.openCollectionSettings(n, collectionSettingsVariables) })
 			}
 			if menu.Item(s.Export).Clicked() {
 				c.After(func() { a.exportCollection(n.collectionID) })
@@ -564,6 +556,10 @@ func (a *App) RequestSave(t *Tab) {
 	if t == nil {
 		return
 	}
+	if t.Kind == collectionSettingsTabKind {
+		a.saveCollectionSettings(t)
+		return
+	}
 	if col, ok := a.Svc.Collections.Get(t.CollectionID); t.CollectionID != "" && ok {
 		found := false
 		model.WalkRequests(col.Items, func(r *model.Request) {
@@ -604,32 +600,6 @@ func (a *App) RequestSave(t *Tab) {
 // collectionsDialogs declares the save / new / rename dialogs.
 func (a *App) collectionsDialogs(c ui.C) {
 	s := &a.collections
-	if s.authOpen {
-		a.collectionAuthModal(c)
-	}
-	if s.variablesOpen {
-		ui.Modal(c, &s.variablesOpen, a.S.Collections.Variables, func() {
-			a.kvTable(c, &s.variablesTable, &s.variables)
-		}, func() {
-			if ui.Button(c, a.S.Collections.Cancel).Outline().Clicked() {
-				s.variablesOpen = false
-			}
-			if ui.Button(c, a.S.Collections.Save).Clicked() {
-				c.After(func() {
-					col, ok := a.Svc.Collections.Get(s.variablesCollection)
-					if !ok {
-						s.variablesOpen = false
-						return
-					}
-					col.Variables = append([]model.KV(nil), s.variables...)
-					if !a.collectionError(a.Svc.Collections.Save(col)) {
-						s.variablesOpen = false
-						a.Toast(a.S.Collections.VariablesSaved, "", ui.ToastSuccess)
-					}
-				})
-			}
-		})
-	}
 	if s.dialogOpen {
 		a.collectionEditDialog(c)
 	}
@@ -662,81 +632,8 @@ func (a *App) collectionsDialogs(c ui.C) {
 	})
 }
 
-func (a *App) collectionAuthDialog(n collectionNode) {
-	col, ok := a.Svc.Collections.Get(n.collectionID)
-	if !ok {
-		a.Toast(a.S.Collections.Authentication, a.S.Collections.AuthTargetMissing, ui.ToastError)
-		return
-	}
-	draft := col.Auth
-	if n.id != "" {
-		item := model.FindItem(col.Items, n.id)
-		if item == nil || item.Type != model.ItemFolder {
-			a.Toast(a.S.Collections.Authentication, a.S.Collections.AuthTargetMissing, ui.ToastError)
-			return
-		}
-		draft = item.Auth
-		if draft.Type == "" {
-			draft.Type = model.AuthInherit
-		}
-	} else if draft.Type == "" || draft.Type == model.AuthInherit {
-		draft.Type = model.AuthNone
-	}
-	s := &a.collections
-	s.authTarget, s.authDraft, s.authEditor, s.authError, s.authOpen = n, draft, authEditorState{}, "", true
-}
-
-func (a *App) collectionAuthModal(c ui.C) {
-	s, labels := &a.collections, &a.S.Collections
-	ui.ModalWith(c, &s.authOpen, labels.Authentication, ui.ModalSpec{Width: Space6 * 24}, func() {
-		ui.Column(c).FillWidth().Gap(Space3).Children(func() {
-			ui.Text(c, s.authTarget.name).Bold()
-			folder := s.authTarget.id != ""
-			a.authEditor(c, &s.authDraft, &s.authEditor, folder, folder)
-			if folder && s.authDraft.Type == model.AuthInherit {
-				col, _ := a.Svc.Collections.Get(s.authTarget.collectionID)
-				a.authPreview(c, &s.authEditor, col, s.authTarget.id)
-			}
-			if s.authError != "" {
-				ui.Wrap(c, s.authError).Color(c.Theme().Danger)
-			}
-		})
-	}, func() {
-		if ui.Button(c, labels.Cancel).Outline().Clicked() {
-			s.authOpen = false
-		}
-		if ui.Button(c, labels.Save).Clicked() {
-			c.After(a.saveCollectionAuth)
-		}
-	})
-}
-
-// Fetch at Save, then clone the tree: concurrent edits to other fields/items
-// survive, and services returning shared slices never observe an unsaved draft.
-func (a *App) saveCollectionAuth() {
-	s := &a.collections
-	col, ok := a.Svc.Collections.Get(s.authTarget.collectionID)
-	if !ok {
-		s.authError = a.S.Collections.AuthTargetMissing
-		return
-	}
-	col.Items = cloneCollectionItems(col.Items)
-	if s.authTarget.id == "" {
-		col.Auth = s.authDraft
-	} else {
-		item := model.FindItem(col.Items, s.authTarget.id)
-		if item == nil || item.Type != model.ItemFolder {
-			s.authError = a.S.Collections.AuthTargetMissing
-			return
-		}
-		item.Auth = s.authDraft
-	}
-	if err := a.Svc.Collections.Save(col); err != nil {
-		s.authError = a.S.Collections.AuthSaveFailed
-		return
-	}
-	s.authOpen, s.authError = false, ""
-	a.Toast(a.S.Collections.AuthSaved, "", ui.ToastSuccess)
+func (a *App) openCollectionAuth(n collectionNode) {
+	a.openCollectionSettings(n, collectionSettingsAuthentication)
 }
 
 func (a *App) collectionFolders() {

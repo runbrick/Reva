@@ -23,6 +23,9 @@ type tabsState struct {
 }
 
 type closedRequestTab struct {
+	kind         tabKind
+	targetID     string
+	section      collectionSettingsSection
 	request      model.Request
 	collectionID string
 	dirty        bool
@@ -114,7 +117,11 @@ func (a *App) tabBar(c ui.C) {
 							if i == a.active {
 								ui.Row(tc).Absolute().Top(0).Left(0).Right(0).Height(2).Background(theme.Primary)
 							}
-							a.MethodBadge(tc, t.Request.Method)
+							if t.Kind == collectionSettingsTabKind {
+								ui.Icon(tc, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
+							} else {
+								a.MethodBadge(tc, t.Request.Method)
+							}
 							ui.Text(tc, title).Grow(1).Ellipsis().Color(foreground)
 							ui.Stack(tc).Size(Space6, Space6).Children(func() {
 								close := ui.ButtonBase(tc, a.S.Tabs.Close).Tooltip(a.S.Tabs.Close).Size(Space6, Space6).
@@ -170,13 +177,17 @@ func (a *App) tabBar(c ui.C) {
 							menu.Separator()
 							if menu.Item(a.S.Tabs.Duplicate).Clicked() {
 								c.After(func() {
+									if t.Kind == collectionSettingsTabKind {
+										a.openCollectionSettings(collectionNode{collectionID: t.CollectionID, id: t.TargetID}, a.collections.settings[t.ID].section)
+										return
+									}
 									copy := a.NewTab()
 									copy.Request = t.Request.Clone()
 									copy.Request.ID = storage.NewID()
 									copy.CollectionID, copy.Dirty = t.CollectionID, true
 								})
 							}
-							if menu.Item(a.S.Tabs.CopyURL).Disabled(t.Request.URL == "").Clicked() {
+							if menu.Item(a.S.Tabs.CopyURL).Disabled(t.Kind != requestTabKind || t.Request.URL == "").Clicked() {
 								c.After(func() {
 									if err := app.SetClipboardText(t.Request.URL); err != nil {
 										a.Toast(a.S.Tabs.CopyError, err.Error(), ui.ToastError)
@@ -237,6 +248,9 @@ func (a *App) tabBar(c ui.C) {
 }
 
 func (a *App) requestTabTitle(t *Tab) string {
+	if t.Kind == collectionSettingsTabKind {
+		return a.collectionSettingsTitle(t)
+	}
 	// Tabs sit behind the preview modal. Their accessible names and overflow
 	// menu labels must not retain raw URLs or request names containing secrets.
 	if a.requestPreviewOpen() {
@@ -284,9 +298,12 @@ func (a *App) continueClosingTabs() {
 	s := &a.tabBarState
 	for len(s.pending) > 0 {
 		id := s.pending[0]
-		if i := a.requestTabIndex(id); i >= 0 && a.Tabs()[i].Dirty {
-			s.confirm = true
-			return
+		if i := a.requestTabIndex(id); i >= 0 {
+			a.syncCollectionSettingsDirty(a.Tabs()[i])
+			if a.Tabs()[i].Dirty {
+				s.confirm = true
+				return
+			}
 		}
 		a.discardRequestTab(id)
 		s.pending = s.pending[1:]
@@ -301,7 +318,11 @@ func (a *App) discardRequestTab(id int) {
 		if len(s.closed) == 10 {
 			s.closed = append(s.closed[:0], s.closed[1:]...)
 		}
-		s.closed = append(s.closed, closedRequestTab{request: tab.Request.Clone(), collectionID: tab.CollectionID, dirty: tab.Dirty})
+		closed := closedRequestTab{kind: tab.Kind, targetID: tab.TargetID, request: tab.Request.Clone(), collectionID: tab.CollectionID, dirty: tab.Dirty}
+		if tab.Kind == collectionSettingsTabKind {
+			closed.section = a.collections.settings[tab.ID].section
+		}
+		s.closed = append(s.closed, closed)
 		a.Cancel(a.Tabs()[i])
 		a.CloseTab(i)
 	}
@@ -315,6 +336,10 @@ func (a *App) reopenRequestTab() {
 	last := s.closed[len(s.closed)-1]
 	s.closed[len(s.closed)-1] = closedRequestTab{}
 	s.closed = s.closed[:len(s.closed)-1]
+	if last.kind == collectionSettingsTabKind {
+		a.openCollectionSettings(collectionNode{collectionID: last.collectionID, id: last.targetID}, last.section)
+		return
+	}
 	tab := a.NewTab()
 	tab.Request, tab.CollectionID, tab.Dirty = last.request, last.collectionID, last.dirty
 	a.Main = PageWorkbench
@@ -342,14 +367,14 @@ func (a *App) OpenRequest(req model.Request, collectionID string) {
 	a.Main = PageWorkbench
 	if req.ID != "" {
 		for i, t := range a.Tabs() {
-			if t.Request.ID == req.ID {
+			if t.Kind == requestTabKind && t.Request.ID == req.ID {
 				a.active = i
 				return
 			}
 		}
 	}
 	t := a.Active()
-	if t.Request.URL != "" || t.Dirty || t.Response != nil || t.Sending {
+	if t.Kind != requestTabKind || t.Request.URL != "" || t.Dirty || t.Response != nil || t.Sending {
 		t = a.NewTab()
 	}
 	t.Request = req.Clone()

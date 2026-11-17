@@ -125,30 +125,32 @@ func TestAuthLegacyViewAndLiveSourcePreview(t *testing.T) {
 	}
 }
 
-func TestAuthDialogCancelEscapeOutsideAndLatestTreeSave(t *testing.T) {
+func TestAuthSettingsDiscardEscapeOutsideAndLatestTreeSave(t *testing.T) {
 	h, col, folder, tab := authFixture(t)
-	for _, closeBy := range []string{"cancel", "escape", "outside"} {
+	for _, closeBy := range []string{"discard", "escape", "outside"} {
 		collectionsContext(h, col.Name, h.App.S.Collections.Authentication)
 		collectionsOption(h, h.App.S.Request.Basic)
-		requestType(h, h.App.S.Request.Password, "unsaved-password", false)
+		requestType(h, h.App.S.Request.Password, "unsaved-password", true)
 		authAssertMasked(h, h.App.S.Request.Password, "unsaved-password")
 		switch closeBy {
-		case "cancel":
-			h.click(h.App.S.Collections.Cancel)
+		case "discard":
+			h.click(h.App.S.Collections.DiscardReload)
 		case "escape":
 			authMust(t, h.D.Key(gfx.KeyEscape, 0))
 		case "outside":
-			// The rail control is outside the modal; its center tests backdrop dismissal.
 			h.click(h.App.S.Shell.APIs)
 		}
 		h.pump()
 		stored, _ := h.Svc.Collections.Get(col.ID)
-		if h.App.collections.authOpen || stored.Auth != col.Auth || tab.Dirty {
-			t.Fatalf("%s persisted draft or left modal open", closeBy)
+		if h.App.Active().Kind != collectionSettingsTabKind || stored.Auth != col.Auth || tab.Dirty {
+			t.Fatalf("%s persisted draft or lost settings tab", closeBy)
 		}
+		h.App.reloadCollectionSettings(h.App.Active())
+		requestRepaint(h)
 	}
+
 	collectionsContext(h, folder.Name, h.App.S.Collections.Authentication)
-	if h.App.collections.authDraft.Type != model.AuthInherit {
+	if h.App.collections.settings[h.App.Active().ID].auth.Type != "" && h.App.collections.settings[h.App.Active().ID].auth.Type != model.AuthInherit {
 		t.Fatal("empty folder should edit as Inherit")
 	}
 	collectionsOption(h, h.App.S.Request.APIKey)
@@ -167,7 +169,7 @@ func TestAuthDialogCancelEscapeOutsideAndLatestTreeSave(t *testing.T) {
 	want := latest
 	want.Items = cloneCollectionItems(latest.Items)
 	model.FindItem(want.Items, folder.ID).Auth = model.Auth{Type: model.AuthAPIKey, Key: "X-New", Value: "saved-key", In: model.APIKeyInHeader}
-	if h.App.collections.authOpen || !reflect.DeepEqual(stored, want) || tab.Dirty {
+	if h.App.Active().Dirty || !reflect.DeepEqual(stored, want) || tab.Dirty {
 		t.Fatal("auth save lost latest independent edits or changed request draft")
 	}
 	collectionsContext(h, stored.Name, h.App.S.Collections.Authentication)
@@ -194,7 +196,7 @@ func (s *authFailingCollections) Save(col model.Collection) error {
 	return s.CollectionService.Save(col)
 }
 
-func TestAuthDialogFailureRetryAndChangedTarget(t *testing.T) {
+func TestAuthSettingsFailureRetryAndChangedTarget(t *testing.T) {
 	h, col, folder, _ := authFixture(t)
 	failing := &authFailingCollections{CollectionService: h.Svc.Collections, fail: true}
 	h.App.Svc.Collections, h.Svc.Collections = failing, failing
@@ -204,22 +206,22 @@ func TestAuthDialogFailureRetryAndChangedTarget(t *testing.T) {
 	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	stored, _ := failing.Get(col.ID)
-	if !h.App.collections.authOpen || h.App.collections.authDraft.Token != "draft-secret" || model.FindItem(stored.Items, folder.ID).Auth != (model.Auth{}) || !h.shows(h.App.S.Collections.AuthSaveFailed) || h.shows("credential-private-backend-error") {
+	if h.App.Active().Kind != collectionSettingsTabKind || h.App.collections.settings[h.App.Active().ID].auth.Token != "draft-secret" || model.FindItem(stored.Items, folder.ID).Auth != (model.Auth{}) || !h.shows(h.App.S.Collections.SettingsSaveFailed) || h.shows("credential-private-backend-error") {
 		t.Fatal("failed save leaked error, mutated shared slices, or discarded draft")
 	}
 	failing.fail = false
 	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	stored, _ = failing.Get(col.ID)
-	if h.App.collections.authOpen || model.FindItem(stored.Items, folder.ID).Auth.Token != "draft-secret" || failing.writes != 2 {
+	if h.App.Active().Dirty || model.FindItem(stored.Items, folder.ID).Auth.Token != "draft-secret" || failing.writes != 2 {
 		t.Fatal("retry did not persist retained draft")
 	}
 	for _, changed := range []string{"type", "deleted", "collection-deleted"} {
 		t.Run(changed, func(t *testing.T) {
 			// Recreate the original tree for each stale-target case.
 			authMust(t, failing.CollectionService.Save(col))
-			h.App.collectionAuthDialog(collectionNode{collectionID: col.ID, id: folder.ID, name: folder.Name})
-			h.App.collections.authDraft = model.Auth{Type: model.AuthBasic, Username: "draft-user"}
+			h.App.openCollectionAuth(collectionNode{collectionID: col.ID, id: folder.ID, name: folder.Name})
+			h.App.collections.settings[h.App.Active().ID].auth = model.Auth{Type: model.AuthBasic, Username: "draft-user"}
 			latest, _ := failing.Get(col.ID)
 			latest.Items = cloneCollectionItems(latest.Items)
 			switch changed {
@@ -232,11 +234,11 @@ func TestAuthDialogFailureRetryAndChangedTarget(t *testing.T) {
 				authMust(t, failing.Delete(col.ID))
 			}
 			writes := failing.writes
-			h.App.saveCollectionAuth()
-			if !h.App.collections.authOpen || h.App.collections.authDraft.Username != "draft-user" || h.App.collections.authError != h.App.S.Collections.AuthTargetMissing || failing.writes != writes {
+			h.App.saveCollectionSettings(h.App.Active())
+			if h.App.Active().Kind != collectionSettingsTabKind || h.App.collections.settings[h.App.Active().ID].auth.Username != "draft-user" || !h.App.collections.settings[h.App.Active().ID].missing || failing.writes != writes {
 				t.Fatal("stale target wrote data or lost draft")
 			}
-			h.App.collections.authOpen = false
+			h.App.CloseTab(h.App.active)
 		})
 	}
 }
@@ -492,7 +494,7 @@ func TestAuthFailureLeavesClipboardNetworkAndPriorDownloadUntouched(t *testing.T
 	}
 }
 
-func TestAuthDialogAndEditorLanguagesThemesLayout(t *testing.T) {
+func TestAuthSettingsAndEditorLanguagesThemesLayout(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		for _, theme := range []string{"light", "dark"} {
 			t.Run(lang+"/"+theme, func(t *testing.T) {
@@ -504,7 +506,7 @@ func TestAuthDialogAndEditorLanguagesThemesLayout(t *testing.T) {
 				if !h.shows(fmt.Sprintf(h.App.S.Request.AuthFromCollection, h.App.S.Request.Bearer, col.Name)) || h.App.Dark() != (theme == "dark") {
 					t.Fatal("localized preview/theme missing")
 				}
-				// Check auth labels in the real page and modal, excluding unrelated shell labels.
+				// Check auth labels in the real request and configuration pages, excluding unrelated shell labels.
 				check := func() {
 					preview := fmt.Sprintf(h.App.S.Request.AuthFromCollection, h.App.S.Request.Bearer, col.Name)
 					labels := &h.App.S.Request
@@ -524,20 +526,20 @@ func TestAuthDialogAndEditorLanguagesThemesLayout(t *testing.T) {
 				}
 				tab.Request.Auth = model.Auth{Type: model.AuthInherit}
 				for _, target := range []collectionNode{{collectionID: col.ID, name: col.Name}, {collectionID: col.ID, id: folder.ID, name: folder.Name}} {
-					h.App.collectionAuthDialog(target)
+					h.App.openCollectionAuth(target)
 					kinds := model.AuthTypes
 					if target.id != "" {
 						kinds = inheritedAuthTypes
 					}
 					for _, kind := range kinds {
-						h.App.collections.authDraft = authBenchmarkConfig(kind)
+						h.App.collections.settings[h.App.Active().ID].auth = authBenchmarkConfig(kind)
 						requestRepaint(h)
-						if !h.shows(h.App.S.Collections.Authentication) || !h.App.collections.authOpen || tab.Dirty {
-							t.Fatal("localized auth modal missing/changed draft")
+						if !h.shows(h.App.S.Collections.Authentication) || h.App.Active().Kind != collectionSettingsTabKind || tab.Dirty {
+							t.Fatal("localized auth settings missing/changed request draft")
 						}
 						check()
 					}
-					h.App.collections.authOpen = false
+					h.App.CloseTab(h.App.active)
 				}
 			})
 		}

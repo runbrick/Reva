@@ -33,9 +33,18 @@ import (
 	"github.com/vivaui/viva/ui"
 )
 
-// Tab is one open request and its latest result.
+type tabKind uint8
+
+const (
+	requestTabKind tabKind = iota
+	collectionSettingsTabKind
+)
+
+// Tab is a request with its latest result, or a collection/folder configuration.
 type Tab struct {
 	ID       int
+	Kind     tabKind
+	TargetID string // folder ID for configuration; empty means collection root
 	Request  model.Request
 	Response *model.Response
 	// Err is the transport error of the last send, if any.
@@ -211,6 +220,7 @@ func (a *App) CloseTab(i int) {
 	if i < 0 || i >= len(a.tabs) {
 		return
 	}
+	delete(a.collections.settings, a.tabs[i].ID)
 	a.tabs = append(a.tabs[:i:i], a.tabs[i+1:]...)
 	if len(a.tabs) == 0 {
 		a.NewTab()
@@ -223,6 +233,9 @@ func (a *App) CloseTab(i int) {
 // Send starts sending t's request with the current variables. The result
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
+	if t == nil || t.Kind != requestTabKind {
+		return
+	}
 	col, _ := a.Svc.Collections.Get(t.CollectionID)
 	plan, err := execution.New(execution.Input{
 		Request: t.Request, Collection: col, Variables: a.VarsFor(t), Settings: a.Svc.Settings.Get(),
@@ -440,6 +453,12 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 	ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() {
 		a.tabBar(c)
 		t := a.Active()
+		if t.Kind == collectionSettingsTabKind {
+			// Continue already authorized request downloads while editing settings.
+			a.requestDownloads(c.KeyInt(t.ID))
+			a.collectionSettingsPane(c.KeyInt(t.ID), t)
+			return
+		}
 		if isWebSocket(t.Request) {
 			a.websocketPane(c.KeyInt(t.ID), t)
 			return

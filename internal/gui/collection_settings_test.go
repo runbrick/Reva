@@ -432,6 +432,86 @@ func TestCollectionSettingsClearsPreviewAndCompletesInflightDownload(t *testing.
 	}
 }
 
+func TestCollectionSettingsPreviewMasksRootFolderAndOverflowTitles(t *testing.T) {
+	h, col, folder, req := authFixture(t)
+	// Both target names contain a current variable/token value, short enough
+	// to remain fully visible in ordinary tabs and overflow entries.
+	const canary = "qx7c9"
+	col.Name = "Root " + canary
+	col.Auth = model.Auth{Type: model.AuthBearer, Token: "{{shared}}"}
+	col.Variables = []model.KV{{Key: "shared", Value: canary}}
+	col.Items = cloneCollectionItems(col.Items)
+	model.FindItem(col.Items, folder.ID).Name = "Folder " + canary
+	authMust(t, h.Svc.Collections.Save(col))
+	root := h.App.openCollectionSettings(collectionNode{collectionID: col.ID}, collectionSettingsGeneral)
+	rootDraft := settingsDraft(h)
+	rootDraft.name = "Root draft"
+	folderTab := h.App.openCollectionSettings(collectionNode{collectionID: col.ID, id: folder.ID}, collectionSettingsAuthentication)
+	folderDraft := settingsDraft(h)
+	folderDraft.auth = model.Auth{Type: model.AuthBasic, Username: "unsaved user"}
+	for i := range 6 {
+		h.App.NewTab().Request.Name = fmt.Sprintf("Overflow request %d", i)
+	}
+	h.App.active = h.App.requestTabIndex(req.ID)
+	requestRepaint(h)
+	requestRepaint(h)
+	rootTitle, folderTitle := h.App.requestTabTitle(root), h.App.requestTabTitle(folderTab)
+	if !strings.Contains(rootTitle, canary) || !strings.Contains(folderTitle, canary) {
+		t.Fatal("fixture did not expose canary in ordinary configuration titles")
+	}
+	assertPrivate := func() {
+		t.Helper()
+		for _, label := range h.D.Snapshot().Labels {
+			if strings.Contains(label.Value, canary) {
+				t.Fatal("preview painted a configuration-name secret")
+			}
+		}
+		for _, hit := range h.D.Snapshot().Hits {
+			if strings.Contains(hit.Label, canary) || strings.Contains(hit.Value, canary) {
+				t.Fatal("preview exposed a configuration-name secret in accessibility")
+			}
+			if hit.Label == h.App.S.Search.Field || hit.Label == rootTitle || hit.Label == folderTitle {
+				t.Fatal("preview exposed search palette or raw configuration menu entry")
+			}
+		}
+		for _, tab := range h.App.Tabs() {
+			if h.App.requestTabTitle(tab) != h.App.S.Request.PreviewTitle {
+				t.Fatal("preview did not mask every mixed tab title")
+			}
+		}
+	}
+	h.click(h.App.S.Request.Preview)
+	requestRepaint(h)
+	assertPrivate()
+	// Force an already-open overflow surface to be declared behind preview;
+	// inspect actual menu hit names, not just the title helper's return values.
+	h.App.tabBarState.menu = true
+	requestRepaint(h)
+	assertPrivate()
+	maskedEntries := 0
+	for _, hit := range h.D.Snapshot().Hits {
+		if hit.Role == gfx.RoleMenuItem && hit.Label == h.App.S.Request.PreviewTitle {
+			maskedEntries++
+		}
+	}
+	if maskedEntries != len(h.App.Tabs()) {
+		t.Fatalf("overflow did not declare all masked mixed-tab entries: got %d, want %d", maskedEntries, len(h.App.Tabs()))
+	}
+	// Even an existing palette state cannot bypass the shell's preview gate.
+	h.App.openSearch()
+	requestRepaint(h)
+	assertPrivate()
+	h.App.search.open, h.App.tabBarState.menu = false, false
+	h.click(h.App.S.Request.PreviewClose)
+	requestRepaint(h)
+	if h.App.requestTabTitle(root) != rootTitle || h.App.requestTabTitle(folderTab) != folderTitle {
+		t.Fatal("configuration titles did not restore after preview closed")
+	}
+	if h.App.collections.settings[root.ID] != rootDraft || h.App.collections.settings[folderTab.ID] != folderDraft || rootDraft.name != "Root draft" || folderDraft.auth.Username != "unsaved user" {
+		t.Fatal("preview changed independent configuration drafts")
+	}
+}
+
 func TestCollectionSettingsLanguagesThemesAndMinimumLayout(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		for _, mode := range []string{"light", "dark"} {

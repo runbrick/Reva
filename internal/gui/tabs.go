@@ -248,13 +248,14 @@ func (a *App) tabBar(c ui.C) {
 }
 
 func (a *App) requestTabTitle(t *Tab) string {
-	if t.Kind == collectionSettingsTabKind {
-		return a.collectionSettingsTitle(t)
-	}
 	// Tabs sit behind the preview modal. Their accessible names and overflow
-	// menu labels must not retain raw URLs or request names containing secrets.
+	// menu labels must not retain raw request or configuration names or URLs
+	// containing current secrets, regardless of the tab's kind.
 	if a.requestPreviewOpen() {
 		return a.S.Request.PreviewTitle
+	}
+	if t.Kind == collectionSettingsTabKind {
+		return a.collectionSettingsTitle(t)
 	}
 	if t.Request.Name != "" {
 		return t.Request.Name

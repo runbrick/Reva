@@ -180,3 +180,67 @@ snapshot but do not implement distributed conflict resolution. Configuration
 layout was verified headlessly rather than by opening a native window. Existing
 creation, deletion confirmation and request-save destination dialogs remain.
 No model/service/shared harness or other unowned production files need changes.
+
+## Review follow-up: preview privacy across mixed tab kinds
+
+The initial implementation commit is
+`74743f6fb395df18c0421d525e327b567cd715cf`. Review found that
+`requestTabTitle` returned configuration titles before checking request-preview
+privacy. An inactive collection/folder tab could therefore expose a saved target
+name containing a current secret while an HTTP preview masked the rest of the
+window. The follow-up moves the preview guard before kind-specific title
+selection. Existing request-kind guards remain unchanged.
+
+`TestCollectionSettingsPreviewMasksRootFolderAndOverflowTitles` uses root and
+folder names containing a short current collection variable/token canary and
+independent unsaved drafts. With the request preview active it checks every
+painted label, accessible hit name/value, all tab title results, and actual
+overflow menu entries. An already-open search palette remains suppressed by the
+shell's existing preview gate. Closing preview restores the original configuration
+titles and retains both draft objects and their unsaved values.
+
+The new regression first failed against the original implementation:
+
+```text
+--- FAIL: TestCollectionSettingsPreviewMasksRootFolderAndOverflowTitles (0.01s)
+    collection_settings_test.go:485: preview painted a configuration-name secret
+FAIL
+FAIL github.com/runbrick/reva/internal/gui 0.345s
+```
+
+It passed after the fix. All four required checks were then rerun, each exiting 0:
+
+```text
+gofmt -l .
+(empty)
+
+go vet ./...
+(empty)
+
+go tool viva vet ./...
+(empty)
+
+go test ./... -count=1
+ok   github.com/runbrick/reva/internal/gui             18.075s
+?    github.com/runbrick/reva/internal/gui/icons       [no test files]
+ok   github.com/runbrick/reva/internal/i18n            0.613s
+ok   github.com/runbrick/reva/internal/importer        6.026s
+ok   github.com/runbrick/reva/internal/model           0.561s
+ok   github.com/runbrick/reva/internal/preview         2.364s
+ok   github.com/runbrick/reva/internal/runner          2.483s
+ok   github.com/runbrick/reva/internal/s3              2.922s
+ok   github.com/runbrick/reva/internal/script          1.075s
+?    github.com/runbrick/reva/internal/service         [no test files]
+?    github.com/runbrick/reva/internal/service/fake    [no test files]
+ok   github.com/runbrick/reva/internal/service/request 3.879s
+ok   github.com/runbrick/reva/internal/service/store   2.208s
+ok   github.com/runbrick/reva/internal/storage         0.595s
+ok   github.com/runbrick/reva/internal/syncing         4.410s
+ok   github.com/runbrick/reva/internal/update          2.963s
+ok   github.com/runbrick/reva/internal/vars            1.519s
+ok   github.com/runbrick/reva/internal/websocket       2.623s
+```
+
+Follow-up changes are confined to `internal/gui/tabs.go`,
+`internal/gui/collection_settings_test.go`, and this report. No remaining blocker
+or ownership expansion is required. `git diff --check` also passed.

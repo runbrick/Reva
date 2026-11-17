@@ -42,6 +42,7 @@ type requestState struct {
 }
 
 type requestTabState struct {
+	previewOpen                    bool
 	auth                           authEditorState
 	section                        requestSection
 	params, headers, encoded, form kvTableState
@@ -75,8 +76,11 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 		a.request.tabs = make(map[int]*requestTabState)
 	}
 	s := a.request.tabs[t.ID]
-	// OpenRequest can replace the request in an existing empty tab. Its query
-	// rows need the same initialization as a request opened in a new tab.
+	// OpenRequest can replace the request in an existing empty tab. Preserve
+	// its authored URL and Params: sending merges them after expansion, where
+	// raw placeholders may become equal or introduce URL delimiters. Parsing
+	// or materializing query rows here could silently change that behavior.
+	// Only explicit URL/table edits synchronize the two representations.
 	if s == nil || s.requestID != t.Request.ID {
 		s = &requestTabState{url: t.Request.URL, requestID: t.Request.ID, timeoutValue: t.Request.Options.TimeoutMs}
 		if s.timeoutValue > 0 {
@@ -87,12 +91,6 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 			return struct{}{}, os.WriteFile(job.path, job.body, 0600)
 		})
 		a.request.tabs[t.ID] = s
-		if len(t.Request.Params) == 0 {
-			requestParamsFromURL(&t.Request)
-		} else {
-			requestURLFromParams(&t.Request)
-			s.url = t.Request.URL
-		}
 	}
 	// Closing a tab releases its editor state on the next declaration.
 	for id := range a.request.tabs {
@@ -105,7 +103,13 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 
 func (a *App) requestPane(c ui.C, t *Tab) {
 	s := a.requestTab(t)
+	// Keep previously authorized downloads declared in their existing scope,
+	// including a write already running when the user opens preview.
 	a.requestDownloads(c)
+	if a.requestPreviewOpen() {
+		a.requestPreview(c, t, s)
+		return
+	}
 	if s.url != t.Request.URL {
 		requestParamsFromURL(&t.Request)
 		s.url = t.Request.URL
@@ -455,6 +459,9 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				a.Send(t)
 			}
 		})
+		if ui.Button(c, labels.Preview).Icon(icons.Eye).Outline().Height(height).Clicked() {
+			c.After(func() { s.previewOpen = true })
+		}
 		ui.Row(c).Height(height).Items(ui.Center).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).Children(func() {
 			if t.Sending {
 				if ui.Button(c, labels.Cancel).Icon(icons.X).Height(height).Clicked() {

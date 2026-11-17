@@ -294,6 +294,10 @@ func (a *App) indexSearch() {
 		items(col.Items, col.ID, col.Name)
 	}
 	for _, tab := range a.Tabs() {
+		if tab.Kind == collectionSettingsTabKind {
+			add(searchResult{kind: searchTab, name: a.collectionSettingsTitle(tab), tabID: tab.ID})
+			continue
+		}
 		add(searchResult{kind: searchTab, name: requestName(tab.Request), detail: tab.Request.URL, request: tab.Request, tabID: tab.ID})
 	}
 	seen := make(map[string]bool)

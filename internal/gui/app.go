@@ -22,21 +22,29 @@ import (
 	"runtime"
 	"time"
 
-	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/execution"
 	"github.com/runbrick/reva/internal/gui/icons"
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
 	"github.com/runbrick/reva/internal/storage"
-	"github.com/runbrick/reva/internal/vars"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
-// Tab is one open request and its latest result.
+type tabKind uint8
+
+const (
+	requestTabKind tabKind = iota
+	collectionSettingsTabKind
+)
+
+// Tab is a request with its latest result, or a collection/folder configuration.
 type Tab struct {
 	ID       int
+	Kind     tabKind
+	TargetID string // folder ID for configuration; empty means collection root
 	Request  model.Request
 	Response *model.Response
 	// Err is the transport error of the last send, if any.
@@ -64,11 +72,12 @@ type TestResult struct {
 type sendJob struct {
 	req  model.Request
 	vars []model.KV
+	plan *execution.Plan
 }
 
 type sendResult struct {
-	resp model.Response
-	err  error
+	job    *sendJob
+	result execution.Result
 }
 
 // Section is what the left rail selects: the list shown in the sidebar.
@@ -211,6 +220,7 @@ func (a *App) CloseTab(i int) {
 	if i < 0 || i >= len(a.tabs) {
 		return
 	}
+	delete(a.collections.settings, a.tabs[i].ID)
 	a.tabs = append(a.tabs[:i:i], a.tabs[i+1:]...)
 	if len(a.tabs) == 0 {
 		a.NewTab()
@@ -223,21 +233,26 @@ func (a *App) CloseTab(i int) {
 // Send starts sending t's request with the current variables. The result
 // arrives on a later paint; Cancel stops it.
 func (a *App) Send(t *Tab) {
-	req := t.Request.Clone()
-	cfg, _, err := a.effectiveAuth(t)
+	if t == nil || t.Kind != requestTabKind {
+		return
+	}
+	col, _ := a.Svc.Collections.Get(t.CollectionID)
+	plan, err := execution.New(execution.Input{
+		Request: t.Request, Collection: col, Variables: a.VarsFor(t), Settings: a.Svc.Settings.Get(),
+	})
 	if err != nil {
 		a.authFailure(t, true)
 		return
 	}
-	req.Auth = cfg
-	req.Options = req.Options.Resolve(a.Svc.Settings.Get())
-	req, values := a.prepareSend(t, req, a.VarsFor(t))
-	if err := auth.Validate(vars.Apply(req, values).Auth); err != nil {
+	// Preserve immediate feedback and the previous response for script-free
+	// invalid auth. Scripts can change auth variables, so those validate in Run.
+	if t.Request.PreScript == "" && plan.ValidateAuth() != nil {
 		a.authFailure(t, false)
 		return
 	}
-	t.job = &sendJob{req: req, vars: values}
+	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
+	a.resetScripts(t)
 }
 
 // Cancel stops t's request in flight.
@@ -254,8 +269,7 @@ func (a *App) Toast(title, description string, kind ui.ToastKind) {
 }
 
 func (a *App) run(ctx context.Context, job *sendJob) (sendResult, error) {
-	resp, err := a.Svc.Requests.Send(ctx, job.req, job.vars)
-	return sendResult{resp: resp, err: err}, nil
+	return sendResult{job: job, result: job.plan.Run(ctx, a.Svc.Requests)}, nil
 }
 
 // declareSends declares each sending tab's effect and applies results.
@@ -264,22 +278,29 @@ func (a *App) declareSends(c ui.C) {
 		if !t.Sending {
 			continue
 		}
-		ui.Effect(c, t.send, t.job)
+		ui.Effect(c.KeyInt(t.ID), t.send, t.job)
 		res, _, ok := t.send.Take()
-		if !ok {
+		if !ok || res.job != t.job {
 			continue
 		}
 		t.Sending = false
-		entry := model.HistoryEntry{At: time.Now(), Request: t.Request.Clone()}
-		entry.Request.Auth = t.job.req.Auth
-		if res.err != nil {
-			t.Err = res.err.Error()
+		r := res.result
+		a.applyScripts(t, r)
+		entry := model.HistoryEntry{At: time.Now(), Request: r.HistoryRequest}
+		if r.Err != nil {
+			t.Err = r.Err.Error()
+			if r.Stage == execution.StageValidation {
+				a.authFailure(t, false)
+			}
 			entry.Error = t.Err
-		} else {
-			resp := res.resp
-			t.Response = &resp
-			entry.StatusCode, entry.Duration = resp.StatusCode, resp.Duration
-			a.afterResponse(t, &resp)
+		} else if r.Pre.Err != nil {
+			t.Err = a.S.Scripts.PreScriptError
+		} else if r.Response != nil {
+			t.Response = r.Response
+			entry.StatusCode, entry.Duration = r.Response.StatusCode, r.Response.Duration
+		}
+		if !r.TransportStarted {
+			continue
 		}
 		if err := a.Svc.History.Add(entry); err != nil {
 			a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
@@ -301,6 +322,9 @@ func (a *App) Page(c ui.C) {
 	}
 	a.declareSends(c)
 	a.declareWebSockets(c)
+	// Preview hides raw background data without moving asynchronous work
+	// into a different declaration scope or changing independent UI state.
+	previewing := a.requestPreviewOpen()
 	theme := c.Theme()
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
@@ -313,16 +337,20 @@ func (a *App) Page(c ui.C) {
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.settingsPage(c) })
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
-					a.sidebar(c)
+					if !previewing {
+						a.sidebar(c)
+					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
 				a.workbench(c, theme)
 			}
 		})
 	})
-	a.dialogs(c)
-	a.searchPalette(c)
-	ui.Toasts(c, &a.toaster)
+	if !previewing {
+		a.dialogs(c)
+		a.searchPalette(c)
+		ui.Toasts(c, &a.toaster)
+	}
 }
 
 // rail is the left icon navigation. It selects Section, and on the
@@ -417,6 +445,7 @@ func (a *App) sidebar(c ui.C) {
 // the Environments section is selected, the env PR's editor may take the
 // whole area instead.
 func (a *App) workbench(c ui.C, theme *ui.Theme) {
+	previewing := a.requestPreviewOpen()
 	if a.Section == SectionEnvironments && a.envReady() {
 		ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() { a.envMain(c) })
 		return
@@ -424,6 +453,12 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 	ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() {
 		a.tabBar(c)
 		t := a.Active()
+		if t.Kind == collectionSettingsTabKind {
+			// Continue already authorized request downloads while editing settings.
+			a.requestDownloads(c.KeyInt(t.ID))
+			a.collectionSettingsPane(c.KeyInt(t.ID), t)
+			return
+		}
 		if isWebSocket(t.Request) {
 			a.websocketPane(c.KeyInt(t.ID), t)
 			return
@@ -433,7 +468,14 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 		})
 		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
 		ui.Column(c).FillWidth().Grow(1).Children(func() {
-			a.responsePane(c.KeyInt(t.ID), t)
+			if previewing {
+				return
+			}
+			if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
+				a.scriptFailurePane(c.KeyInt(t.ID), t)
+			} else {
+				a.responsePane(c.KeyInt(t.ID), t)
+			}
 		})
 	})
 }

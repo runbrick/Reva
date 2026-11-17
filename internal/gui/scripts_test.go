@@ -69,13 +69,12 @@ func TestPreScriptErrorAndConsoleSurviveSendReset(t *testing.T) {
 	tab.Request.TestScript = `pm.test("response ok", function() { pm.expect(pm.response.code).to.equal(200); }); console.log("test log");`
 	h.pump()
 	h.click("Send")
-	h.waitFor("pre error and test result", func() bool { return tab.Response != nil })
-	if len(tab.Tests) != 2 || tab.Tests[0].Name != h.App.S.Scripts.PreScriptError || tab.Tests[0].Passed || !strings.Contains(tab.Tests[0].Error, "pre failed") || !tab.Tests[1].Passed {
+	h.waitFor("pre error", func() bool { return !tab.Sending })
+	if tab.Response != nil || len(h.Svc.History.List()) != 0 || len(tab.Tests) != 1 || tab.Tests[0].Name != h.App.S.Scripts.PreScriptError || tab.Tests[0].Passed || !strings.Contains(tab.Tests[0].Error, "pre failed") {
 		t.Fatalf("results = %+v", tab.Tests)
 	}
-	h.click(fmt.Sprintf(h.App.S.Response.TestsCount, len(tab.Tests)))
-	if !h.shows("pre log") || !h.shows("test log") || !h.shows("pre failed") || !h.shows("1/2") {
-		t.Fatal("missing merged pre-script diagnostics")
+	if !h.shows("pre log") || h.shows("test log") || !h.shows("pre failed") || !h.shows("0/1") {
+		t.Fatal("missing pre-script diagnostics or response tests ran after abort")
 	}
 	// A later send with no scripts must clear diagnostics from the previous run.
 	tab.Request.PreScript, tab.Request.TestScript = "", ""
@@ -94,14 +93,14 @@ func TestScriptStateIsPerTabAndExceptionsBecomeFailures(t *testing.T) {
 	if err := h.D.Resize(1280, 800); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor("first tab result", func() bool { return first.Response != nil })
+	h.waitFor("first tab result", func() bool { return !first.Sending })
 	second := h.App.NewTab()
 	second.Request.TestScript = `throw new Error("second failure");`
 	h.App.Send(second)
 	if err := h.D.Resize(1280, 800); err != nil {
 		t.Fatal(err)
 	}
-	h.waitFor("both tab results", func() bool { return first.Response != nil && second.Response != nil })
+	h.waitFor("both tab results", func() bool { return !first.Sending && second.Response != nil })
 	if len(first.Tests) != 1 || !strings.Contains(first.Tests[0].Error, "first failure") {
 		t.Fatalf("first = %+v", first.Tests)
 	}

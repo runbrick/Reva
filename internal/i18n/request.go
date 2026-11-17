@@ -2,26 +2,44 @@ package i18n
 
 // Request holds the strings of the request editor. Owned by that feature's PR.
 type Request struct {
-	Bearer, AuthInherit, AuthMissingContext, AuthParentNone    string
-	AuthFromCollection, AuthFromFolder, AuthError, AuthInvalid string
-	CURLFailed, AuthUnsupported                                string
-	Title, Method, Send, SendAccessible, Save, Cancel          string
-	Params, Headers, Body, Auth, Scripts                       string
-	None, Raw, FormData, URLEncoded, Binary                    string
-	BodyText, ContentType, Format, InvalidJSON                 string
-	Text, File, FilePath, Browse, Enabled                      string
-	Basic, APIKey, Token, Username, Password                   string
-	APIKeyName, APIKeyValue, APIKeyLocation, InHeader, InQuery string
-	URL, SendMenu, SendDownload, CopyCURL, DownloadName        string
-	Settings, Timeout, FollowRedirects, VerifyTLS              string
-	Inherit, On, Off, TimeoutHelp                              string
-	ParamName, ParamValue, HeaderName, HeaderValue             string
-	Description, AddParam, AddHeader, BulkEdit, TableEdit      string
-	BulkContent, BulkHelp                                      string
-	GraphQLQuery, GraphQLVariables, GraphQLRaw, GraphQLEdit    string
+	Preview, PreviewTitle, PreviewClose, PreviewPhase, PreviewLimits                      string
+	PreviewMaskHelp, PreviewMasked, PreviewURLInvalid                                     string
+	PreviewVariables, PreviewVariableRow, PreviewNoVariables                              string
+	PreviewCollection, PreviewEnvironment, PreviewActiveEnvironment, PreviewNoEnvironment string
+	PreviewWinner, PreviewShadowed, PreviewDisabled                                       string
+	PreviewUnresolved, PreviewNoUnresolved, PreviewOwn, PreviewFolder                     string
+	PreviewAuth, PreviewAuthOverride, PreviewAuthQuery, PreviewNoHeaders, PreviewBody     string
+	Bearer, AuthInherit, AuthMissingContext, AuthParentNone                               string
+	AuthFromCollection, AuthFromFolder, AuthError, AuthInvalid                            string
+	CURLFailed, AuthUnsupported                                                           string
+	Title, Method, Send, SendAccessible, Save, Cancel                                     string
+	Params, Headers, Body, Auth, Scripts                                                  string
+	None, Raw, FormData, URLEncoded, Binary                                               string
+	BodyText, ContentType, Format, InvalidJSON                                            string
+	Text, File, FilePath, Browse, Enabled                                                 string
+	Basic, APIKey, Token, Username, Password                                              string
+	APIKeyName, APIKeyValue, APIKeyLocation, InHeader, InQuery                            string
+	URL, SendMenu, SendDownload, CopyCURL, DownloadName                                   string
+	Settings, Timeout, FollowRedirects, VerifyTLS                                         string
+	Inherit, On, Off, TimeoutHelp                                                         string
+	ParamName, ParamValue, HeaderName, HeaderValue                                        string
+	Description, AddParam, AddHeader, BulkEdit, TableEdit                                 string
+	BulkContent, BulkHelp                                                                 string
+	GraphQLQuery, GraphQLVariables, GraphQLRaw, GraphQLEdit                               string
 }
 
 var requestZh = Request{
+	Preview: "请求预览", PreviewTitle: "发送前只读预览", PreviewClose: "关闭预览",
+	PreviewPhase:    "在前置脚本之前计算；按当前请求草稿、已保存的集合和活动环境实时刷新。",
+	PreviewLimits:   "这不是完整的线上报文：不运行脚本、不发送、不保存、不读取上传文件；不计算网络库自动生成的请求头、请求体编码或重定向。WebSocket 不使用此 HTTP 预览。",
+	PreviewMaskHelp: "所有变量值均隐藏，包括主机和路径变量；URL 仅显示字面路由结构。查询值、请求头值、凭据、片段及请求体全部隐藏；[masked] 表示已隐藏。未知变量名称列于下方。",
+	PreviewMasked:   "值已隐藏", PreviewURLInvalid: "无法预览 URL 或查询参数，请检查 URL（错误详情已隐藏）。",
+	PreviewVariables: "变量来源与覆盖", PreviewVariableRow: "%s · %s 第 %d 行 · %s · 值已隐藏", PreviewNoVariables: "没有集合或环境变量。",
+	PreviewCollection: "集合", PreviewEnvironment: "环境", PreviewActiveEnvironment: "活动环境：%s", PreviewNoEnvironment: "未选择活动环境",
+	PreviewWinner: "生效", PreviewShadowed: "被后面的启用行覆盖", PreviewDisabled: "禁用（不参与覆盖）",
+	PreviewUnresolved: "未解析的变量", PreviewNoUnresolved: "没有未解析的变量。", PreviewOwn: "当前请求", PreviewFolder: "最近的父文件夹",
+	PreviewAuth: "认证：%s · 来源：%s · 凭据已隐藏", PreviewAuthOverride: "显式请求头优先于生成的认证（空值也优先）。",
+	PreviewAuthQuery: "查询密钥替换同名查询值；仅用于初始 URL。", PreviewNoHeaders: "没有显式或认证生成的请求头。", PreviewBody: "请求体：%s · 内容和文件路径已隐藏，未读取文件。",
 	Bearer: "Bearer", AuthInherit: "继承父级认证", AuthMissingContext: "无法继承认证：所属集合或请求项已不存在，请重新打开请求或选择独立认证。",
 	AuthParentNone: "父级已禁用认证，不会自动添加凭据。", AuthFromCollection: "%s · 来自集合「%s」", AuthFromFolder: "%s · 来自文件夹「%s」",
 	AuthError: "认证错误", AuthInvalid: "认证配置无效，请检查认证类型、密钥位置及请求头名称和值。", CURLFailed: "无法生成 cURL，请检查 URL 查询参数。",
@@ -43,6 +61,17 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
+	Preview: "Request preview", PreviewTitle: "Read-only pre-send preview", PreviewClose: "Close preview",
+	PreviewPhase:    "Computed BEFORE pre-request scripts; refreshed from the current draft, stored collection and active environment.",
+	PreviewLimits:   "This is not a complete wire request: no scripts, sending, saving or upload file reads. Generated transport headers, body encoding and redirects are not evaluated. WebSocket does not use this HTTP preview.",
+	PreviewMaskHelp: "All variable values are hidden, including host and path variables; the URL shows literal routing structure only. Query values, header values, credentials, fragments and body content are hidden; [masked] marks hidden text. Unknown variable names appear below.",
+	PreviewMasked:   "Values hidden", PreviewURLInvalid: "Cannot preview the URL or query parameters. Check the URL (error details hidden).",
+	PreviewVariables: "Variable sources and overrides", PreviewVariableRow: "%s · %s row %d · %s · value hidden", PreviewNoVariables: "No collection or environment variables.",
+	PreviewCollection: "Collection", PreviewEnvironment: "Environment", PreviewActiveEnvironment: "Active environment: %s", PreviewNoEnvironment: "No active environment",
+	PreviewWinner: "Winner", PreviewShadowed: "Shadowed by a later enabled row", PreviewDisabled: "Disabled (does not override)",
+	PreviewUnresolved: "Unresolved variables", PreviewNoUnresolved: "No unresolved variables.", PreviewOwn: "Current request", PreviewFolder: "Nearest parent folder",
+	PreviewAuth: "Authentication: %s · Source: %s · credentials hidden", PreviewAuthOverride: "An explicit header takes precedence over generated authentication, including an empty value.",
+	PreviewAuthQuery: "The query API key replaces matching query values and applies only to the initial URL.", PreviewNoHeaders: "No explicit or authentication-generated headers.", PreviewBody: "Body: %s · content and file paths hidden; files have not been read.",
 	Bearer: "Bearer", AuthInherit: "Inherit", AuthMissingContext: "Cannot inherit authentication: the collection or request item is missing. Reopen the request or select its own authentication.",
 	AuthParentNone: "Authentication is disabled by the parent; no credentials will be generated.", AuthFromCollection: "%s · From collection “%s”", AuthFromFolder: "%s · From folder “%s”",
 	AuthError: "Authentication error", AuthInvalid: "Invalid authentication configuration. Check the scheme, API key placement, and header name and value.", CURLFailed: "Cannot generate cURL. Check the URL query parameters.",

@@ -411,9 +411,11 @@ func TestImportedAuthSendPreservesHierarchy(t *testing.T) {
 			requestType(h, h.App.S.Request.APIKeyValue, second, true)
 		}
 		collectionsOption(h, h.App.S.Collections.Save)
-		if h.App.collections.authOpen {
-			t.Fatal("parent auth edit did not save")
+		if h.App.Active().Kind != collectionSettingsTabKind || h.App.Active().Dirty {
+			t.Fatal("parent configuration tab did not save cleanly")
 		}
+		h.App.active = h.App.requestTabIndex(live.ID)
+		requestRepaint(h)
 	}
 	editParent(h.App.S.Request.Basic, "{{user}}", "{{password}}")
 	got = send()
@@ -448,6 +450,11 @@ func TestImportedAuthSendPreservesHierarchy(t *testing.T) {
 	requestType(h, h.App.S.Request.APIKeyName, "key", true)
 	collectionsOption(h, h.App.S.Request.InQuery)
 	collectionsOption(h, h.App.S.Collections.Save)
+	if h.App.Active().Kind != collectionSettingsTabKind || h.App.Active().Dirty {
+		t.Fatal("parent query auth configuration did not save cleanly")
+	}
+	h.App.active = h.App.requestTabIndex(live.ID)
+	requestRepaint(h)
 	got = send()
 	if !reflect.DeepEqual(got.query["key"], []string{"env-token"}) || !reflect.DeepEqual(got.query["q"], []string{"a", "a", "b"}) || len(got.query["skip"]) != 0 || len(got.authorization) != 0 || len(got.apiKey) != 0 {
 		t.Fatal("query API-key replacement damaged repeated query rows or sent disabled rows")

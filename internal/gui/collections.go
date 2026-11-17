@@ -33,15 +33,8 @@ type collectionsState struct {
 	rowMenuID                       string
 	selected                        collectionNode
 	activeCollection, activeRequest string
-	variablesOpen                   bool
-	variablesCollection             string
-	variables                       []model.KV
-	variablesTable                  kvTableState
-	authOpen                        bool
-	authTarget                      collectionNode
-	authDraft                       model.Auth
-	authEditor                      authEditorState
-	authError                       string
+	activeSettings                  bool
+	settings                        map[int]*collectionSettingsDraft
 
 	dialogOpen bool
 	dialog     collectionDialog
@@ -62,8 +55,10 @@ type collectionsState struct {
 type collectionNode struct {
 	collectionID, id, parentID, name string
 	actions                          string
+	settings                         string
 	method                           model.Method
 	depth, key                       int
+	requests                         int
 	branch                           bool
 }
 
@@ -78,7 +73,7 @@ const (
 
 func (s *collectionsState) node(i int) ui.TreeNode {
 	n := s.visible[i]
-	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: !n.branch && n.collectionID == s.activeCollection && n.id == s.activeRequest}
+	return ui.TreeNode{Depth: n.depth, Branch: n.branch, Expanded: s.filter != "" || !s.closed[s.nodeKey(n)], Selected: n.branch == s.activeSettings && n.collectionID == s.activeCollection && n.id == s.activeRequest}
 }
 
 func (s *collectionsState) nodeKey(n collectionNode) string { return n.collectionID + "/" + n.id }
@@ -140,6 +135,10 @@ func (s *collectionsState) appendNode(n collectionNode) {
 func (s *collectionsState) appendItems(colID, parentID string, items []model.Item, depth int) {
 	for _, item := range items {
 		n := collectionNode{collectionID: colID, id: item.ID, parentID: parentID, name: item.Name, depth: depth, branch: item.Type == model.ItemFolder}
+		if n.branch {
+			h, w := collectionRequestCounts(item.Items)
+			n.requests = h + w
+		}
 		if item.Request != nil {
 			n.method = item.Request.Method
 		}
@@ -203,8 +202,25 @@ func (a *App) refreshCollections() {
 	for _, col := range cols {
 		s.collectionIDs = append(s.collectionIDs, col.ID)
 		s.collectionNames[col.ID] = col.Name
-		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true})
+		h, w := collectionRequestCounts(col.Items)
+		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true, requests: h + w})
 		s.appendItems(col.ID, "", col.Items, 1)
+	}
+	// Duplicate display names still need distinct gear controls for accessibility.
+	branchNames := make(map[string]int)
+	for _, n := range s.all {
+		if n.branch {
+			branchNames[n.name]++
+		}
+	}
+	for i := range s.all {
+		n := &s.all[i]
+		if n.branch {
+			n.settings = fmt.Sprintf(a.S.Collections.SettingsFor, n.name)
+			if branchNames[n.name] > 1 {
+				n.settings = fmt.Sprintf(a.S.Collections.SettingsForTarget, n.name, s.nodeKey(*n))
+			}
+		}
 	}
 	s.folderCollection = "" // invalidate the save dialog's folder choices too
 	// Deletion and external imports can invalidate the creation menu's target.
@@ -224,7 +240,11 @@ func (a *App) collectionsPane(c ui.C) {
 	a.refreshCollections()
 	s, text, theme := &a.collections, a.S.Collections, c.Theme()
 	s.activeCollection, s.activeRequest = a.Active().CollectionID, a.Active().Request.ID
-	ui.Column(c).Fill().Pad(Space3).Gap(Space2).Children(func() {
+	s.activeSettings = a.Active().Kind == collectionSettingsTabKind
+	if s.activeSettings {
+		s.activeRequest = a.Active().TargetID
+	}
+	ui.Column(c).Fill().Pad(Space2).Gap(Space2).Children(func() {
 		ui.Row(c).FillWidth().Items(ui.Center).Children(func() {
 			ui.Text(c, text.Title).Bold().Grow(1)
 			add := ui.Button(c, text.Add).Icon(icons.Plus).IconOnly().Ghost()
@@ -296,6 +316,9 @@ func (a *App) collectionsPane(c ui.C) {
 			rc := c.KeyInt(n.key)
 			selected := s.node(i).Selected
 			row := ui.Row(rc).Grow(1).FillHeight().Gap(Space2).Items(ui.Center).Radius(theme.Metrics.RadiusControl).HitWith(s.tree.RowID(i), n.name, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected})
+			if n.branch {
+				row.Gap(Space1)
+			}
 			row.Children(func() {
 				if n.branch {
 					icon := icons.Folder
@@ -310,15 +333,26 @@ func (a *App) collectionsPane(c ui.C) {
 				if selected {
 					label.Color(theme.Primary)
 				}
-				more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Shrink(0)
-				if !selected && !(s.rowMenuOpen && s.rowMenuID == s.nodeKey(n)) {
-					more.Opacity(0).StateFrom(row).Hover(ui.Look{}.Opacity(1)).Focus(ui.Look{}.Opacity(1))
+				if n.branch {
+					ui.Text(rc, fmt.Sprintf(text.SidebarCount, n.requests)).Muted().FontSize(theme.Metrics.FontSizeS).Shrink(0)
 				}
-				if more.Clicked() {
-					s.selected, s.rowMenuID, s.rowMenuOpen = n, s.nodeKey(n), true
+				if !n.branch {
+					more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Size(Space6, Space6).Shrink(0)
+					if !selected && !(s.rowMenuOpen && s.rowMenuID == s.nodeKey(n)) {
+						more.Opacity(0).StateFrom(row).Hover(ui.Look{}.Opacity(1)).Focus(ui.Look{}.Opacity(1))
+					}
+					if more.Clicked() {
+						s.selected, s.rowMenuID, s.rowMenuOpen = n, s.nodeKey(n), true
+					}
+					if s.rowMenuID == s.nodeKey(n) {
+						ui.Menu(rc, more, &s.rowMenuOpen, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+					}
 				}
-				if s.rowMenuID == s.nodeKey(n) {
-					ui.Menu(rc, more, &s.rowMenuOpen, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
+				if n.branch {
+					gearName := n.settings
+					if ui.Button(rc, gearName).Tooltip(gearName).Icon(icons.Settings).IconOnly().Ghost().Size(Space6, Space6).Shrink(0).Clicked() {
+						c.After(func() { s.selected = n; a.openCollectionSettings(n, collectionSettingsGeneral) })
+					}
 				}
 			})
 			ui.ContextMenu(rc, row, func(menu *ui.MenuItems) { a.collectionMenu(c, menu, n) })
@@ -446,8 +480,15 @@ func (a *App) moveCollectionItem(from, to collectionNode) {
 func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 	s := a.S.Collections
 	if n.branch {
+		settingsLabel := s.Settings
+		if n.id != "" {
+			settingsLabel = s.FolderSettings
+		}
+		if menu.Item(settingsLabel).Icon(icons.Settings).Clicked() {
+			c.After(func() { a.openCollectionSettings(n, collectionSettingsGeneral) })
+		}
 		if menu.Item(s.Authentication).Clicked() {
-			c.After(func() { a.collectionAuthDialog(n) })
+			c.After(func() { a.openCollectionAuth(n) })
 		}
 		if menu.Item(s.NewFolder).Clicked() {
 			c.After(func() { a.collectionNameDialog(collectionFolder, n) })
@@ -463,14 +504,7 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		}
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {
-				c.After(func() {
-					if col, ok := a.Svc.Collections.Get(n.collectionID); ok {
-						state := &a.collections
-						state.variablesCollection, state.variablesOpen = col.ID, true
-						state.variables = append([]model.KV(nil), col.Variables...)
-						state.variablesTable = kvTableState{}
-					}
-				})
+				c.After(func() { a.openCollectionSettings(n, collectionSettingsVariables) })
 			}
 			if menu.Item(s.Export).Clicked() {
 				c.After(func() { a.exportCollection(n.collectionID) })
@@ -564,6 +598,10 @@ func (a *App) RequestSave(t *Tab) {
 	if t == nil {
 		return
 	}
+	if t.Kind == collectionSettingsTabKind {
+		a.saveCollectionSettings(t)
+		return
+	}
 	if col, ok := a.Svc.Collections.Get(t.CollectionID); t.CollectionID != "" && ok {
 		found := false
 		model.WalkRequests(col.Items, func(r *model.Request) {
@@ -604,32 +642,6 @@ func (a *App) RequestSave(t *Tab) {
 // collectionsDialogs declares the save / new / rename dialogs.
 func (a *App) collectionsDialogs(c ui.C) {
 	s := &a.collections
-	if s.authOpen {
-		a.collectionAuthModal(c)
-	}
-	if s.variablesOpen {
-		ui.Modal(c, &s.variablesOpen, a.S.Collections.Variables, func() {
-			a.kvTable(c, &s.variablesTable, &s.variables)
-		}, func() {
-			if ui.Button(c, a.S.Collections.Cancel).Outline().Clicked() {
-				s.variablesOpen = false
-			}
-			if ui.Button(c, a.S.Collections.Save).Clicked() {
-				c.After(func() {
-					col, ok := a.Svc.Collections.Get(s.variablesCollection)
-					if !ok {
-						s.variablesOpen = false
-						return
-					}
-					col.Variables = append([]model.KV(nil), s.variables...)
-					if !a.collectionError(a.Svc.Collections.Save(col)) {
-						s.variablesOpen = false
-						a.Toast(a.S.Collections.VariablesSaved, "", ui.ToastSuccess)
-					}
-				})
-			}
-		})
-	}
 	if s.dialogOpen {
 		a.collectionEditDialog(c)
 	}
@@ -662,81 +674,8 @@ func (a *App) collectionsDialogs(c ui.C) {
 	})
 }
 
-func (a *App) collectionAuthDialog(n collectionNode) {
-	col, ok := a.Svc.Collections.Get(n.collectionID)
-	if !ok {
-		a.Toast(a.S.Collections.Authentication, a.S.Collections.AuthTargetMissing, ui.ToastError)
-		return
-	}
-	draft := col.Auth
-	if n.id != "" {
-		item := model.FindItem(col.Items, n.id)
-		if item == nil || item.Type != model.ItemFolder {
-			a.Toast(a.S.Collections.Authentication, a.S.Collections.AuthTargetMissing, ui.ToastError)
-			return
-		}
-		draft = item.Auth
-		if draft.Type == "" {
-			draft.Type = model.AuthInherit
-		}
-	} else if draft.Type == "" || draft.Type == model.AuthInherit {
-		draft.Type = model.AuthNone
-	}
-	s := &a.collections
-	s.authTarget, s.authDraft, s.authEditor, s.authError, s.authOpen = n, draft, authEditorState{}, "", true
-}
-
-func (a *App) collectionAuthModal(c ui.C) {
-	s, labels := &a.collections, &a.S.Collections
-	ui.ModalWith(c, &s.authOpen, labels.Authentication, ui.ModalSpec{Width: Space6 * 24}, func() {
-		ui.Column(c).FillWidth().Gap(Space3).Children(func() {
-			ui.Text(c, s.authTarget.name).Bold()
-			folder := s.authTarget.id != ""
-			a.authEditor(c, &s.authDraft, &s.authEditor, folder, folder)
-			if folder && s.authDraft.Type == model.AuthInherit {
-				col, _ := a.Svc.Collections.Get(s.authTarget.collectionID)
-				a.authPreview(c, &s.authEditor, col, s.authTarget.id)
-			}
-			if s.authError != "" {
-				ui.Wrap(c, s.authError).Color(c.Theme().Danger)
-			}
-		})
-	}, func() {
-		if ui.Button(c, labels.Cancel).Outline().Clicked() {
-			s.authOpen = false
-		}
-		if ui.Button(c, labels.Save).Clicked() {
-			c.After(a.saveCollectionAuth)
-		}
-	})
-}
-
-// Fetch at Save, then clone the tree: concurrent edits to other fields/items
-// survive, and services returning shared slices never observe an unsaved draft.
-func (a *App) saveCollectionAuth() {
-	s := &a.collections
-	col, ok := a.Svc.Collections.Get(s.authTarget.collectionID)
-	if !ok {
-		s.authError = a.S.Collections.AuthTargetMissing
-		return
-	}
-	col.Items = cloneCollectionItems(col.Items)
-	if s.authTarget.id == "" {
-		col.Auth = s.authDraft
-	} else {
-		item := model.FindItem(col.Items, s.authTarget.id)
-		if item == nil || item.Type != model.ItemFolder {
-			s.authError = a.S.Collections.AuthTargetMissing
-			return
-		}
-		item.Auth = s.authDraft
-	}
-	if err := a.Svc.Collections.Save(col); err != nil {
-		s.authError = a.S.Collections.AuthSaveFailed
-		return
-	}
-	s.authOpen, s.authError = false, ""
-	a.Toast(a.S.Collections.AuthSaved, "", ui.ToastSuccess)
+func (a *App) openCollectionAuth(n collectionNode) {
+	a.openCollectionSettings(n, collectionSettingsAuthentication)
 }
 
 func (a *App) collectionFolders() {

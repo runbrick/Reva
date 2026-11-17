@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/runner"
 	"github.com/runbrick/reva/internal/service/request"
 )
@@ -21,19 +22,6 @@ const (
 	exitInput     = 2
 	exitCancelled = 130
 )
-
-const usage = `Usage: reva-run --collection ID [--data-dir DIR] [--environment ID] [--stop-on-failure]
-
-Runs a native Reva collection serially. No environment is selected by default.
-Data directory: --data-dir, then REVA_HOME, then the user config directory/Reva.
-Reads existing data only; never saves settings, history, collections or environments.
-Native pre-request/test scripts execute; enabled upload files may be read and sent.
-Stdout: one compact safe JSON report (version 1) after a run, including cancellation.
-Stderr: fixed diagnostics only. Input errors produce no report.
-Exit codes: 0 passed/help, 1 run/report-write failure, 2 usage/load error, 130 cancelled.
-Use a built binary when consuming exit codes; go run may wrap nonzero exit status.
-Flags: --collection ID, --environment ID, --data-dir DIR, --stop-on-failure, -h, --help.
-`
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -59,7 +47,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		return diagnostic(stderr, "invalid_arguments", exitInput)
 	}
 	if *help || *shortHelp {
-		if _, err := io.WriteString(stdout, usage); err != nil {
+		if _, err := io.WriteString(stdout, i18n.RunnerFor(i18n.Zh).Help+"\n"+i18n.RunnerFor(i18n.En).Help); err != nil {
 			return diagnostic(stderr, "output_failed", exitFailed)
 		}
 		return exitOK

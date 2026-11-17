@@ -5,6 +5,10 @@
 [研究清单](research-manifest.json)。研究中的功能与议题状态沿用原始证据，
 不将开放提案或 beta 能力当作稳定交付，也不将议题样本数量当作需求频率。
 
+本轮状态：R1、R2、R3、R4 和独立 QA 均已在各自 Codex 子工作树提交，
+经审查合入上述当前分支，最终四项检查通过。
+[提交、验收与实际边界](implementation-results.zh-CN.md)记录了完整交付结果。
+
 ## 功能归并
 
 | 能力 | 可借鉴的优势与来源 | Reva 已有基础 | 可实施功能与边界 |
@@ -33,6 +37,12 @@
 
 测试随各功能提交，QA PR 补充跨模块回归。不得修改另一 worker 的所有权文件；需要扩展
 所有权时向协调者说明。复用现有 model/service 接口，不加依赖或改动持久化 schema。
+
+审查期间批准的最小所有权扩展：R3 新增 `internal/i18n/runner.go` 和本节测试，
+使帮助文案遵守中英文规则；R4 扩展 `tabs.go`、`env.go` 与 `app.go` 的预览背景显示，
+以及 `request_test.go`、`importer_test.go` 和新增 `request_load_test.go` 的初始加载行为验证。
+这些扩展均由协调者通过 orchestration 明确批准；未改动 importer 生产逻辑、model、
+service 接口或共享 harness。功能所有者的后续修复和 QA 测试分别提交。
 
 ## 后续任务及验收
 

@@ -293,7 +293,7 @@ func TestCLIUsageAndHelpNeverLoadOrCreateData(t *testing.T) {
 	}
 	for _, help := range []string{"-h", "--help"} {
 		var out, stderr bytes.Buffer
-		if code := run(context.Background(), []string{help}, &out, &stderr); code != exitOK || stderr.Len() != 0 || !strings.HasPrefix(out.String(), "Usage:") {
+		if code := run(context.Background(), []string{help}, &out, &stderr); code != exitOK || stderr.Len() != 0 || !strings.HasPrefix(out.String(), "用法：") || !strings.Contains(out.String(), "Usage:") {
 			t.Fatal("help did not succeed without data")
 		}
 	}
@@ -303,6 +303,25 @@ func TestCLIUsageAndHelpNeverLoadOrCreateData(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Dir(dir)); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("CLI created missing data directory")
+	}
+}
+
+func TestCLIHelpIsBilingualAndIgnoresNativeData(t *testing.T) {
+	dir := t.TempDir()
+	writeJSON(t, dir, "settings.json", map[string]any{"version": secret})
+	writeJSON(t, dir, "collections/collection.json", map[string]any{secret: secret})
+	before := snapshot(t, dir)
+	for _, help := range []string{"-h", "--help"} {
+		code, out, stderr := invoke(t, context.Background(), dir, help)
+		if code != exitOK || stderr != "" || !strings.HasPrefix(out, "用法：") || !strings.Contains(out, "Usage:") {
+			t.Fatal("help must print Chinese then English without loading invalid native data")
+		}
+		if !strings.Contains(out, "默认不选择环境") || !strings.Contains(out, "No environment is selected by default") {
+			t.Fatal("help must explain environment selection in both languages")
+		}
+	}
+	if !reflect.DeepEqual(before, snapshot(t, dir)) {
+		t.Fatal("help mutated native data")
 	}
 }
 
@@ -471,6 +490,9 @@ func TestCLIBinaryExitCodesAndGUIFreeDependencies(t *testing.T) {
 		}
 		if tc.exit == exitFailed {
 			decodeReport(t, stdout.String())
+		}
+		if tc.exit == exitOK && (!strings.HasPrefix(stdout.String(), "用法：") || !strings.Contains(stdout.String(), "Usage:")) {
+			t.Fatal("binary help must include Chinese and English")
 		}
 	}
 }

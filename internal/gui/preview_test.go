@@ -422,3 +422,79 @@ func TestPreviewAllowsPreviouslyAuthorizedDownloadToComplete(t *testing.T) {
 		})
 	}
 }
+
+func TestPreviewHidesSensitiveBackgroundAndRestoresOnClose(t *testing.T) {
+	for _, prior := range []string{"response", "script diagnostics"} {
+		t.Run(prior, func(t *testing.T) {
+			svc := fake.New()
+			previewFailOnSend(t, svc)
+			r := model.NewRequest("background-request")
+			r.Name, r.URL = "BGCANARY Request", "https://example.test/preview"
+			col := model.Collection{ID: "background-collection", Name: "BGCANARY Collection", Items: []model.Item{{ID: r.ID, Name: r.Name, Type: model.ItemRequest, Request: &r}}}
+			if err := svc.Collections.Save(col); err != nil {
+				t.Fatal(err)
+			}
+			for _, env := range []model.Environment{
+				{ID: "active", Name: "BGCANARY Environment", Variables: []model.KV{{Key: "secret", Value: "BGCANARY"}}},
+				{ID: "other", Name: "BGCANARY OTHERCANARY Choice", Variables: []model.KV{{Key: "secret", Value: "OTHERCANARY"}}},
+			} {
+				if err := svc.Environments.Save(env); err != nil {
+					t.Fatal(err)
+				}
+			}
+			settings := svc.Settings.Get()
+			settings.ActiveEnvID = "active"
+			if err := svc.Settings.Save(settings); err != nil {
+				t.Fatal(err)
+			}
+			svc.Collections = previewReadOnlyCollections{svc.Collections}
+			svc.Environments = previewReadOnlyEnvironments{svc.Environments}
+			svc.Settings = previewReadOnlySettings{svc.Settings}
+			svc.History = previewReadOnlyHistory{svc.History}
+			h := newHarness(t, svc)
+			requestEnglish(h)
+			h.App.OpenRequest(r, col.ID)
+			tab := h.App.Active()
+			marker := "BGCANARY response-marker"
+			if prior == "response" {
+				tab.Response = &model.Response{StatusCode: 200, Headers: []model.KV{{Key: "Content-Type", Value: "text/plain"}}, Body: []byte(marker)}
+			} else {
+				marker = "BGCANARY console-marker"
+				tab.Err = "BGCANARY previous script error"
+				tab.Tests = []TestResult{{Name: "BGCANARY assertion", Error: "BGCANARY diagnostic"}}
+				h.App.scriptTab(tab).logs = []string{marker}
+			}
+			requestRepaint(h)
+			if !h.shows(marker) || !h.shows("BGCANARY Environment") || !h.shows("BGCANARY Collection") {
+				t.Fatalf("fixture did not paint sensitive background: %s", previewLabels(h))
+			}
+			before, _ := json.Marshal([]any{tab.Request, svc.Collections.List(), svc.Environments.List(), svc.Settings.Get()})
+			h.App.Toast("BGCANARY toast", "BGCANARY details", ui.ToastError)
+			h.click(h.App.S.Request.Preview)
+			requestRepaint(h)
+			// Existing picker/palette state must not bypass preview masking,
+			// even when they were left open by an independent UI action.
+			h.App.env.picker = true
+			h.App.openSearch()
+			h.App.search.query = "BGCANARY search"
+			requestRepaint(h)
+			painted := previewLabels(h)
+			if strings.Contains(painted, "BGCANARY") || strings.Contains(painted, "OTHERCANARY") {
+				t.Fatalf("preview leaked sensitive background: %s", painted)
+			}
+			if !h.App.env.picker || !h.App.search.open {
+				t.Fatal("preview mutated independent picker/search state")
+			}
+			h.click(h.App.S.Request.PreviewClose)
+			h.App.env.picker, h.App.search.open = false, false
+			requestRepaint(h)
+			if !h.shows(marker) || !h.shows("BGCANARY Environment") || !h.shows("BGCANARY Collection") || h.App.requestTabTitle(tab) != r.Name {
+				t.Fatal("closing preview did not restore background content and normal names")
+			}
+			after, _ := json.Marshal([]any{tab.Request, svc.Collections.List(), svc.Environments.List(), svc.Settings.Get()})
+			if string(before) != string(after) || tab.Dirty {
+				t.Fatal("preview background masking mutated draft or persistence")
+			}
+		})
+	}
+}

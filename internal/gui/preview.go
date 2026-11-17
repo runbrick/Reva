@@ -2,8 +2,10 @@ package gui
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/runbrick/reva/internal/auth"
+	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/preview"
 	"github.com/vivaui/viva/ui"
 )
@@ -13,12 +15,29 @@ import (
 func (a *App) requestPreviewOpen() bool {
 	active := a.Active()
 	for id, state := range a.request.tabs {
-		if id != active.ID || isWebSocket(active.Request) {
+		if id != active.ID || isWebSocket(active.Request) || a.Main != PageWorkbench || a.Section == SectionEnvironments {
 			state.previewOpen = false
 		}
 	}
 	state := a.request.tabs[active.ID]
 	return state != nil && state.previewOpen
+}
+
+func (a *App) requestPreviewSnapshot(t *Tab) preview.Snapshot {
+	col, _ := a.Svc.Collections.Get(t.CollectionID)
+	env, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
+	return preview.Build(t.Request, col, env)
+}
+
+// Picker labels use the same redactor as the preview. Include the candidate's
+// values as well as the active environment's values without changing active
+// expansion precedence or either stored environment.
+func (a *App) requestPreviewEnvironmentName(candidate model.Environment) string {
+	t := a.Active()
+	col, _ := a.Svc.Collections.Get(t.CollectionID)
+	active, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
+	candidate.Variables = append(slices.Clone(candidate.Variables), active.Variables...)
+	return preview.Build(t.Request, col, candidate).EnvironmentName
 }
 
 // The preview is rebuilt on every declaration; no resolved credential values
@@ -28,9 +47,7 @@ func (a *App) requestPreview(c ui.C, t *Tab, state *requestTabState) {
 		state.previewOpen = false
 		return
 	}
-	col, _ := a.Svc.Collections.Get(t.CollectionID)
-	env, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
-	snapshot := preview.Build(t.Request, col, env)
+	snapshot := a.requestPreviewSnapshot(t)
 	s, theme := &a.S.Request, c.Theme()
 	ui.Column(c).Fill().Background(a.palette.Surface)
 	ui.ModalWith(c, &state.previewOpen, s.PreviewTitle, ui.ModalSpec{Width: Space6 * 28, Height: Space6 * 20}, func() {

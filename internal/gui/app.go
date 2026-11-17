@@ -309,6 +309,9 @@ func (a *App) Page(c ui.C) {
 	}
 	a.declareSends(c)
 	a.declareWebSockets(c)
+	// Preview hides raw background data without moving asynchronous work
+	// into a different declaration scope or changing independent UI state.
+	previewing := a.requestPreviewOpen()
 	theme := c.Theme()
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
@@ -321,16 +324,20 @@ func (a *App) Page(c ui.C) {
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.settingsPage(c) })
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
-					a.sidebar(c)
+					if !previewing {
+						a.sidebar(c)
+					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
 				a.workbench(c, theme)
 			}
 		})
 	})
-	a.dialogs(c)
-	a.searchPalette(c)
-	ui.Toasts(c, &a.toaster)
+	if !previewing {
+		a.dialogs(c)
+		a.searchPalette(c)
+		ui.Toasts(c, &a.toaster)
+	}
 }
 
 // rail is the left icon navigation. It selects Section, and on the
@@ -425,6 +432,7 @@ func (a *App) sidebar(c ui.C) {
 // the Environments section is selected, the env PR's editor may take the
 // whole area instead.
 func (a *App) workbench(c ui.C, theme *ui.Theme) {
+	previewing := a.requestPreviewOpen()
 	if a.Section == SectionEnvironments && a.envReady() {
 		ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() { a.envMain(c) })
 		return
@@ -441,6 +449,9 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 		})
 		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
 		ui.Column(c).FillWidth().Grow(1).Children(func() {
+			if previewing {
+				return
+			}
 			if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
 				a.scriptFailurePane(c.KeyInt(t.ID), t)
 			} else {

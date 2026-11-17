@@ -28,6 +28,88 @@ not move existing user data. Backups now use `.revabak` and the
 `reva-backup-v1` envelope; backups from earlier builds must be re-exported from
 their local data with this build.
 
+## Headless collection CLI
+
+Run an existing native collection without opening a window:
+
+```sh
+go run ./cmd/reva-run --data-dir ./reva-data --collection 0123456789abcdef
+go run ./cmd/reva-run --collection 0123456789abcdef --environment fedcba9876543210 --stop-on-failure
+go build -o bin/reva-run ./cmd/reva-run
+```
+
+For automation, use the built `bin/reva-run` (`bin/reva-run.exe` on Windows):
+`go run` wraps nonzero program exits and may add its own `exit status` diagnostic.
+Use `-h` or `--help` for usage in Chinese followed by English; help succeeds
+without reading data or selecting a language from saved settings.
+
+`--collection ID` is required and selects `collections/<ID>.json`; IDs are the
+native stored IDs, not display names or input file paths. `--data-dir` overrides
+`REVA_HOME`, then the normal user config directory/Reva location. The directory
+must already exist. Only `settings.json`, the selected collection, and an
+explicitly selected `environments/<ID>.json` are read. **No environment is used
+by default**, even when GUI settings have an active environment. Explicit
+environment rows override collection variables; disabled rows fall back to
+enabled collection values.
+
+The CLI creates no data directories and saves no settings, collection,
+environment, or history files, on success, error, or cancellation. An absent
+`settings.json` uses the model's safe defaults (60-second request timeout,
+redirects enabled, TLS verification enabled). A present malformed/unreadable
+settings file aborts; it never silently falls back. Selected files must use
+native schema version 1, with exact known field names and types; duplicate
+JSON keys, missing required fields, duplicate item IDs, inconsistent item trees,
+invalid transport toggles/timeouts, and future schema versions are rejected
+before scripts or HTTP run. Limits are 32 MiB of UTF-8 JSON per file, 1,024 JSON
+container levels, 256 item levels, 10,000 tree nodes, and 100,000 variable/table/form
+rows per collection (or environment). Unselected files and history are ignored.
+
+Execution uses the shared collection runner: serial depth-first native order,
+inherited collection/folder auth, request options over saved settings, pre-request
+scripts, one variable expansion, HTTP, then response tests. Default behavior
+continues after failures; `--stop-on-failure` marks subsequent requests skipped.
+HTTP 4xx/5xx alone do not fail a run; assert the desired status in a response
+test. Script variable edits are local to one request and do not carry into the
+next request. Pre-script failure prevents sending. The existing bounded ES5
+script sandbox is used; a running script may take up to its two-second limit
+to observe cancellation. Enabled binary/multipart upload references can read
+local files and send them, as in the GUI. This command runs trusted native
+collections; it is not an import preview or a filesystem/network sandbox.
+
+After any run, stdout contains exactly one compact JSON report plus a newline,
+including failures and partial cancellation. Input/load errors produce no
+report; help prints usage text. Stderr contains only fixed diagnostic codes,
+never raw filesystem, HTTP, or script errors. Example for an empty collection
+(the measured `durationNs` varies):
+
+```json
+{"version":1,"outcome":"passed","durationNs":1200,"counts":{"total":0,"passed":0,"failed":0,"cancelled":0,"skipped":0},"assertions":{"passed":0,"failed":0},"requests":[]}
+```
+
+Report version 1 is independent of the native data schema. Reports contain only
+fixed outcome/stage/diagnostic codes, one-based request ordinals, sender-invoked
+flags, optional HTTP status codes, nonnegative nanosecond timings, request counts,
+and assertion pass/fail counts. They omit all entity IDs/names, URLs, methods,
+headers, bodies, credentials, variables, script sources/logs, assertion names,
+and arbitrary error messages. Locate a reported ordinal using the collection's
+depth-first request order. Counts/order, HTTP status, timings, and execution
+outcomes are intentionally visible; there is no raw/debug report flag.
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | All requests passed (including an empty collection), or help |
+| `1` | Transport/auth/script/assertion/unsupported-request failure, or report write failure |
+| `2` | Invalid arguments, unavailable data directory, or invalid/missing selected data |
+| `130` | Parent context cancelled, including Ctrl+C or SIGTERM where supported |
+
+Cancellation prevents subsequent sends and includes skipped request positions
+in the report. A per-request timeout is a run failure (`1`); it does not cancel
+the parent run. If stdout cannot be written, the report may be incomplete and
+the exit code is `1` with `reva-run: output_failed` on stderr. No new dependencies,
+GUI packages, parallel execution, iterations, implicit active-environment
+selection, response capture between requests, cookie jar, or full Postman runtime
+are introduced.
+
 ## Layout
 
 ```

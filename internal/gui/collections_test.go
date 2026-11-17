@@ -576,7 +576,7 @@ func TestCollectionsContextVariablesSaveCancelAndExport(t *testing.T) {
 	h := newHarness(t, svc)
 	collectionsContext(h, "Payments", h.App.S.Collections.Variables)
 	collectionsReplace(h, h.App.S.Common.Value, "after")
-	h.click(h.App.S.Collections.Cancel)
+	h.click(h.App.S.Collections.DiscardReload)
 	h.pump()
 	stored, _ := svc.Collections.Get(col.ID)
 	if stored.Variables[0].Value != "before" {
@@ -587,7 +587,7 @@ func TestCollectionsContextVariablesSaveCancelAndExport(t *testing.T) {
 	collectionsOption(h, h.App.S.Collections.Save)
 	h.pump()
 	stored, _ = svc.Collections.Get(col.ID)
-	if stored.Variables[0].Value != "after" || !h.shows(h.App.S.Collections.VariablesSaved) {
+	if stored.Variables[0].Value != "after" || !h.shows(h.App.S.Collections.SettingsSaved) {
 		t.Fatal("collection menu did not save edited variables")
 	}
 	path := filepath.Join(t.TempDir(), "collection.json")

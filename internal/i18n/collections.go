@@ -2,6 +2,10 @@ package i18n
 
 // Collections holds the strings of the collections sidebar and save dialog. Owned by that feature's PR.
 type Collections struct {
+	Settings, FolderSettings, SettingsTitle, FolderSettingsTitle       string
+	General, DiscardReload, Unsaved, SettingsSaved, SettingsSaveFailed string
+	SettingsMissing, SettingsHelp, SettingsNavigation, SettingsContent string
+
 	Authentication, AuthSaved, AuthSaveFailed, AuthTargetMissing string
 	Title, NewCollection, NewFolder, NewRequest                  string
 	NewGraphQL, NewWebSocket                                     string
@@ -15,6 +19,10 @@ type Collections struct {
 }
 
 var collectionsZh = Collections{
+	Settings: "集合设置", FolderSettings: "文件夹设置", SettingsTitle: "%s · 集合设置", FolderSettingsTitle: "%s · 文件夹设置",
+	General: "常规", DiscardReload: "放弃更改并重新加载", Unsaved: "有未保存的更改", SettingsSaved: "设置已保存", SettingsSaveFailed: "无法保存设置，请重试。",
+	SettingsMissing: "集合或文件夹已不存在。无法保存，请关闭此标签页。", SettingsHelp: "在此管理名称、共享认证和集合变量。更改仅在保存后生效。", SettingsNavigation: "设置导航", SettingsContent: "配置内容",
+
 	Authentication: "身份认证", AuthSaved: "认证已保存", AuthSaveFailed: "无法保存认证，请重试。", AuthTargetMissing: "集合或文件夹已不存在，无法保存认证。",
 	NewWebSocket: "新建 WebSocket",
 	NewGraphQL:   "新建 GraphQL 请求",
@@ -30,6 +38,10 @@ var collectionsZh = Collections{
 }
 
 var collectionsEn = Collections{
+	Settings: "Collection settings", FolderSettings: "Folder settings", SettingsTitle: "%s · Collection settings", FolderSettingsTitle: "%s · Folder settings",
+	General: "General", DiscardReload: "Discard and reload", Unsaved: "Unsaved changes", SettingsSaved: "Settings saved", SettingsSaveFailed: "Could not save settings. Please try again.",
+	SettingsMissing: "The collection or folder no longer exists. Close this tab; its changes cannot be saved.", SettingsHelp: "Manage names, shared authentication and collection variables here. Changes take effect only when saved.", SettingsNavigation: "Settings navigation", SettingsContent: "Configuration content",
+
 	Authentication: "Authentication", AuthSaved: "Authentication saved", AuthSaveFailed: "Could not save authentication. Please try again.", AuthTargetMissing: "The collection or folder no longer exists. Authentication could not be saved.",
 	NewWebSocket: "New WebSocket",
 	NewGraphQL:   "New GraphQL request",

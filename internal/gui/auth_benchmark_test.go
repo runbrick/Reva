@@ -10,7 +10,7 @@ import (
 	"github.com/vivaui/viva/ui"
 )
 
-// These benchmarks repaint the actual shared editor and dialog after warming
+// These benchmarks repaint the actual shared editor and configuration page after warming
 // their state. Inherit includes the latest-collection lookup and source preview.
 func BenchmarkAuthEditorPaint(b *testing.B) {
 	for _, kind := range []model.AuthType{model.AuthInherit, model.AuthNone, model.AuthBearer, model.AuthBasic, model.AuthAPIKey} {
@@ -25,7 +25,7 @@ func BenchmarkAuthEditorPaint(b *testing.B) {
 	}
 }
 
-func BenchmarkAuthDialogPaint(b *testing.B) {
+func BenchmarkAuthSettingsPaint(b *testing.B) {
 	for _, scope := range []string{"root", "folder"} {
 		kinds := model.AuthTypes
 		if scope == "folder" {
@@ -38,9 +38,9 @@ func BenchmarkAuthDialogPaint(b *testing.B) {
 				if scope == "folder" {
 					node.id, node.name = "folder", "Shared folder"
 				}
-				a.collectionAuthDialog(node)
-				a.collections.authDraft = authBenchmarkConfig(kind)
-				authBenchmarkPaint(b, a, a.collectionsDialogs, 1280, 800)
+				a.openCollectionAuth(node)
+				a.collections.settings[a.Active().ID].auth = authBenchmarkConfig(kind)
+				authBenchmarkPaint(b, a, func(c ui.C) { a.collectionSettingsPane(c, a.Active()) }, 1280, 800)
 			})
 		}
 	}

@@ -1,23 +1,120 @@
 # Collection configuration in workbench tabs
 
-Branch: `runbrick/collection-settings-tabs`, based on parent
-`runbrick/onboarding-orchestration` at `c460f09`.
+Current layout branch: `runbrick/collection-reference-layout`, based on parent
+`runbrick/onboarding-orchestration` at `1e8d4c4`. The earlier implementation and
+review checks below describe the original collection settings feature.
 
-The collection context menu starts with **集合设置 / Collection settings**.
+Each collection/folder sidebar row has a directly visible gear at its right edge,
+and a separate descendant request count. Clicking the gear opens **概览 / Overview**
+without a menu or modal, reusing the target's existing settings tab and its draft.
+The active configuration target is highlighted; disclosure chevrons still expand
+and collapse the tree independently. Counts never modify a saved display name,
+including names containing parentheses. Duplicate names get distinct accessible
+gear labels containing the display name and target identity.
+
+The collection context menu still starts with **集合设置 / Collection settings**.
 Folders offer **文件夹设置 / Folder settings**. Each target opens one configuration
 tab alongside request tabs, with a folder icon instead of an HTTP method badge.
 The existing Authentication and Collection variables menu shortcuts select
 sections in that same tab. Collection roots retain their tree expansion behavior.
 
-Configuration fills the workbench below the tab strip. It has a target heading,
-an unsaved indicator, Save, Discard and reload, and General / Authentication /
-Collection variables navigation. General edits the name inline. Folder settings
-have General and Authentication, including the inherited parent preview; folders
+Configuration fills the workbench below the tab strip. The strip paints the bare
+saved target name beside its folder icon; its accessible name and overflow entry
+retain the collection/folder settings distinction. A compact heading holds the
+editable name in Overview, an unsaved indicator, Save, and Discard (whose tooltip
+explains that it reloads saved data). The plain horizontal Overview / Collection
+variables / Authentication labels use `ui.TabBase` with an active blue underline.
+Folder settings have Overview and Authentication, including the parent preview; folders
 have no variables section. Configurations never show the request URL bar, Send,
 response pane or request/response splitter. The existing shared auth editor masks
 Bearer tokens, Basic passwords and API-key values, including variable placeholders.
 All new copy is in the Collections zh/en string tables and uses existing theme,
 spacing and icon assets. No icons or dependencies were added.
+
+## Reference layout
+
+The supplied Reqable screenshot informs the hierarchy and whitespace, with Reva's
+existing blue theme retained in light and dark modes. Direct gears replace branch
+ellipsis buttons; right-click context menus retain all existing shortcuts. Request
+rows retain their ellipsis actions. The sidebar's shell width/resizer is unchanged.
+
+Overview has two equal columns separated by whitespace: API/actions on the left,
+and a localized collection guide on the right. Both section headings begin directly
+below navigation. Thin rules divide API, organization, and export; no card surfaces
+or extra settings toolbar are introduced. The name field has a compact maximum
+width and trailing Save/Discard controls remain in the same heading row.
+
+- HTTP counts all saved non-WebSocket request nodes, including GraphQL bodies.
+  WebSocket is counted separately. Empty folders never count as requests.
+- Collection counts cover the complete persisted tree; folder counts and creation
+  actions cover only that subtree. Plus actions create real HTTP/WebSocket requests
+  through the existing service and open their editors without sending. New folder
+  uses the existing name dialog with the same target.
+- Collection export is the existing native Reva JSON save-file flow using current
+  saved data, including its credentials. Unsaved settings do not enter exports.
+  Folder overview does not offer whole-collection export.
+- The guide explains actual collection/folder scope, shared variables, auth
+  inheritance, draft editing, save/discard, and export behavior. It is static help,
+  never an editable or persisted document. There are no unsupported document
+  generators, export formats, request headers, or script sections.
+- Wide overviews give each column its own scroll area. When the available content
+  width falls below 720 logical pixels, including after resizing the sidebar, one
+  scroll area stacks actions before the guide. Heading/navigation remain outside
+  that body scroll; 960×600 remains usable. At 1440 and 1800 default widths, API
+  actions and the guide appear simultaneously.
+
+New headless behavior/layout tests in `collection_layout_test.go`:
+
+- `TestCollectionOverviewGearCountsReuseAndDisclosure`
+- `TestCollectionOverviewFolderActionsAndSavedExport`
+- `TestCollectionOverviewDuplicateNamesHaveDistinctGears`
+- `TestCollectionOverviewResponsiveGeometry`
+- `TestCollectionOverviewSidebarResizeAndIndependentScroll`
+- `TestCollectionOverviewHeadlessCapture` (opt-in review PNGs)
+
+The geometry matrix covers zh/en, light/dark, 960×600, 1440×900, and 1800×1000;
+it checks compact controls, active underline, columns/stack, and reachable guide
+content. Existing settings save/draft/error/close/reopen, masking/preview,
+no-send, pending-download, auth, variables and collection behaviors remain covered
+by their original tests without assertion removals or test rewrites.
+
+Actual native offscreen PNGs can be reproduced without a window or production
+screenshot mode by setting `REVA_COLLECTION_CAPTURE_DIR` to a scratch directory
+outside the repository and running:
+
+```text
+go test ./internal/gui -run '^TestCollectionOverviewHeadlessCapture$' -count=1 -v
+```
+
+This uses Viva 0.6.0 `headless.Open` / `Session.Screenshot` with the actual App
+page and platform text engine at scale 1. The rendered zh/light 1800×1000,
+en/dark 1440×900, and en/light 960×600 images were inspected during this revision.
+No real native window, browser mockup, or external network is used.
+
+Revision verification: all four required checks passed on this child branch.
+The existing behavior tests needed no caption or assertion rewrites. Output tails:
+
+```text
+gofmt -l .
+(empty)
+
+go vet ./...
+(empty)
+
+go tool viva vet ./...
+(empty)
+
+go test ./... -count=1
+ok   github.com/runbrick/reva/internal/gui              20.884s
+ok   github.com/runbrick/reva/internal/i18n              1.338s
+ok   github.com/runbrick/reva/internal/service/request   5.074s
+ok   github.com/runbrick/reva/internal/service/store     4.363s
+ok   github.com/runbrick/reva/internal/storage           1.975s
+ok   github.com/runbrick/reva/internal/syncing            5.510s
+ok   github.com/runbrick/reva/internal/update            3.382s
+ok   github.com/runbrick/reva/internal/vars              1.972s
+ok   github.com/runbrick/reva/internal/websocket         2.933s
+```
 
 ## Draft and persistence semantics
 

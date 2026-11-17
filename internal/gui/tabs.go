@@ -118,11 +118,20 @@ func (a *App) tabBar(c ui.C) {
 								ui.Row(tc).Absolute().Top(0).Left(0).Right(0).Height(2).Background(theme.Primary)
 							}
 							if t.Kind == collectionSettingsTabKind {
+								kind := a.S.Collections.Settings
+								if t.TargetID != "" {
+									kind = a.S.Collections.FolderSettings
+								}
+								row.Tooltip(kind)
 								ui.Icon(tc, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
 							} else {
 								a.MethodBadge(tc, t.Request.Method)
 							}
-							ui.Text(tc, title).Grow(1).Ellipsis().Color(foreground)
+							caption := title
+							if t.Kind == collectionSettingsTabKind && !a.requestPreviewOpen() {
+								caption = a.collectionSettingsName(t)
+							}
+							ui.Text(tc, caption).Grow(1).Ellipsis().Color(foreground)
 							ui.Stack(tc).Size(Space6, Space6).Children(func() {
 								close := ui.ButtonBase(tc, a.S.Tabs.Close).Tooltip(a.S.Tabs.Close).Size(Space6, Space6).
 									Radius(theme.Metrics.RadiusControl).Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))

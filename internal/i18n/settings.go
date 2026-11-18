@@ -23,6 +23,7 @@ type Settings struct {
 	AccessKey, SecretKey, SnippetID, SnippetFile, APIAddress, PathStyle string
 	GettingStarted, GettingStartedDescription, OpenGuide, ReplayGuide   string
 	GuideTitle, GuideIntro, GuideRequestTitle, GuideRequestDescription  string
+	GuidePractice, GuidePracticeName, GuideImport                       string
 	GuideVariablesTitle, GuideVariablesDescription                      string
 	GuideDataTitle, GuideDataDescription, GuideDone, GuideSkip          string
 	GuideSaveFailed                                                     string
@@ -55,6 +56,7 @@ var settingsZh = Settings{
 	OpenGuide: "打开指南", ReplayGuide: "重新查看指南", GuideTitle: "欢迎使用 Reva",
 	GuideIntro:        "可随时关闭指南并开始使用。点击“完成”会标记为已完成；点击“暂时跳过”只关闭指南，不标记完成。之后可在设置中重新查看。",
 	GuideRequestTitle: "发送第一个请求", GuideRequestDescription: "输入 URL，选择 HTTP 方法，再手动点击“发送”发出请求。也可导入 curl 命令或 Postman 集合。",
+	GuidePractice: "离线预览示例", GuidePracticeName: "示例请求", GuideImport: "导入已有请求",
 	GuideVariablesTitle: "使用环境变量", GuideVariablesDescription: "在环境中配置变量，用 {{name}} 在请求中引用。请在自己的配置中填写令牌、密码等凭据。",
 	GuideDataTitle: "管理本机数据", GuideDataDescription: "数据保存在本机，无需账号。可按需配置加密备份或同步。",
 	GuideDone: "完成", GuideSkip: "暂时跳过", GuideSaveFailed: "未能保存指南完成状态，请重试。",
@@ -87,6 +89,7 @@ var settingsEn = Settings{
 	OpenGuide: "Open guide", ReplayGuide: "Replay guide", GuideTitle: "Welcome to Reva",
 	GuideIntro:        "Close this guide anytime and start using the app. Done marks it complete; Skip for now closes it without marking it complete. Replay it anytime from Settings.",
 	GuideRequestTitle: "Send your first request", GuideRequestDescription: "Enter a URL, choose an HTTP method, then click Send manually to send the request. You can also import a curl command or a Postman collection.",
+	GuidePractice: "Preview sample offline", GuidePracticeName: "Sample request", GuideImport: "Import existing requests",
 	GuideVariablesTitle: "Use environment variables", GuideVariablesDescription: "Define variables in an environment and reference them in requests with {{name}}. Enter credentials such as tokens and passwords in your own configuration.",
 	GuideDataTitle: "Manage local data", GuideDataDescription: "Your data stays on this device, with no account required. Encrypted backup and sync are optional and can be configured when you need them.",
 	GuideDone: "Done", GuideSkip: "Skip for now", GuideSaveFailed: "Could not save guide completion. Please try again.",

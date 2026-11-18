@@ -15,6 +15,7 @@ import (
 // envState owns the titlebar picker, sidebar menus and independent editor drafts.
 type envState struct {
 	picker     bool
+	filter     string
 	activeID   string
 	drafts     []*envDraft
 	selected   string
@@ -145,14 +146,25 @@ func (a *App) envSelector(c ui.C) {
 			name = a.requestPreviewEnvironmentName(active)
 		}
 	}
-	trigger := ui.ButtonBase(c, a.S.Env.Title).Height(Space4 * 2).MaxWidth(Space6 * 10).
+	label := a.S.Env.Title
+	if a.studioLayout() {
+		label = a.S.Env.SelectEnvironment
+	}
+	trigger := ui.ButtonBase(c, label).Height(Space4 * 2).MaxWidth(Space6 * 10).
 		PadX(Space3).Gap(Space2).Radius(theme.Metrics.RadiusControl).
 		Background(a.palette.Rail).Hover(ui.Look{}.Background(theme.Hover)).
 		Focus(ui.Look{}.Ring(Space1/2, theme.Ring)).Children(func() {
-		ui.Icon(c, icons.Globe).Size(Space4, Space4).Color(theme.MutedForeground)
+		if a.studioLayout() && hasActive {
+			statusDot(c, theme.Success)
+		} else {
+			ui.Icon(c, icons.Globe).Size(Space4, Space4).Color(theme.MutedForeground)
+		}
 		ui.Text(c, name).Ellipsis()
 		ui.Icon(c, icons.ChevronDown).Size(Space4, Space4).Color(theme.MutedForeground)
 	})
+	if a.studioLayout() {
+		trigger.MaxWidth(Space6*7).Border(1, theme.Border).Background(theme.Card).Tooltip(name)
+	}
 	if trigger.Clicked() {
 		s.picker = !s.picker
 	}
@@ -290,13 +302,31 @@ func (a *App) envSidebar(c ui.C) {
 	s, theme := &a.env, c.Theme()
 	ui.Column(c).Fill().Pad(Space3).Gap(Space3).Children(func() {
 		ui.Row(c).FillWidth().Items(ui.Center).Children(func() {
-			ui.Text(c, a.S.Env.Title).Bold().Grow(1)
-			if ui.Button(c, a.S.Env.New).Icon(icons.Plus).IconOnly().Ghost().Tooltip(a.S.Env.New).Clicked() {
+			heading := ui.Text(c, a.S.Env.Title).Bold().Grow(1)
+			add := ui.Button(c, a.S.Env.New).Icon(icons.Plus).IconOnly().Tooltip(a.S.Env.New)
+			if a.studioLayout() {
+				heading.FontSize(theme.Metrics.FontSizeL - Space1)
+			} else {
+				add.Ghost()
+			}
+			if add.Clicked() {
 				c.After(a.createEnvironment)
 			}
 		})
+		if a.studioLayout() {
+			ui.TextField(c, &s.filter, a.S.Env.Filter, a.S.Env.Filter).Icon(icons.Search).FillWidth().Background(theme.Muted)
+		}
+		activeID := a.Svc.Settings.Get().ActiveEnvID
+		query := ""
+		if a.studioLayout() {
+			query = strings.ToLower(strings.TrimSpace(s.filter))
+		}
 		ui.Scroll(c).FillWidth().Grow(1).Gap(Space1).Children(func() {
+			found := false
 			for _, env := range a.Svc.Environments.List() {
+				if query != "" && !strings.Contains(strings.ToLower(env.Name), query) {
+					continue
+				}
 				var draft *envDraft
 				for _, d := range s.drafts {
 					if d.id == env.ID {
@@ -307,6 +337,7 @@ func (a *App) envSidebar(c ui.C) {
 				if draft == nil {
 					continue
 				}
+				found = true
 				ui.Row(c.Key(env.ID)).FillWidth().Gap(Space1).Items(ui.Center).Children(func() {
 					row := ui.ButtonBase(c, env.Name).Grow(1).Height(theme.Metrics.ControlHeight).
 						PadX(Space2).Gap(Space2).Justify(ui.Start).Radius(theme.Metrics.RadiusControl).
@@ -315,12 +346,20 @@ func (a *App) envSidebar(c ui.C) {
 						row.Background(a.palette.RailActive)
 					}
 					row.Children(func() {
-						ui.Icon(c, icons.Globe).Size(Space4, Space4).Color(theme.MutedForeground)
+						if a.studioLayout() {
+							color := theme.MutedForeground
+							if activeID == env.ID {
+								color = theme.Success
+							}
+							statusDot(c, color)
+						} else {
+							ui.Icon(c, icons.Globe).Size(Space4, Space4).Color(theme.MutedForeground)
+						}
 						ui.Text(c, env.Name).Grow(1).Ellipsis()
 						if draft.dirty() {
 							ui.Text(c, a.S.Env.UnsavedMark).Color(a.palette.Warning)
 						}
-						if a.Svc.Settings.Get().ActiveEnvID == env.ID {
+						if activeID == env.ID {
 							ui.Icon(c, icons.Check).Size(Space4, Space4).Color(theme.Primary)
 						}
 					})
@@ -335,6 +374,9 @@ func (a *App) envSidebar(c ui.C) {
 					ui.Menu(c, more, &draft.menu, actions)
 					ui.ContextMenu(c, row, actions)
 				})
+			}
+			if query != "" && !found {
+				ui.Text(c, a.S.Env.NoMatches).Muted()
 			}
 		})
 	})
@@ -419,7 +461,7 @@ func (a *App) envReady() bool { return true }
 func (a *App) envMain(c ui.C) {
 	a.syncEnvironments()
 	s, theme := &a.env, c.Theme()
-	ui.Column(c).Fill().Pad(Space6).Gap(Space4).Children(func() {
+	ui.Row(c).Fill().Pad(Space4).Gap(Space4).Children(func() {
 		d := s.current()
 		if d == nil {
 			ui.Column(c).Fill().Center().Gap(Space4).Children(func() {
@@ -435,13 +477,26 @@ func (a *App) envMain(c ui.C) {
 			}
 			return
 		}
-		ui.Column(c.Key(d.id)).Fill().Gap(Space4).Children(func() {
+		ui.Column(c.Key(d.id)).Grow(1).MinWidth(0).FillHeight().Gap(Space3).Children(func() {
 			// Synchronize fields before dirty indicators and shortcut save see the draft.
+			d.table.syncBulk(&d.variables)
 			d.table.sync(d.variables)
+			if a.studioLayout() {
+				ui.Row(c).FillWidth().Items(ui.Center).Gap(Space3).Children(func() {
+					ui.Row(c).Size(Space6*2, Space6*2).Center().Radius(theme.Metrics.RadiusSurface).Background(theme.Accent).Children(func() {
+						ui.Icon(c, icons.Layers).Size(Space6, Space6).Color(theme.AccentForeground)
+					})
+					ui.Text(c, a.S.Env.Manage).FontSize(theme.Metrics.FontSizeL).Bold().Ellipsis()
+				})
+			}
 			ui.Row(c).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
-				ui.Text(c, a.S.Env.Title).Bold().FontSize(theme.Metrics.FontSizeL)
+				if a.studioLayout() {
+					ui.Text(c, a.S.Env.Variables).Bold().Color(theme.AccentForeground).Ellipsis()
+				} else {
+					ui.Text(c, a.S.Env.Title).Bold().FontSize(theme.Metrics.FontSizeL)
+				}
 				if d.dirty() {
-					ui.Text(c, a.S.Env.Unsaved).FontSize(theme.Metrics.FontSizeS).Color(a.palette.Warning)
+					ui.Text(c, a.S.Env.Unsaved).FontSize(theme.Metrics.FontSizeS).Color(a.palette.Warning).Ellipsis()
 				}
 				ui.Spacer(c)
 				if ui.Button(c, a.S.Env.Discard).Outline().Disabled(!d.dirty()).Clicked() {
@@ -452,23 +507,55 @@ func (a *App) envMain(c ui.C) {
 						s.err, s.rename = "", false
 					})
 				}
-				if ui.Button(c, a.S.Env.Save).Icon(icons.Check).Disabled(!d.dirty()).Clicked() {
+				if ui.Button(c, a.S.Env.Save).Icon(icons.Check).Shrink(0).Disabled(!d.dirty()).Clicked() {
 					c.After(a.saveEnvironments)
 				}
 			})
+			if a.studioLayout() {
+				ui.Divider(c)
+			}
 			name := ui.TextField(c, &d.name, a.S.Env.Name, a.S.Env.NewEnvironment).FillWidth()
 			if s.rename {
 				name.AutoFocus()
 			}
-			ui.Wrap(c, a.S.Env.SaveHint).Muted().FontSize(theme.Metrics.FontSizeS)
+			if !a.studioLayout() {
+				ui.Wrap(c, a.S.Env.SaveHint).Muted().FontSize(theme.Metrics.FontSizeS)
+			}
 			ui.Scroll(c).FillWidth().Grow(1).Gap(Space3).Children(func() {
-				a.kvTable(c, &d.table, &d.variables)
+				if a.studioLayout() {
+					a.kvTableWithLabels(c, &d.table, &d.variables, "", a.S.Env.Key, a.S.Env.Value, a.S.Env.Description, a.S.Env.AddRow)
+				} else {
+					a.kvTable(c, &d.table, &d.variables)
+				}
 			})
 			if s.err != "" {
 				ui.Wrap(c, s.err).Color(theme.Danger)
 			}
 			if ui.Shortcut(c, ui.Primary, "s") {
 				c.After(a.saveEnvironments)
+			}
+		})
+		if a.studioInspectorFits(c) {
+			a.studioEnvironmentInspector(c, d)
+		}
+	})
+}
+
+func (a *App) studioEnvironmentInspector(c ui.C, draft *envDraft) {
+	theme, labels := c.Theme(), a.S.Env
+	active := a.Svc.Settings.Get().ActiveEnvID == draft.id
+	ui.Column(c).Width(studioInspectorWidth).Shrink(0).Children(func() {
+		studioCard(c, labels.Details, icons.Info, func() {
+			ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
+				ui.Text(c, draft.name).Grow(1).Bold().Ellipsis()
+				if active {
+					ui.Text(c, labels.Active).FontSize(theme.Metrics.FontSizeS).Color(theme.Success).
+						PadX(Space2).Radius(theme.Metrics.RadiusControl).Background(theme.Success.WithAlpha(0.12))
+				}
+			})
+			studioDetail(c, labels.Variables, fmt.Sprint(len(draft.variables)))
+			if !active && ui.Button(c, labels.SetActive).Outline().Icon(icons.Check).FillWidth().Clicked() {
+				c.After(func() { a.selectEnvironment("", draft.id) })
 			}
 		})
 	})

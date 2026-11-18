@@ -28,6 +28,14 @@ func (a *App) Palette() *Palette { return &a.palette }
 
 func (a *App) desktopLayout() bool { return a.themeLayout == themes.LayoutDesktop }
 
+func (a *App) studioLayout() bool { return a.themeLayout == themes.LayoutStudio }
+
+const studioInspectorWidth = Space6 * 11
+
+func (a *App) studioInspectorFits(c ui.C) bool {
+	return a.studioLayout() && c.Bounds().Width-a.sideSplit.Pos-RailWidth >= studioInspectorWidth+Space6*29
+}
+
 func (a *App) railWidth() float32 {
 	if a.desktopLayout() {
 		return 0

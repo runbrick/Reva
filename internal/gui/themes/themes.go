@@ -13,6 +13,7 @@ type Style string
 const (
 	Modern  Style = "modern"
 	Classic Style = "classic"
+	Studio  Style = "studio"
 )
 
 type Layout uint8
@@ -20,6 +21,7 @@ type Layout uint8
 const (
 	LayoutRail Layout = iota
 	LayoutDesktop
+	LayoutStudio
 )
 
 type definition struct {
@@ -31,6 +33,7 @@ type definition struct {
 var builtins = [...]definition{
 	{Modern, LayoutRail, modernTheme},
 	{Classic, LayoutDesktop, classicTheme},
+	{Studio, LayoutStudio, studioTheme},
 }
 
 func Styles() []Style {

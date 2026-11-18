@@ -143,7 +143,12 @@ func (a *App) requestPane(c ui.C, t *Tab) {
 			ui.Column(c).FillWidth().Gap(Space2).Children(func() {
 				switch s.section {
 				case requestParams:
-					if a.kvTable(c, &s.params, &t.Request.Params) {
+					labels := a.S.Request
+					title := ""
+					if a.studioLayout() {
+						title = labels.QueryParameters
+					}
+					if a.kvTableWithLabels(c, &s.params, &t.Request.Params, title, labels.ParamName, labels.ParamValue, labels.Description, labels.AddParam) {
 						t.Dirty = true
 						requestURLFromParams(&t.Request)
 						s.url = t.Request.URL
@@ -456,8 +461,13 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 	theme, labels := c.Theme(), &a.S.Request
 	height := theme.Metrics.ControlHeight + Space1
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-		if ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
-			Width(Space6 * 4).Height(height).Shrink(0).Changed() {
+		method := ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
+			Width(Space6 * 4).Height(height).Shrink(0)
+		if a.studioLayout() {
+			color := a.palette.MethodColor(t.Request.Method)
+			method.Color(color).Background(color.WithAlpha(0.08))
+		}
+		if method.Changed() {
 			t.Dirty = true
 		}
 		field := ui.TextField(c, &t.Request.URL, labels.URL, "https://").Grow(1).MinWidth(Space6*4).Height(height).
@@ -524,12 +534,39 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				}
 			})
 		})
+		if a.studioLayout() {
+			save := ui.Button(c, labels.Save).Icon(icons.Save).Outline().Height(height).Shrink(0).Tooltip(labels.Save)
+			if c.Bounds().Width-a.sideSplit.Pos-RailWidth < Space6*27 {
+				save.IconOnly()
+			}
+			if save.Clicked() {
+				c.After(func() { a.RequestSave(t) })
+			}
+		}
 	})
 }
 
 func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
+	if a.studioLayout() {
+		ui.Row(c).FillWidth().Height(c.Theme().Metrics.ControlHeight + Space1).Shrink(0).Items(ui.Center).Children(func() {
+			ui.Scroll(c).Grow(1).MinWidth(0).FillHeight().Sideways().Children(func() {
+				a.requestSectionTabList(c, t, s)
+			})
+			a.requestPreviewButton(c, s)
+		})
+	} else {
+		a.requestSectionTabList(c, t, s)
+	}
+	ui.Divider(c)
+}
+
+func (a *App) requestSectionTabList(c ui.C, t *Tab, s *requestTabState) {
 	theme := c.Theme()
-	ui.Row(c).FillWidth().Gap(Space1).Items(ui.Center).FocusGroup(ui.FocusHorizontal).Children(func() {
+	row := ui.Row(c).Gap(Space1).Items(ui.Center).FocusGroup(ui.FocusHorizontal)
+	if !a.studioLayout() {
+		row.FillWidth()
+	}
+	row.Children(func() {
 		for _, section := range requestSections {
 			count := 0
 			var rows []model.KV
@@ -585,13 +622,18 @@ func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
 				}
 			})
 		}
-		ui.Spacer(c)
-		label := a.S.Request.Preview
-		if ui.Button(c, label).Icon(icons.Eye).IconOnly().Ghost().Tooltip(label).Shrink(0).Clicked() {
-			c.After(func() { s.previewOpen = true })
+		if !a.studioLayout() {
+			ui.Spacer(c)
+			a.requestPreviewButton(c, s)
 		}
 	})
-	ui.Divider(c)
+}
+
+func (a *App) requestPreviewButton(c ui.C, state *requestTabState) {
+	label := a.S.Request.Preview
+	if ui.Button(c, label).Icon(icons.Eye).IconOnly().Ghost().Tooltip(label).Shrink(0).Clicked() {
+		c.After(func() { state.previewOpen = true })
+	}
 }
 
 var requestToggles = []model.Toggle{model.ToggleInherit, model.ToggleOn, model.ToggleOff}

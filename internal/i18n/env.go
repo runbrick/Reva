@@ -8,9 +8,13 @@ type Env struct {
 	Save, Close, Discard, Cancel, Empty, SaveHint, NameRequired string
 	SetActive, Actions, Unsaved, UnsavedMark                    string
 	Unresolved, UnresolvedTip, Error                            string
+	Filter, NoMatches, Variables, Details, Active               string
+	SelectEnvironment                                           string
 }
 
 var envZh = Env{
+	SelectEnvironment: "切换环境",
+	Filter:            "搜索环境", NoMatches: "没有匹配的环境", Variables: "环境变量", Details: "环境信息", Active: "当前使用",
 	Title: "环境", NoEnvironment: "无环境", Edit: "编辑环境", Manage: "管理环境", New: "新建环境", NewEnvironment: "新环境",
 	Rename: "重命名", Duplicate: "复制环境", CopyName: "%s（副本）", Delete: "删除环境", DeleteConfirm: "确定删除环境「%s」及其所有变量？此操作无法撤销。",
 	Name: "环境名称", Enabled: "启用", Key: "变量名", Value: "变量值", Description: "变量描述", DeleteRow: "删除变量", AddRow: "添加变量",
@@ -21,6 +25,8 @@ var envZh = Env{
 }
 
 var envEn = Env{
+	SelectEnvironment: "Switch environment",
+	Filter:            "Find environments", NoMatches: "No matching environments", Variables: "Environment variables", Details: "Environment details", Active: "Active",
 	Title: "Environments", NoEnvironment: "No environment", Edit: "Edit environments", Manage: "Manage environments", New: "New environment", NewEnvironment: "New environment",
 	Rename: "Rename", Duplicate: "Duplicate environment", CopyName: "%s (copy)", Delete: "Delete environment", DeleteConfirm: "Delete environment “%s” and all its variables? This cannot be undone.",
 	Name: "Environment name", Enabled: "Enabled", Key: "Variable key", Value: "Variable value", Description: "Variable descriptions", DeleteRow: "Delete row", AddRow: "Add variable",

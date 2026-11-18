@@ -9,7 +9,7 @@ import (
 )
 
 // titlebarState is retained for the shell's feature state slot.
-type titlebarState struct{}
+type titlebarState struct{ collectionsOpen bool }
 
 const desktopToolbarHeight = Space6 + Space4
 
@@ -44,6 +44,10 @@ func (a *App) titlebarInsets() (leading, trailing float32) {
 // titlebarStrip keeps content clear of native controls. Only the flexible empty
 // space moves the window; Viva supplies dragging and double-click maximize/zoom.
 func (a *App) titlebarStrip(c ui.C) {
+	if a.studioLayout() {
+		a.studioTitlebar(c)
+		return
+	}
 	if a.desktopLayout() {
 		a.desktopTitlebar(c)
 		return
@@ -76,14 +80,80 @@ func (a *App) titlebarStrip(c ui.C) {
 	})
 }
 
+func (a *App) studioTitlebar(c ui.C) {
+	theme := c.Theme()
+	leading, trailing := a.titlebarInsets()
+	ui.Row(c).FillWidth().Height(TitlebarHeight).Shrink(0).Background(theme.Card).
+		PadLeft(leading + Space4).PadRight(trailing + Space4).Gap(Space3).Items(ui.Center).
+		Draw(drawTitlebarBorder).Children(func() {
+		a.titlebarBrand(c)
+		if !a.requestPreviewOpen() {
+			a.studioCollectionPicker(c)
+		}
+		a.envSelector(c)
+		ui.Row(c).Grow(1).MinWidth(Space4).FillHeight().MovesWindow()
+		ui.Row(c).Shrink(1).MinWidth(0).Clip().Children(func() { a.searchBox(c) })
+		if c.Bounds().Width >= Space6*52 {
+			ui.Row(c).Grow(1).MinWidth(Space4).FillHeight().MovesWindow()
+		}
+		label := a.S.Import.Title
+		if ui.Button(c, label).Icon(icons.Download).IconOnly().Outline().Tooltip(label).Clicked() {
+			c.After(a.openImportDialog)
+		}
+		ui.Row(c).Width(Space4).FillHeight().MovesWindow()
+		a.declareSettingsEffects(c)
+	})
+}
+
+func (a *App) studioCollectionPicker(c ui.C) {
+	theme, labels := c.Theme(), a.S.Collections
+	activeID := a.Active().CollectionID
+	name := labels.Title
+	if collection, found := a.Svc.Collections.Get(activeID); found {
+		name = collection.Name
+	}
+	trigger := ui.ButtonBase(c, labels.Collection).Width(Space6*7).Height(theme.Metrics.ControlHeight).Shrink(0).
+		Radius(theme.Metrics.RadiusControl).Border(1, theme.Border).Background(theme.Card).
+		PadX(Space2).Gap(Space2).Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
+		ui.Icon(c, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
+		ui.Text(c, name).Grow(1).Ellipsis()
+		ui.Icon(c, icons.ChevronDown).Size(Space4, Space4).Color(theme.MutedForeground)
+	})
+	if trigger.Clicked() {
+		a.titlebar.collectionsOpen = !a.titlebar.collectionsOpen
+	}
+	ui.Menu(c, trigger, &a.titlebar.collectionsOpen, func(menu *ui.MenuItems) {
+		for _, collection := range a.Svc.Collections.List() {
+			if menu.Item(collection.Name).Icon(icons.Folder).Chosen(collection.ID == activeID).Clicked() {
+				c.After(func() {
+					a.openCollectionSettings(collectionNode{collectionID: collection.ID}, collectionSettingsGeneral)
+				})
+			}
+		}
+		if menu.Item(labels.NewCollection).Icon(icons.Plus).Clicked() {
+			c.After(func() {
+				a.SelectSection(SectionAPIs)
+				a.collectionNameDialog(collectionCreate, collectionNode{})
+			})
+		}
+	})
+}
+
 func (a *App) titlebarBrand(c ui.C) {
 	theme := c.Theme()
+	size := Space6
+	if a.studioLayout() {
+		size += Space1
+	}
 	ui.Row(c).Gap(Space2).Items(ui.Center).Shrink(0).Children(func() {
-		ui.Row(c).Size(Space6, Space6).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
+		ui.Row(c).Size(size, size).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
 			Center().Children(func() {
 			ui.Icon(c, icons.Send).Size(Space4, Space4).Color(theme.PrimaryForeground)
 		})
-		ui.Text(c, a.S.Common.AppName).Bold()
+		name := ui.Text(c, a.S.Common.AppName).Bold()
+		if a.studioLayout() {
+			name.FontSize(theme.Metrics.FontSizeL - Space1)
+		}
 	})
 }
 

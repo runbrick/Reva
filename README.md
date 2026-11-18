@@ -151,11 +151,12 @@ calls run in a `ui.Effect` off the UI thread and can be cancelled.
 
 ## Interface styles
 
-Switch between **Modern** and **Classic desktop** in **Settings > Appearance >
-Interface style**. Classic desktop moves navigation above the workbench, uses
-compact bordered panels, and puts response display modes beside the body.
-Both styles support Light, Dark and Follow system. Changes apply immediately
-and are saved locally without closing open tabs.
+Choose **Modern**, **Classic desktop**, or **Studio** in **Settings > Appearance >
+Interface style**. Classic desktop moves navigation above the workbench and puts
+response display modes beside the body. Studio uses orange accents, a compact
+navigation rail, and request and environment details on wider windows. All
+styles support Light, Dark and Follow system. Changes apply immediately and are
+saved locally without closing open tabs.
 
 To add a built-in style, create its light and dark palette in
 `internal/gui/themes`, register a stable ID and a layout profile in `themes.go`,

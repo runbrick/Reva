@@ -371,6 +371,7 @@ func (a *App) Page(c ui.C) {
 	previewing := a.requestPreviewOpen()
 	theme := c.Theme()
 	classic := a.desktopLayout()
+	studio := a.studioLayout()
 	height := c.Bounds().Height - TitlebarHeight
 	if classic {
 		height -= desktopToolbarHeight
@@ -381,7 +382,9 @@ func (a *App) Page(c ui.C) {
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
 		ui.Row(c).FillWidth().Height(max(0, height)).Shrink(0).Children(func() {
-			if !classic {
+			if studio {
+				a.studioRail(c)
+			} else if !classic {
 				a.rail(c)
 			}
 			switch a.Main {
@@ -393,11 +396,11 @@ func (a *App) Page(c ui.C) {
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
 					if !previewing {
 						sidebar := ui.Column(c).Fill()
-						if !classic {
+						if !classic && !studio {
 							sidebar.PadBottom(statusStripHeight(theme))
 						}
 						sidebar.Children(func() { a.sidebar(c) })
-						if !classic {
+						if !classic && !studio {
 							a.statusStrip(c, false)
 						}
 					}
@@ -552,25 +555,38 @@ func (a *App) workbench(c ui.C) {
 			a.websocketPane(c.KeyInt(t.ID), t)
 			return
 		}
-		a.workbenchPanel(c, ui.Column(c).FillWidth().Height(a.mainSplit.Pos), !previewing, func() {
-			a.requestPane(c.KeyInt(t.ID), t)
-		})
-		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
-		a.workbenchPanel(c, ui.Column(c).FillWidth().Grow(1), !previewing, func() {
-			if previewing {
-				return
-			}
-			if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
-				a.scriptFailurePane(c.KeyInt(t.ID), t)
-			} else {
-				a.responsePane(c.KeyInt(t.ID), t)
-			}
-		})
+		if a.studioLayout() {
+			ui.Row(c).FillWidth().Grow(1).MinHeight(0).Children(func() {
+				ui.Column(c).Grow(1).MinWidth(0).FillHeight().Children(func() { a.httpWorkbench(c, t, previewing) })
+				if !previewing && a.studioInspectorFits(c) {
+					a.studioRequestInspector(c, t)
+				}
+			})
+			return
+		}
+		a.httpWorkbench(c, t, previewing)
+	})
+}
+
+func (a *App) httpWorkbench(c ui.C, t *Tab, previewing bool) {
+	a.workbenchPanel(c, ui.Column(c).FillWidth().Height(a.mainSplit.Pos), !previewing, func() {
+		a.requestPane(c.KeyInt(t.ID), t)
+	})
+	ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
+	a.workbenchPanel(c, ui.Column(c).FillWidth().Grow(1), !previewing, func() {
+		if previewing {
+			return
+		}
+		if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
+			a.scriptFailurePane(c.KeyInt(t.ID), t)
+		} else {
+			a.responsePane(c.KeyInt(t.ID), t)
+		}
 	})
 }
 
 func (a *App) workbenchPanel(c ui.C, panel ui.Box, visible bool, content func()) {
-	if visible && a.desktopLayout() {
+	if visible && (a.desktopLayout() || a.studioLayout()) {
 		theme := c.Theme()
 		panel.MarginX(Space1).MarginY(Space1).Background(theme.Card).
 			Border(1, theme.Border).Radius(theme.Metrics.RadiusSurface).Clip()

@@ -266,7 +266,7 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 	statusColor := a.palette.StatusColor(theme, t.Response.StatusCode)
 	labels := &a.S.Response
 	ui.Row(c).FillWidth().Height(a.tabBarHeight()).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
-		Background(a.palette.Sidebar).Children(func() {
+		Background(a.responseToolbarColor(c, a.palette.Sidebar)).Children(func() {
 		a.responseTabs(c, v, sections)
 		ui.Row(c).MaxWidth(Space6 * 9).Shrink(0).PadX(Space2).PadY(Space1).Gap(Space1).Items(ui.Center).
 			Radius(gfx.RadiusFull).Background(statusColor.WithAlpha(0.12)).Children(func() {
@@ -355,7 +355,7 @@ func (a *App) responseCopyButton(c ui.C, r *model.Response) {
 func (a *App) responseWorkbench(c ui.C, v *responseView) {
 	theme, labels := c.Theme(), &a.S.Response
 	workbenchWidth := c.Bounds().Width - a.sideSplit.Pos - a.railWidth()
-	wide := !a.desktopLayout() && workbenchWidth >= Space6*36 && c.Bounds().Height >= Space6*28
+	wide := !a.desktopLayout() && !a.studioLayout() && workbenchWidth >= Space6*36 && c.Bounds().Height >= Space6*28
 	success := v.source.StatusCode >= 200 && v.source.StatusCode < 300
 	ui.Row(c).FillWidth().Grow(1).Children(func() {
 		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, v) })
@@ -434,12 +434,15 @@ func (a *App) desktopResponseModes(c ui.C, v *responseView) {
 func (a *App) responseBodyContent(c ui.C, v *responseView) {
 	theme := c.Theme()
 	ui.Row(c).FillWidth().Height(a.tabBarHeight()).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
-		Background(a.palette.TableHeader).Children(func() {
+		Background(a.responseToolbarColor(c, a.palette.TableHeader)).Children(func() {
+		if a.studioLayout() {
+			ui.Choice(c, &v.mode, responseModes, a.responseModeLabel)
+		}
 		if v.json {
 			ui.Text(c, "JSON").FontSize(theme.Metrics.FontSizeS).Bold().Muted().PadX(Space2).
 				Background(theme.Secondary).Radius(theme.Metrics.RadiusControl).Shrink(0)
 		}
-		if !a.desktopLayout() {
+		if !a.desktopLayout() && !a.studioLayout() {
 			ui.Choice(c, &v.mode, responseModes, a.responseModeLabel)
 		}
 		if ui.Button(c, a.S.Response.Wrap).Icon(icons.Braces).IconOnly().Ghost().Tooltip(a.S.Response.Wrap).Disabled(v.mode == responsePreview).Clicked() {
@@ -471,6 +474,13 @@ func (a *App) responseBodyContent(c ui.C, v *responseView) {
 		marks = v.matches
 	}
 	v.code.declare(c, a.S.Response.CodeBody, a.palette, v.wrap, marks)
+}
+
+func (a *App) responseToolbarColor(c ui.C, fallback ui.Color) ui.Color {
+	if a.studioLayout() {
+		return c.Theme().Card
+	}
+	return fallback
 }
 
 func (v *responseView) updateSearch(body string) {

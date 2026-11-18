@@ -14,6 +14,9 @@ func TestSettingsCompatibility(t *testing.T) {
 		{"classic:light", "light", Classic},
 		{"classic:dark", "dark", Classic},
 		{"classic:system", "system", Classic},
+		{"studio:light", "light", Studio},
+		{"studio:dark", "dark", Studio},
+		{"studio:system", "system", Studio},
 		{"future:dark", "dark", Modern},
 		{"classic:future", "light", Classic},
 	} {

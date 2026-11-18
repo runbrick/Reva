@@ -446,6 +446,9 @@ func TestScriptCompletionPaintsOpaqueAboveCode(t *testing.T) {
 
 func TestScriptEditorDragResizesAndKeepsPerScriptHeight(t *testing.T) {
 	h := newHarness(t)
+	h.App.mainSplit.Ratio = 0
+	h.App.mainSplit.Pos = 500
+	studioResize(t, h, 1280, 800)
 	h.click(h.App.S.Request.Scripts)
 	v := &h.App.scriptTab(h.App.Active()).preEditor
 	before := v.height

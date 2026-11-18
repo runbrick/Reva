@@ -43,7 +43,7 @@ func envClickField(h *harness, label string) {
 
 func envSelect(h *harness, name string) {
 	h.t.Helper()
-	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.SelectEnvironment)
 	h.click(name)
 }
 
@@ -72,7 +72,7 @@ func envSend(h *harness, received <-chan model.Request) model.Request {
 
 func envManage(h *harness) {
 	h.t.Helper()
-	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.SelectEnvironment)
 	h.click(h.App.S.Env.Manage)
 	if h.App.Section != SectionEnvironments || h.App.Main != PageWorkbench || !h.App.envReady() {
 		h.t.Fatal("Manage environments did not open the environment page")
@@ -128,8 +128,8 @@ func TestEnvironmentCreateSelectAndSend(t *testing.T) {
 				}
 				h.typeInto(h.App.S.Common.Value, "https://dev.example.test")
 				h.typeInto(h.App.S.Request.Description, "Development host")
-				if !h.shows(h.App.S.Env.SaveHint) || !h.App.env.current().dirty() {
-					t.Fatal("editor missing save hint or dirty state")
+				if !h.shows(h.App.S.Env.Unsaved) || !h.App.env.current().dirty() {
+					t.Fatal("editor did not show unsaved changes")
 				}
 				before := svc.Environments.List()[0]
 				if before.Name == "Development" || len(before.Variables) != 0 {

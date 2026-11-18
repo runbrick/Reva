@@ -38,7 +38,7 @@ func TestOnboardingGuideIsOptionalAndReplayable(t *testing.T) {
 				}
 				h.click(h.App.S.Settings.Title)
 				if h.App.settings.guideOpen || !h.shows(h.App.S.Settings.GettingStarted) ||
-					!h.shows(h.App.S.Settings.OpenGuide) || !h.shows(h.App.S.Settings.DataDirectory) {
+					!h.shows(h.App.S.Settings.OpenGuide) || !h.shows(h.App.S.Settings.ThemePreview) {
 					t.Fatal("Settings should offer the guide while retaining its initial controls")
 				}
 				if err := h.D.Resize(960, 600); err != nil {

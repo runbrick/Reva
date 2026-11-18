@@ -120,35 +120,15 @@ func (a *App) requestPane(c ui.C, t *Tab) {
 		requestURLFromParams(&t.Request)
 		s.url = t.Request.URL
 	}
-	padding := Space4
-	if a.desktopLayout() {
-		padding = Space2
-	}
-	ui.Column(c).Fill().Pad(padding).Gap(Space2).Children(func() {
-		if a.desktopLayout() && a.mainSplit.Pos >= Space6*10 {
-			theme := c.Theme()
-			ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
-				ui.Icon(c, icons.Pencil).Size(Space4, Space4).Color(theme.AccentForeground)
-				ui.Text(c, a.requestTabTitle(t)).FontSize(theme.Metrics.FontSizeL - Space1).Bold().Grow(1).Ellipsis()
-			})
-			ui.Divider(c)
-		}
+	ui.Column(c).Fill().Pad(Space4).Gap(Space2).Children(func() {
 		a.requestURLBar(c, t, s)
 		a.requestSectionTabs(c, t, s)
-		content := ui.Scroll(c).FillWidth().Grow(1)
-		if a.desktopLayout() {
-			content.Scrollbars()
-		}
-		content.Children(func() {
+		ui.Scroll(c).FillWidth().Grow(1).Children(func() {
 			ui.Column(c).FillWidth().Gap(Space2).Children(func() {
 				switch s.section {
 				case requestParams:
 					labels := a.S.Request
-					title := ""
-					if a.studioLayout() {
-						title = labels.QueryParameters
-					}
-					if a.kvTableWithLabels(c, &s.params, &t.Request.Params, title, labels.ParamName, labels.ParamValue, labels.Description, labels.AddParam) {
+					if a.kvTableWithLabels(c, &s.params, &t.Request.Params, labels.QueryParameters, labels.ParamName, labels.ParamValue, labels.Description, labels.AddParam) {
 						t.Dirty = true
 						requestURLFromParams(&t.Request)
 						s.url = t.Request.URL
@@ -463,10 +443,8 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
 		method := ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
 			Width(Space6 * 4).Height(height).Shrink(0)
-		if a.studioLayout() {
-			color := a.palette.MethodColor(t.Request.Method)
-			method.Color(color).Background(color.WithAlpha(0.08))
-		}
+		color := a.palette.MethodColor(t.Request.Method)
+		method.Color(color).Background(color.WithAlpha(0.08))
 		if method.Changed() {
 			t.Dirty = true
 		}
@@ -534,39 +512,29 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 				}
 			})
 		})
-		if a.studioLayout() {
-			save := ui.Button(c, labels.Save).Icon(icons.Save).Outline().Height(height).Shrink(0).Tooltip(labels.Save)
-			if c.Bounds().Width-a.sideSplit.Pos-RailWidth < Space6*27 {
-				save.IconOnly()
-			}
-			if save.Clicked() {
-				c.After(func() { a.RequestSave(t) })
-			}
+		save := ui.Button(c, labels.Save).Icon(icons.Save).Outline().Height(height).Shrink(0).Tooltip(labels.Save)
+		if c.Bounds().Width-a.sideSplit.Pos-RailWidth < Space6*27 {
+			save.IconOnly()
+		}
+		if save.Clicked() {
+			c.After(func() { a.RequestSave(t) })
 		}
 	})
 }
 
 func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
-	if a.studioLayout() {
-		ui.Row(c).FillWidth().Height(c.Theme().Metrics.ControlHeight + Space1).Shrink(0).Items(ui.Center).Children(func() {
-			ui.Scroll(c).Grow(1).MinWidth(0).FillHeight().Sideways().Children(func() {
-				a.requestSectionTabList(c, t, s)
-			})
-			a.requestPreviewButton(c, s)
+	ui.Row(c).FillWidth().Height(c.Theme().Metrics.ControlHeight + Space1).Shrink(0).Items(ui.Center).Children(func() {
+		ui.Scroll(c).Grow(1).MinWidth(0).FillHeight().Sideways().Children(func() {
+			a.requestSectionTabList(c, t, s)
 		})
-	} else {
-		a.requestSectionTabList(c, t, s)
-	}
+		a.requestPreviewButton(c, s)
+	})
 	ui.Divider(c)
 }
 
 func (a *App) requestSectionTabList(c ui.C, t *Tab, s *requestTabState) {
 	theme := c.Theme()
-	row := ui.Row(c).Gap(Space1).Items(ui.Center).FocusGroup(ui.FocusHorizontal)
-	if !a.studioLayout() {
-		row.FillWidth()
-	}
-	row.Children(func() {
+	ui.Row(c).Gap(Space1).Items(ui.Center).FocusGroup(ui.FocusHorizontal).Children(func() {
 		for _, section := range requestSections {
 			count := 0
 			var rows []model.KV
@@ -621,10 +589,6 @@ func (a *App) requestSectionTabList(c ui.C, t *Tab, s *requestTabState) {
 					ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Height(Space1 / 2).Background(theme.Primary)
 				}
 			})
-		}
-		if !a.studioLayout() {
-			ui.Spacer(c)
-			a.requestPreviewButton(c, s)
 		}
 	})
 }

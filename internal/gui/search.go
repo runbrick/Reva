@@ -6,7 +6,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/runbrick/reva/internal/gui/icons"
-	"github.com/runbrick/reva/internal/gui/themes"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
@@ -69,18 +68,9 @@ func (a *App) searchBox(c ui.C) {
 	if a.Platform == "darwin" {
 		hint = a.S.Search.MacHint
 	}
-	radius, width := gfx.RadiusFull, Space6*12
-	if a.desktopLayout() {
-		radius, width = theme.Metrics.RadiusControl, Space6*10
-	} else if a.studioLayout() {
-		radius, width = theme.Metrics.RadiusControl, Space6*15
-	}
-	box := ui.Row(c).Width(width).Height(theme.Metrics.ControlHeight - Space1).Shrink(0)
-	if a.studioLayout() {
-		box.Shrink(1).MinWidth(0)
-	}
-	box.PadX(Space3).Gap(Space2).Items(ui.Center).
-		Background(theme.Muted).Border(1, theme.Border).Radius(radius).
+	box := ui.Row(c).Width(Space6*15).Height(theme.Metrics.ControlHeight-Space1).Shrink(1).MinWidth(0).
+		PadX(Space3).Gap(Space2).Items(ui.Center).
+		Background(theme.Muted).Border(1, theme.Border).Radius(theme.Metrics.RadiusControl).
 		Hit(ui.ID(c.Part("global-search")), a.S.Search.Title).
 		Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
 		ui.Icon(c, icons.Search).Size(Space4, Space4).Color(theme.MutedForeground)
@@ -406,12 +396,10 @@ func (a *App) runSearch(r searchResult) {
 
 func (a *App) toggleTheme() {
 	settings := a.Svc.Settings.Get()
-	style, _ := themes.Decode(settings.Theme)
-	mode := "dark"
+	settings.Theme = "dark"
 	if a.Dark() {
-		mode = "light"
+		settings.Theme = "light"
 	}
-	settings.Theme = themes.Encode(style, mode)
 	a.saveSearchSettings(settings)
 }
 

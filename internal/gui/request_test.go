@@ -599,7 +599,7 @@ func TestRequestSendMenuSaveOpensCollectionsDialog(t *testing.T) {
 	h := newHarness(t)
 	requestEnglish(h)
 	h.click("Send options")
-	h.click("Save")
+	collectionsOption(h, "Save")
 	if !h.App.collections.saveOpen || !h.shows(h.App.S.Collections.SaveRequest) {
 		t.Fatal("Send menu Save did not open collections dialog")
 	}

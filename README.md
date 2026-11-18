@@ -142,26 +142,20 @@ internal/importer/     bounded collection/environment, HAR and curl import
 internal/script/       pre-request / test JavaScript      (PR: scripts)
 internal/i18n/         every user-visible string, zh + en, one file per feature
 internal/gui/          Viva UI: app.go is the shell, one file per feature
-  themes/              built-in interface styles, color palettes and metrics
+  themes/              light and dark palettes and shared metrics
 ```
 
 The UI depends only on the interfaces in `internal/service`; Viva is pure Go, so
 the UI calls Go methods directly and types are checked by the compiler. Network
 calls run in a `ui.Effect` off the UI thread and can be cancelled.
 
-## Interface styles
+## Appearance
 
-Choose **Modern**, **Classic desktop**, or **Studio** in **Settings > Appearance >
-Interface style**. Classic desktop moves navigation above the workbench and puts
-response display modes beside the body. Studio uses orange accents, a compact
-navigation rail, and request and environment details on wider windows. All
-styles support Light, Dark and Follow system. Changes apply immediately and are
-saved locally without closing open tabs.
-
-To add a built-in style, create its light and dark palette in
-`internal/gui/themes`, register a stable ID and a layout profile in `themes.go`,
-and add its Chinese and English names in Settings. Reuse the shared components
-and layouts unless the style needs a different workbench arrangement.
+Choose **Light**, **Dark**, or **Follow system** in **Settings > Appearance**.
+The workbench uses a compact navigation rail and shows request and environment
+details on wider windows. The theme applies immediately and is saved without
+closing open tabs. Settings saved with an older layout use the current workbench
+and keep their light, dark, or system preference.
 
 ## HTTP authentication
 

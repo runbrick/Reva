@@ -41,28 +41,9 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 							t.Errorf("%q at %+v overlaps window controls (insets %g, %g)", hit.Label, r, leading, trailing)
 						}
 					}
-					// An overlap check must also ensure controls remain available.
-					for _, p := range []MainPage{PageWorkbench, PageHistory} {
-						titlebarClick(t, h, h.App.pageLabel(p))
-						if h.App.Main != p {
-							t.Fatalf("navigation %v did not switch page", p)
-						}
-					}
-					settingsHits := 0
-					for _, hit := range h.D.Snapshot().Hits {
-						if hit.Label == h.App.pageLabel(PageSettings) && hit.Bounds.Y < TitlebarHeight {
-							settingsHits++
-						}
-						if hit.Label == "用户菜单" || hit.Label == "User menu" {
-							t.Fatal("removed avatar menu is still present")
-						}
-					}
-					if settingsHits != 1 {
-						t.Fatalf("titlebar has %d Settings entries, want only the gear", settingsHits)
-					}
-					titlebarClick(t, h, h.App.pageLabel(PageSettings))
-					if h.App.Main != PageSettings {
-						t.Fatal("Settings gear did not open the Settings page")
+					titlebarClick(t, h, h.App.S.Search.Title)
+					if !h.App.search.open {
+						t.Fatal("search is not reachable from the titlebar")
 					}
 				})
 			}
@@ -70,10 +51,14 @@ func TestTitlebarKeepsPlatformInsetsClear(t *testing.T) {
 	}
 }
 
-func TestTitlebarNavigationShowsPages(t *testing.T) {
+func TestRailNavigationShowsPages(t *testing.T) {
 	h := newHarness(t)
 	for _, p := range []MainPage{PageHistory, PageWorkbench} {
-		titlebarClick(t, h, h.App.pageLabel(p))
+		label := h.App.S.Shell.APIs
+		if p == PageHistory {
+			label = h.App.S.Shell.History
+		}
+		h.click(label)
 		if h.App.Main != p {
 			t.Fatalf("Main = %v, want %v", h.App.Main, p)
 		}
@@ -122,24 +107,25 @@ func TestTitlebarWindowControlsFollowThemeAndLanguage(t *testing.T) {
 	}
 }
 
-func TestTitlebarThemeToggleAndNewRequestFromHistory(t *testing.T) {
+func TestRailThemeToggleAndNewRequestAfterHistory(t *testing.T) {
 	h := newHarness(t)
-	titlebarClick(t, h, h.App.S.Titlebar.DarkTheme)
+	h.click(h.App.S.Titlebar.DarkTheme)
 	if !h.App.Dark() || h.Svc.Settings.Get().Theme != "dark" {
 		t.Fatal("theme button did not persist and apply dark mode")
 	}
-	titlebarClick(t, h, h.App.S.Titlebar.LightTheme)
+	h.click(h.App.S.Titlebar.LightTheme)
 	if h.App.Dark() || h.Svc.Settings.Get().Theme != "light" {
 		t.Fatal("theme button did not persist and apply light mode")
 	}
-	titlebarClick(t, h, h.App.S.Shell.History)
-	titlebarClick(t, h, h.App.S.Titlebar.NewRequestTab)
+	h.click(h.App.S.Shell.History)
+	h.click(h.App.S.Shell.APIs)
+	h.click(h.App.S.Tabs.New)
 	if h.App.Main != PageWorkbench || h.App.Section != SectionAPIs || len(h.App.Tabs()) != 2 || h.App.Active() != h.App.Tabs()[1] {
 		t.Fatal("new-request button did not open a new workbench tab")
 	}
 }
 
-// titlebarClick distinguishes the strip's Settings hit from the rail and page.
+// titlebarClick selects a control in the window strip.
 func titlebarClick(t *testing.T, h *harness, label string) {
 	t.Helper()
 	for _, hit := range h.D.Snapshot().Hits {

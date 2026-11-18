@@ -93,7 +93,7 @@ func (a *App) studioThemePreview(c ui.C, mode string) {
 		ui.Row(c).FillWidth().Gap(Space3).FocusGroup(ui.FocusHorizontal).Children(func() {
 			for index, option := range settingsThemes[:2] {
 				label := a.settingsThemeLabel(option)
-				previewTheme, palette, _ := themes.Resolve(themes.Studio, option == "dark")
+				previewTheme, palette := themes.Resolve(option == "dark")
 				selected := mode == option || mode == "system" && a.Dark() == (option == "dark")
 				kc := c.KeyInt(index)
 				tile := ui.Column(kc).Basis(0).Grow(1).MinWidth(0).Pad(Space1).Gap(Space1).Items(ui.Center).
@@ -109,7 +109,7 @@ func (a *App) studioThemePreview(c ui.C, mode string) {
 				})
 				if tile.Clicked() {
 					current := a.Svc.Settings.Get()
-					current.Theme = themes.Encode(themes.Studio, option)
+					current.Theme = option
 					a.saveSettingsAfter(c, current)
 				}
 			}

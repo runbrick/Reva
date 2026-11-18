@@ -54,20 +54,8 @@ func (a *App) ConfigureUpdates(quit func(), restartFailed bool) {
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
-var settingsStyles = themes.Styles()
 var settingsHistoryLimits = []int{50, 100, 200, 500, 1000}
 var settingsTimeouts = []int{10, 30, 60, 120, 300}
-
-// settingsButton declares the titlebar action and its window-wide shortcut.
-func (a *App) settingsButton(c ui.C) {
-	if ui.Shortcut(c, ui.Primary, ",") {
-		a.openSettings()
-	}
-	if ui.Button(c, a.S.Settings.Title).Icon(icons.Settings).IconOnly().Ghost().Tooltip(a.S.Settings.Title).Clicked() {
-		a.openSettings()
-	}
-	a.declareSettingsEffects(c)
-}
 
 func (a *App) declareSettingsEffects(c ui.C) {
 	state := &a.settings
@@ -155,10 +143,11 @@ func (a *App) settingsPage(c ui.C) {
 	state := &a.settings
 	if !state.initialized {
 		state.dir, state.dirError = storage.Dir()
+		a.loadSyncSettings()
 		state.initialized = true
 	}
 	state.current = a.Svc.Settings.Get()
-	style, mode := themes.Decode(state.current.Theme)
+	mode := themes.Mode(state.current.Theme)
 	state.language = i18n.Lang(state.current.Language)
 	state.followRedirects, state.verifyTLS = !state.current.NoFollowRedirects, !state.current.InsecureTLS
 	state.timeout = state.current.RequestTimeoutSec
@@ -169,16 +158,9 @@ func (a *App) settingsPage(c ui.C) {
 	theme := c.Theme()
 	appearance := func() {
 		settingsCard(c, s.Appearance, func() {
-			settingsRow(c, s.Style, "", func() {
-				if ui.Choice(c, &style, settingsStyles, a.settingsStyleLabel).Width(Space6 * 15).Changed() {
-					state.current.Theme = themes.Encode(style, mode)
-					a.saveSettingsAfter(c, state.current)
-				}
-			})
-			ui.Divider(c)
 			settingsRow(c, s.Theme, s.ThemeDescription, func() {
 				if ui.Choice(c, &mode, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {
-					state.current.Theme = themes.Encode(style, mode)
+					state.current.Theme = mode
 					a.saveSettingsAfter(c, state.current)
 				}
 			})
@@ -291,24 +273,7 @@ func (a *App) settingsPage(c ui.C) {
 			}
 		})
 	}
-	if a.studioLayout() {
-		a.studioSettingsPage(c, mode, appearance, requests, data, about)
-		return
-	}
-	ui.Scroll(c).FillWidth().Grow(1).Basis(0).Scrollbars().Children(func() {
-		ui.Column(c).FillWidth().Pad(Space4).Items(ui.Center).Children(func() {
-			ui.Column(c).FillWidth().MaxWidth(720).Gap(Space3).Children(func() {
-				ui.Row(c).FillWidth().Items(ui.Center).Gap(Space3).Children(func() {
-					ui.Text(c, s.Title).FontSize(theme.Metrics.FontSizeL).Bold().Grow(1)
-					a.onboardingEntry(c)
-				})
-				appearance()
-				requests()
-				data()
-				about()
-			})
-		})
-	})
+	a.studioSettingsPage(c, mode, appearance, requests, data, about)
 }
 
 // settingsCard and settingsRow adapt Viva's settings-row recipe to grouped controls.
@@ -352,17 +317,6 @@ func (a *App) settingsThemeLabel(theme string) string {
 		return a.S.Settings.System
 	default:
 		return a.S.Settings.Light
-	}
-}
-
-func (a *App) settingsStyleLabel(style themes.Style) string {
-	switch style {
-	case themes.Classic:
-		return a.S.Settings.ClassicStyle
-	case themes.Studio:
-		return a.S.Settings.StudioStyle
-	default:
-		return a.S.Settings.ModernStyle
 	}
 }
 

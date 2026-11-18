@@ -154,7 +154,7 @@ func TestImportEnvironmentHandoffConfirmAndRetry(t *testing.T) {
 				t.Fatal("import rewrote the URL or retained a Postman script")
 			}
 			h.click("Migrated request")
-			h.click(h.App.S.Env.Title)
+			h.click(h.App.S.Env.SelectEnvironment)
 			collectionsOption(h, "New environment")
 			h.click(h.App.S.Request.Preview)
 			stored, _ := svc.Collections.Get(collections[0].ID)

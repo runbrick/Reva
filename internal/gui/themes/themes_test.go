@@ -2,35 +2,28 @@ package themes
 
 import "testing"
 
-func TestSettingsCompatibility(t *testing.T) {
-	for _, test := range []struct {
-		stored, mode string
-		style        Style
-	}{
-		{"", "light", Modern},
-		{"light", "light", Modern},
-		{"dark", "dark", Modern},
-		{"system", "system", Modern},
-		{"classic:light", "light", Classic},
-		{"classic:dark", "dark", Classic},
-		{"classic:system", "system", Classic},
-		{"studio:light", "light", Studio},
-		{"studio:dark", "dark", Studio},
-		{"studio:system", "system", Studio},
-		{"future:dark", "dark", Modern},
-		{"classic:future", "light", Classic},
+func TestAppearanceModeReadsLegacySettings(t *testing.T) {
+	for stored, want := range map[string]string{
+		"": "light", "light": "light", "dark": "dark", "system": "system",
+		"modern:light": "light", "classic:dark": "dark", "studio:system": "system",
+		"future:dark": "dark", "classic:future": "light",
 	} {
-		style, mode := Decode(test.stored)
-		if style != test.style || mode != test.mode {
-			t.Errorf("Decode(%q) = %q, %q; want %q, %q", test.stored, style, mode, test.style, test.mode)
-		}
-		if savedStyle, savedMode := Decode(Encode(style, mode)); savedStyle != style || savedMode != mode {
-			t.Errorf("style and mode did not round-trip for %q", test.stored)
+		if got := Mode(stored); got != want {
+			t.Errorf("Mode(%q) = %q, want %q", stored, got, want)
 		}
 	}
-	for _, mode := range []string{"light", "dark", "system"} {
-		if value := Encode(Modern, mode); value != mode {
-			t.Errorf("modern mode %q saved as %q", mode, value)
-		}
+}
+
+func TestAppearanceChangesColorsWithoutChangingMetrics(t *testing.T) {
+	light, lightPalette := Resolve(false)
+	dark, darkPalette := Resolve(true)
+	if light.Metrics != dark.Metrics {
+		t.Fatal("appearance changed layout metrics")
+	}
+	if light.Primary != light.Foreground || dark.Primary != dark.Foreground || light.Primary == dark.Primary {
+		t.Fatal("primary action does not follow the neutral foreground")
+	}
+	if lightPalette.Get == lightPalette.Post || darkPalette.Get == darkPalette.Post {
+		t.Fatal("HTTP methods lost their distinct colors")
 	}
 }

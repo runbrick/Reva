@@ -466,7 +466,7 @@ func TestPreviewHidesSensitiveBackgroundAndRestoresOnClose(t *testing.T) {
 				h.App.scriptTab(tab).logs = []string{marker}
 			}
 			requestRepaint(h)
-			if !h.shows(marker) || !h.shows("BGCANARY Environment") || !h.shows("BGCANARY Collection") {
+			if !h.shows(marker) || !h.shows("BGCANARY E") || !h.shows("BGCANARY Collection") {
 				t.Fatalf("fixture did not paint sensitive background: %s", previewLabels(h))
 			}
 			before, _ := json.Marshal([]any{tab.Request, svc.Collections.List(), svc.Environments.List(), svc.Settings.Get()})
@@ -489,7 +489,7 @@ func TestPreviewHidesSensitiveBackgroundAndRestoresOnClose(t *testing.T) {
 			h.click(h.App.S.Request.PreviewClose)
 			h.App.env.picker, h.App.search.open = false, false
 			requestRepaint(h)
-			if !h.shows(marker) || !h.shows("BGCANARY Environment") || !h.shows("BGCANARY Collection") || h.App.requestTabTitle(tab) != r.Name {
+			if !h.shows(marker) || !h.shows("BGCANARY E") || !h.shows("BGCANARY Collection") || h.App.requestTabTitle(tab) != r.Name {
 				t.Fatal("closing preview did not restore background content and normal names")
 			}
 			after, _ := json.Marshal([]any{tab.Request, svc.Collections.List(), svc.Environments.List(), svc.Settings.Get()})

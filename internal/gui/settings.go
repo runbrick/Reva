@@ -20,6 +20,7 @@ const settingsVersion = update.Current
 // settingsState holds the page's controls and folder-reveal effect.
 type settingsState struct {
 	initialized                bool
+	section                    studioSettingsSection
 	current                    model.Settings
 	language                   i18n.Lang
 	followRedirects, verifyTLS bool
@@ -53,20 +54,8 @@ func (a *App) ConfigureUpdates(quit func(), restartFailed bool) {
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
-var settingsStyles = themes.Styles()
 var settingsHistoryLimits = []int{50, 100, 200, 500, 1000}
 var settingsTimeouts = []int{10, 30, 60, 120, 300}
-
-// settingsButton declares the titlebar action and its window-wide shortcut.
-func (a *App) settingsButton(c ui.C) {
-	if ui.Shortcut(c, ui.Primary, ",") {
-		a.openSettings()
-	}
-	if ui.Button(c, a.S.Settings.Title).Icon(icons.Settings).IconOnly().Ghost().Tooltip(a.S.Settings.Title).Clicked() {
-		a.openSettings()
-	}
-	a.declareSettingsEffects(c)
-}
 
 func (a *App) declareSettingsEffects(c ui.C) {
 	state := &a.settings
@@ -154,10 +143,11 @@ func (a *App) settingsPage(c ui.C) {
 	state := &a.settings
 	if !state.initialized {
 		state.dir, state.dirError = storage.Dir()
+		a.loadSyncSettings()
 		state.initialized = true
 	}
 	state.current = a.Svc.Settings.Get()
-	style, mode := themes.Decode(state.current.Theme)
+	mode := themes.Mode(state.current.Theme)
 	state.language = i18n.Lang(state.current.Language)
 	state.followRedirects, state.verifyTLS = !state.current.NoFollowRedirects, !state.current.InsecureTLS
 	state.timeout = state.current.RequestTimeoutSec
@@ -166,132 +156,124 @@ func (a *App) settingsPage(c ui.C) {
 	}
 	s := &a.S.Settings
 	theme := c.Theme()
-	ui.Scroll(c).FillWidth().Grow(1).Basis(0).Scrollbars().Children(func() {
-		ui.Column(c).FillWidth().Pad(Space4).Items(ui.Center).Children(func() {
-			ui.Column(c).FillWidth().MaxWidth(720).Gap(Space3).Children(func() {
-				ui.Row(c).FillWidth().Items(ui.Center).Gap(Space3).Children(func() {
-					ui.Text(c, s.Title).FontSize(theme.Metrics.FontSizeL).Bold().Grow(1)
-					a.onboardingEntry(c)
-				})
-				settingsCard(c, s.Appearance, func() {
-					settingsRow(c, s.Style, "", func() {
-						if ui.Choice(c, &style, settingsStyles, a.settingsStyleLabel).Width(Space6 * 15).Changed() {
-							state.current.Theme = themes.Encode(style, mode)
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-					ui.Divider(c)
-					settingsRow(c, s.Theme, s.ThemeDescription, func() {
-						if ui.Choice(c, &mode, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {
-							state.current.Theme = themes.Encode(style, mode)
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-					ui.Divider(c)
-					settingsRow(c, s.Language, s.LanguageDescription, func() {
-						if ui.Choice(c, &state.language, i18n.Langs, a.settingsLanguageLabel).Changed() {
-							state.current.Language = string(state.language)
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-				})
-				settingsCard(c, s.Requests, func() {
-					settingsRow(c, s.Timeout, s.TimeoutDescription, func() {
-						if ui.Select(c, &state.timeout, settingsTimeouts, a.settingsTimeoutLabel).
-							Label(s.Timeout).Width(Space6 * 6).Changed() {
-							state.current.RequestTimeoutSec = state.timeout
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-					ui.Divider(c)
-					settingsRow(c, s.FollowRedirects, s.FollowRedirectsDescription, func() {
-						if ui.Switch(c, &state.followRedirects, "").Label(s.FollowRedirects).Changed() {
-							state.current.NoFollowRedirects = !state.followRedirects
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-					ui.Divider(c)
-					settingsRow(c, s.VerifyTLS, s.VerifyTLSDescription, func() {
-						if ui.Switch(c, &state.verifyTLS, "").Label(s.VerifyTLS).Changed() {
-							state.current.InsecureTLS = !state.verifyTLS
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-					if state.current.InsecureTLS {
-						ui.Wrap(c, s.TLSWarning).FillWidth().FontSize(theme.Metrics.FontSizeS).Color(a.palette.Warning)
-					}
-				})
-				settingsCard(c, s.History, func() {
-					settingsRow(c, s.HistoryLimit, s.HistoryDescription, func() {
-						if ui.Select(c, &state.current.HistoryLimit, settingsHistoryLimits, a.settingsHistoryLabel).
-							Label(s.HistoryLimit).Width(Space6 * 6).Changed() {
-							a.saveSettingsAfter(c, state.current)
-						}
-					})
-				})
-				settingsCard(c, s.Data, func() {
-					directory := state.dir
-					if state.dirError != nil {
-						directory = state.dirError.Error()
-					}
-					settingsRow(c, s.DataDirectory, directory, func() {
-						if state.dirError == nil && ui.Button(c, s.OpenFolder).Outline().Disabled(state.reveal != nil).Clicked() {
-							c.After(func() { state.reveal = ui.NewEffectKeyed[struct{}, string](revealSettingsFolder) })
-						}
-					})
-				})
-				a.syncSettings(c)
-				settingsCard(c, s.About, func() {
-					settingsRow(c, s.About, a.S.Common.AppName, func() {
-						ui.Text(c, "v"+settingsVersion).Muted()
-						if ui.Button(c, s.CheckUpdates).Icon(icons.RefreshCw).Outline().Disabled(state.checking != nil).Clicked() {
-							c.After(func() {
-								check := state.check
-								if check == nil {
-									check = func(ctx context.Context) (update.Release, error) { return update.Latest(ctx, nil, update.Feed) }
-								}
-								state.checked, state.checkError, state.latest = false, nil, settingsUpdate{}
-								state.checking = ui.NewEffect[settingsUpdate, string](func(ctx context.Context) (settingsUpdate, error) {
-									release, err := check(ctx)
-									return settingsUpdate{release: release, offer: release.Offer()}, err
-								})
-							})
-						}
-					})
-					if state.checking != nil {
-						ui.Text(c, s.CheckingUpdates).Muted()
-					} else if state.checked {
-						switch {
-						case errors.Is(state.checkError, update.ErrNoRelease):
-							ui.Text(c, s.NoRelease).Muted()
-						case state.checkError != nil:
-							ui.Wrap(c, s.UpdateFailed+": "+state.checkError.Error()).FillWidth().Color(theme.Danger)
-						case update.Newer(settingsVersion, state.latest.release.Version):
-							canInstall := state.quit != nil && (state.latest.offer.Available() || state.install != nil)
-							ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
-								ui.Text(c, s.UpdateAvailable+" v"+state.latest.release.Version).Color(theme.Success).Grow(1)
-								if canInstall && ui.Button(c, s.DownloadUpdate).Icon(icons.Download).Clicked() {
-									state.updateConfirm, state.installError = true, nil
-								}
-								if ui.Button(c, s.OpenRelease).Icon(icons.ExternalLink).Outline().Clicked() {
-									c.After(func() {
-										if err := app.OpenURL(state.latest.release.URL); err != nil {
-											a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
-										}
-									})
-								}
-							})
-							if !canInstall {
-								ui.Wrap(c, s.UpdateManualOnly).FillWidth().Muted()
-							}
-						default:
-							ui.Text(c, s.UpToDate).Muted()
-						}
-					}
-				})
+	appearance := func() {
+		settingsCard(c, s.Appearance, func() {
+			settingsRow(c, s.Theme, s.ThemeDescription, func() {
+				if ui.Choice(c, &mode, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {
+					state.current.Theme = mode
+					a.saveSettingsAfter(c, state.current)
+				}
+			})
+			ui.Divider(c)
+			settingsRow(c, s.Language, s.LanguageDescription, func() {
+				if ui.Choice(c, &state.language, i18n.Langs, a.settingsLanguageLabel).Changed() {
+					state.current.Language = string(state.language)
+					a.saveSettingsAfter(c, state.current)
+				}
 			})
 		})
-	})
+	}
+	requests := func() {
+		settingsCard(c, s.Requests, func() {
+			settingsRow(c, s.Timeout, s.TimeoutDescription, func() {
+				if ui.Select(c, &state.timeout, settingsTimeouts, a.settingsTimeoutLabel).
+					Label(s.Timeout).Width(Space6 * 6).Changed() {
+					state.current.RequestTimeoutSec = state.timeout
+					a.saveSettingsAfter(c, state.current)
+				}
+			})
+			ui.Divider(c)
+			settingsRow(c, s.FollowRedirects, s.FollowRedirectsDescription, func() {
+				if ui.Switch(c, &state.followRedirects, "").Label(s.FollowRedirects).Changed() {
+					state.current.NoFollowRedirects = !state.followRedirects
+					a.saveSettingsAfter(c, state.current)
+				}
+			})
+			ui.Divider(c)
+			settingsRow(c, s.VerifyTLS, s.VerifyTLSDescription, func() {
+				if ui.Switch(c, &state.verifyTLS, "").Label(s.VerifyTLS).Changed() {
+					state.current.InsecureTLS = !state.verifyTLS
+					a.saveSettingsAfter(c, state.current)
+				}
+			})
+			if state.current.InsecureTLS {
+				ui.Wrap(c, s.TLSWarning).FillWidth().FontSize(theme.Metrics.FontSizeS).Color(a.palette.Warning)
+			}
+		})
+		settingsCard(c, s.History, func() {
+			settingsRow(c, s.HistoryLimit, s.HistoryDescription, func() {
+				if ui.Select(c, &state.current.HistoryLimit, settingsHistoryLimits, a.settingsHistoryLabel).
+					Label(s.HistoryLimit).Width(Space6 * 6).Changed() {
+					a.saveSettingsAfter(c, state.current)
+				}
+			})
+		})
+	}
+	data := func() {
+		settingsCard(c, s.Data, func() {
+			directory := state.dir
+			if state.dirError != nil {
+				directory = state.dirError.Error()
+			}
+			settingsRow(c, s.DataDirectory, directory, func() {
+				if state.dirError == nil && ui.Button(c, s.OpenFolder).Outline().Disabled(state.reveal != nil).Clicked() {
+					c.After(func() { state.reveal = ui.NewEffectKeyed[struct{}, string](revealSettingsFolder) })
+				}
+			})
+		})
+		a.syncSettings(c)
+	}
+	about := func() {
+		settingsCard(c, s.About, func() {
+			settingsRow(c, s.About, a.S.Common.AppName, func() {
+				ui.Text(c, "v"+settingsVersion).Muted()
+				if ui.Button(c, s.CheckUpdates).Icon(icons.RefreshCw).Outline().Disabled(state.checking != nil).Clicked() {
+					c.After(func() {
+						check := state.check
+						if check == nil {
+							check = func(ctx context.Context) (update.Release, error) { return update.Latest(ctx, nil, update.Feed) }
+						}
+						state.checked, state.checkError, state.latest = false, nil, settingsUpdate{}
+						state.checking = ui.NewEffect[settingsUpdate, string](func(ctx context.Context) (settingsUpdate, error) {
+							release, err := check(ctx)
+							return settingsUpdate{release: release, offer: release.Offer()}, err
+						})
+					})
+				}
+			})
+			if state.checking != nil {
+				ui.Text(c, s.CheckingUpdates).Muted()
+			} else if state.checked {
+				switch {
+				case errors.Is(state.checkError, update.ErrNoRelease):
+					ui.Text(c, s.NoRelease).Muted()
+				case state.checkError != nil:
+					ui.Wrap(c, s.UpdateFailed+": "+state.checkError.Error()).FillWidth().Color(theme.Danger)
+				case update.Newer(settingsVersion, state.latest.release.Version):
+					canInstall := state.quit != nil && (state.latest.offer.Available() || state.install != nil)
+					ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
+						ui.Text(c, s.UpdateAvailable+" v"+state.latest.release.Version).Color(theme.Success).Grow(1)
+						if canInstall && ui.Button(c, s.DownloadUpdate).Icon(icons.Download).Clicked() {
+							state.updateConfirm, state.installError = true, nil
+						}
+						if ui.Button(c, s.OpenRelease).Icon(icons.ExternalLink).Outline().Clicked() {
+							c.After(func() {
+								if err := app.OpenURL(state.latest.release.URL); err != nil {
+									a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
+								}
+							})
+						}
+					})
+					if !canInstall {
+						ui.Wrap(c, s.UpdateManualOnly).FillWidth().Muted()
+					}
+				default:
+					ui.Text(c, s.UpToDate).Muted()
+				}
+			}
+		})
+	}
+	a.studioSettingsPage(c, mode, appearance, requests, data, about)
 }
 
 // settingsCard and settingsRow adapt Viva's settings-row recipe to grouped controls.
@@ -336,13 +318,6 @@ func (a *App) settingsThemeLabel(theme string) string {
 	default:
 		return a.S.Settings.Light
 	}
-}
-
-func (a *App) settingsStyleLabel(style themes.Style) string {
-	if style == themes.Classic {
-		return a.S.Settings.ClassicStyle
-	}
-	return a.S.Settings.ModernStyle
 }
 
 func (a *App) settingsLanguageLabel(lang i18n.Lang) string {

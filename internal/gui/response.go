@@ -265,8 +265,8 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 	theme := c.Theme()
 	statusColor := a.palette.StatusColor(theme, t.Response.StatusCode)
 	labels := &a.S.Response
-	ui.Row(c).FillWidth().Height(a.tabBarHeight()).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
-		Background(a.palette.Sidebar).Children(func() {
+	ui.Row(c).FillWidth().Height(TabBarHeight).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
+		Background(theme.Card).Children(func() {
 		a.responseTabs(c, v, sections)
 		ui.Row(c).MaxWidth(Space6 * 9).Shrink(0).PadX(Space2).PadY(Space1).Gap(Space1).Items(ui.Center).
 			Radius(gfx.RadiusFull).Background(statusColor.WithAlpha(0.12)).Children(func() {
@@ -305,7 +305,7 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 func (a *App) responseTabs(c ui.C, v *responseView, sections []responseSection) {
 	theme, labels := c.Theme(), &a.S.Response
 	ui.Scroll(c).FillHeight().Grow(1).MinWidth(0).Sideways().Children(func() {
-		ui.Row(c).Height(a.tabBarHeight()).Gap(Space1).FocusGroup(ui.FocusHorizontal).Children(func() {
+		ui.Row(c).Height(TabBarHeight).Gap(Space1).FocusGroup(ui.FocusHorizontal).Children(func() {
 			for _, section := range sections {
 				label := labels.Body
 				switch section {
@@ -353,25 +353,8 @@ func (a *App) responseCopyButton(c ui.C, r *model.Response) {
 }
 
 func (a *App) responseWorkbench(c ui.C, v *responseView) {
-	theme, labels := c.Theme(), &a.S.Response
-	workbenchWidth := c.Bounds().Width - a.sideSplit.Pos - a.railWidth()
-	wide := !a.desktopLayout() && workbenchWidth >= Space6*36 && c.Bounds().Height >= Space6*28
-	success := v.source.StatusCode >= 200 && v.source.StatusCode < 300
 	ui.Row(c).FillWidth().Grow(1).Children(func() {
 		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, v) })
-		if !wide || !success || v.mode == responsePreview {
-			return
-		}
-		ui.Divider(c).Vertical()
-		ui.Column(c).Width(min(workbenchWidth*0.375, Space6*18)).FillHeight().Shrink(0).Center().Gap(Space2).
-			Background(a.palette.Sidebar).Children(func() {
-			ui.Row(c).Size(Space6*2, Space6*2).Center().Radius(theme.Metrics.RadiusSurface).
-				Background(theme.Accent).Children(func() {
-				ui.Icon(c, icons.CircleCheck).Size(Space6, Space6).Color(theme.AccentForeground)
-			})
-			ui.Text(c, labels.Success).Bold()
-			ui.Text(c, labels.Received).FontSize(theme.Metrics.FontSizeS).Muted()
-		})
 	})
 }
 
@@ -388,17 +371,7 @@ func (a *App) responseBodyView(c ui.C, v *responseView) {
 			a.responseCopy(c, selected)
 		}
 	}
-	pane.Children(func() {
-		if !a.desktopLayout() {
-			a.responseBodyContent(c, v)
-			return
-		}
-		ui.Row(c).Fill().Children(func() {
-			a.desktopResponseModes(c, v)
-			ui.Divider(c).Vertical()
-			ui.Column(c).Grow(1).MinWidth(0).FillHeight().Children(func() { a.responseBodyContent(c, v) })
-		})
-	})
+	pane.Children(func() { a.responseBodyContent(c, v) })
 }
 
 func (a *App) responseModeLabel(mode responseMode) string {
@@ -412,35 +385,14 @@ func (a *App) responseModeLabel(mode responseMode) string {
 	}
 }
 
-func (a *App) desktopResponseModes(c ui.C, v *responseView) {
-	theme := c.Theme()
-	ui.Column(c).Width(Space6 * 4).FillHeight().Shrink(0).Pad(Space1).Gap(Space1).
-		Background(a.palette.TableHeader).FocusGroup(ui.FocusVertical).Children(func() {
-		for _, mode := range responseModes {
-			label := a.responseModeLabel(mode)
-			fg := theme.Foreground
-			item := ui.RadioBase(c.KeyInt(int(mode)), &v.mode, mode, label).
-				FillWidth().Height(theme.Metrics.ControlHeight).PadX(Space2).Radius(theme.Metrics.RadiusControl).
-				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
-			if v.mode == mode {
-				fg = theme.AccentForeground
-				item.Background(theme.Accent)
-			}
-			item.Children(func() { ui.Text(c, label).Color(fg).Ellipsis() })
-		}
-	})
-}
-
 func (a *App) responseBodyContent(c ui.C, v *responseView) {
 	theme := c.Theme()
-	ui.Row(c).FillWidth().Height(a.tabBarHeight()).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
-		Background(a.palette.TableHeader).Children(func() {
+	ui.Row(c).FillWidth().Height(TabBarHeight).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
+		Background(theme.Card).Children(func() {
+		ui.Choice(c, &v.mode, responseModes, a.responseModeLabel)
 		if v.json {
 			ui.Text(c, "JSON").FontSize(theme.Metrics.FontSizeS).Bold().Muted().PadX(Space2).
 				Background(theme.Secondary).Radius(theme.Metrics.RadiusControl).Shrink(0)
-		}
-		if !a.desktopLayout() {
-			ui.Choice(c, &v.mode, responseModes, a.responseModeLabel)
 		}
 		if ui.Button(c, a.S.Response.Wrap).Icon(icons.Braces).IconOnly().Ghost().Tooltip(a.S.Response.Wrap).Disabled(v.mode == responsePreview).Clicked() {
 			v.wrap = !v.wrap

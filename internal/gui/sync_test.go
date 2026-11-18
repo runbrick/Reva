@@ -22,6 +22,7 @@ func TestSettingsEncryptedExportAndRestore(t *testing.T) {
 	}
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Data)
 	if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 580, DeltaY: 180, Precise: true}); err != nil {
 		t.Fatal(err)
 	}

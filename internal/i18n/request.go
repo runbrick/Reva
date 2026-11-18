@@ -26,9 +26,11 @@ type Request struct {
 	Description, AddParam, AddHeader, BulkEdit, TableEdit                                 string
 	BulkContent, BulkHelp                                                                 string
 	GraphQLQuery, GraphQLVariables, GraphQLRaw, GraphQLEdit                               string
+	Details, QueryParameters                                                              string
 }
 
 var requestZh = Request{
+	Details: "接口信息", QueryParameters: "查询参数",
 	Preview: "请求预览", PreviewTitle: "发送前只读预览", PreviewClose: "关闭预览",
 	PreviewPhase:    "在前置脚本之前计算；按当前请求草稿、已保存的集合和活动环境实时刷新。",
 	PreviewLimits:   "这不是完整的线上报文：不运行脚本、不发送、不保存、不读取上传文件；不计算网络库自动生成的请求头、请求体编码或重定向。WebSocket 不使用此 HTTP 预览。",
@@ -61,6 +63,7 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
+	Details: "Request details", QueryParameters: "Query parameters",
 	Preview: "Request preview", PreviewTitle: "Read-only pre-send preview", PreviewClose: "Close preview",
 	PreviewPhase:    "Computed BEFORE pre-request scripts; refreshed from the current draft, stored collection and active environment.",
 	PreviewLimits:   "This is not a complete wire request: no scripts, sending, saving or upload file reads. Generated transport headers, body encoding and redirects are not evaluated. WebSocket does not use this HTTP preview.",

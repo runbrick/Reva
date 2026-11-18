@@ -3,7 +3,7 @@ package i18n
 // Settings holds every label and description on the settings page.
 type Settings struct {
 	Title, Appearance, Requests, History, Data                          string
-	Style, ModernStyle, ClassicStyle                                    string
+	ThemePreview, PreviewTheme                                          string
 	Theme, ThemeDescription, Light, Dark, System                        string
 	Language, LanguageDescription, Chinese, English                     string
 	Timeout, TimeoutDescription                                         string
@@ -33,8 +33,8 @@ type Settings struct {
 }
 
 var settingsZh = Settings{
+	ThemePreview: "主题预览", PreviewTheme: "预览主题：%s",
 	Title: "设置", Appearance: "外观", Requests: "请求", History: "历史记录", Data: "数据",
-	Style: "界面风格", ModernStyle: "现代", ClassicStyle: "经典桌面",
 	Theme: "主题", ThemeDescription: "选择应用外观，或跟随系统设置。", Light: "浅色", Dark: "深色", System: "跟随系统",
 	Language: "语言", LanguageDescription: "选择界面显示语言。", Chinese: "中文", English: "English",
 	Timeout: "默认超时（秒）", TimeoutDescription: "未单独设置时，请求等待响应的最长时间。",
@@ -72,8 +72,8 @@ var settingsZh = Settings{
 }
 
 var settingsEn = Settings{
+	ThemePreview: "Theme preview", PreviewTheme: "Preview theme: %s",
 	Title: "Settings", Appearance: "Appearance", Requests: "Requests", History: "History", Data: "Data",
-	Style: "Interface style", ModernStyle: "Modern", ClassicStyle: "Classic desktop",
 	Theme: "Theme", ThemeDescription: "Choose an appearance or follow your system.", Light: "Light", Dark: "Dark", System: "Follow system",
 	Language: "Language", LanguageDescription: "Choose the interface language.", Chinese: "中文", English: "English",
 	Timeout: "Default timeout (seconds)", TimeoutDescription: "Maximum wait for requests without their own timeout.",

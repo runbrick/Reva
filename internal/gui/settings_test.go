@@ -47,9 +47,7 @@ func TestSettingsCheckUpdates(t *testing.T) {
 			h.App.settings.check = func(context.Context) (update.Release, error) { return tc.release, tc.err }
 			h.click(h.App.S.Settings.Title)
 			h.click("English")
-			if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 600, DeltaY: 1000, Precise: true}); err != nil {
-				t.Fatal(err)
-			}
+			h.click(h.App.S.Settings.About)
 			h.click(h.App.S.Settings.CheckUpdates)
 			h.waitFor(tc.want, func() bool { return h.shows(tc.want) })
 			if tc.name == "new release" {
@@ -98,9 +96,7 @@ func TestSettingsInstallUpdateConfirmsRetriesAndQuitsOnlyOnSuccess(t *testing.T)
 	}
 	s := h.App.S.Settings
 	h.click(s.Title)
-	if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 600, DeltaY: 1000, Precise: true}); err != nil {
-		t.Fatal(err)
-	}
+	h.click(s.About)
 	h.click(s.CheckUpdates)
 	h.waitFor(s.UpdateAvailable, func() bool { return h.shows(s.UpdateAvailable) })
 	h.click(s.DownloadUpdate)
@@ -136,7 +132,7 @@ func TestSettingsLanguageAppliesAndSavesImmediately(t *testing.T) {
 	h := newHarness(t)
 	h.click(h.App.S.Settings.Title)
 	h.click("English")
-	if h.App.S.Lang != i18n.En || !h.shows("Data directory") {
+	if h.App.S.Lang != i18n.En || !h.shows("Theme preview") {
 		t.Fatal("switching language did not immediately show English settings")
 	}
 	if got := h.Svc.Settings.Get().Language; got != "en" {
@@ -146,7 +142,7 @@ func TestSettingsLanguageAppliesAndSavesImmediately(t *testing.T) {
 	settingsRepaint(t, h)
 	settingsAssertSelected(t, h, "English")
 	h.click("中文")
-	if h.App.S.Lang != i18n.Zh || !h.shows("数据目录") {
+	if h.App.S.Lang != i18n.Zh || !h.shows(h.App.S.Settings.ThemePreview) {
 		t.Fatal("switching back did not show Chinese settings")
 	}
 	if got := h.Svc.Settings.Get().Language; got != "zh" {
@@ -220,6 +216,7 @@ func TestSettingsHistoryLimitsSaveAndPreserveOtherSettings(t *testing.T) {
 	}
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Requests)
 	for _, limit := range []int{50, 100, 200, 500, 1000} {
 		h.click(h.App.S.Settings.HistoryLimit)
 		h.click(strconv.Itoa(limit))
@@ -244,6 +241,7 @@ func TestSettingsRequestDefaultsSaveImmediately(t *testing.T) {
 	}
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Requests)
 	assertSaved := func() {
 		t.Helper()
 		if got := svc.Settings.Get(); got != want {
@@ -284,6 +282,7 @@ func TestSettingsLegacyZeroTimeoutDisplaysEffectiveDefault(t *testing.T) {
 	}
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Requests)
 	settingsAssertValue(t, h, h.App.S.Settings.Timeout, "60")
 	h.click(h.App.S.Settings.FollowRedirects)
 	if svc.Settings.Get().RequestTimeoutSec != 0 {
@@ -297,6 +296,7 @@ func TestSettingsReopeningShowsCurrentValues(t *testing.T) {
 	h.click(h.App.S.Settings.Title)
 	h.click("English")
 	h.click("Dark")
+	h.click("Requests")
 	h.click("History limit")
 	h.click("500")
 	h.click(h.App.S.Shell.APIs)
@@ -304,9 +304,10 @@ func TestSettingsReopeningShowsCurrentValues(t *testing.T) {
 		t.Fatal("navigating to APIs did not leave settings")
 	}
 	h.click("Settings")
+	settingsAssertLimit(t, h, "500")
+	h.click("Appearance")
 	settingsAssertSelected(t, h, "Dark")
 	settingsAssertSelected(t, h, "English")
-	settingsAssertLimit(t, h, "500")
 
 	// Read the service again when opening, including changes from another feature.
 	h.click(h.App.S.Shell.APIs)
@@ -317,19 +318,20 @@ func TestSettingsReopeningShowsCurrentValues(t *testing.T) {
 	}
 	h.click("Settings")
 	settingsAssertSelected(t, h, "Light")
+	h.click("Requests")
 	settingsAssertLimit(t, h, "1000")
 }
 
 func TestSettingsShortcutOpensPage(t *testing.T) {
 	t.Setenv(storage.EnvHome, t.TempDir())
 	h := newHarness(t)
-	if h.shows(h.App.S.Settings.DataDirectory) {
+	if h.shows(h.App.S.Settings.ThemePreview) {
 		t.Fatal("settings page is open before the shortcut")
 	}
 	if handled, err := h.D.ShortcutChord(ui.Primary, ','); err != nil || !handled {
 		t.Fatalf("settings shortcut: handled = %t, error = %v", handled, err)
 	}
-	if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.DataDirectory) {
+	if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.ThemePreview) {
 		t.Fatal("settings shortcut did not open the page")
 	}
 	h.App.Main = PageHistory
@@ -346,6 +348,9 @@ func TestSettingsSaveErrorShowsToastAndKeepsPreferences(t *testing.T) {
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
 	for _, label := range []string{h.App.S.Settings.Dark, "English", h.App.S.Settings.FollowRedirects, h.App.S.Settings.VerifyTLS} {
+		if label == h.App.S.Settings.FollowRedirects {
+			h.click(h.App.S.Settings.Requests)
+		}
 		h.click(label)
 		if !h.shows(h.App.S.Common.Error) || !h.shows("settings cannot be saved") {
 			t.Fatal("save failure did not show an error toast")
@@ -355,10 +360,11 @@ func TestSettingsSaveErrorShowsToastAndKeepsPreferences(t *testing.T) {
 			t.Fatal("failed save changed the active or persisted settings")
 		}
 	}
-	settingsAssertSelected(t, h, h.App.S.Settings.Light)
-	settingsAssertSelected(t, h, "中文")
 	settingsAssertChecked(t, h, h.App.S.Settings.FollowRedirects, true)
 	settingsAssertChecked(t, h, h.App.S.Settings.VerifyTLS, true)
+	h.click(h.App.S.Settings.Appearance)
+	settingsAssertSelected(t, h, h.App.S.Settings.Light)
+	settingsAssertSelected(t, h, "中文")
 }
 
 func TestSettingsDataDirectoryAndOpenFolder(t *testing.T) {
@@ -366,6 +372,7 @@ func TestSettingsDataDirectoryAndOpenFolder(t *testing.T) {
 	t.Setenv(storage.EnvHome, dir)
 	h := newHarness(t)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Data)
 	if !settingsShowsWrapped(h, dir) {
 		t.Fatalf("data directory is not displayed: %+v", h.D.Snapshot().Texts)
 	}
@@ -386,6 +393,7 @@ func TestSettingsDataDirectoryErrorIsShown(t *testing.T) {
 	t.Setenv(storage.EnvHome, filepath.Join(path, "data"))
 	h := newHarness(t)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Data)
 	if h.App.settings.dirError == nil || !settingsShowsWrapped(h, h.App.settings.dirError.Error()) {
 		t.Fatal("data directory failure is not displayed")
 	}
@@ -402,6 +410,7 @@ func TestSettingsOpenFolderErrorShowsToast(t *testing.T) {
 	t.Setenv(storage.EnvHome, dir)
 	h := newHarness(t)
 	h.click(h.App.S.Settings.Title)
+	h.click(h.App.S.Settings.Data)
 	if err := os.Remove(dir); err != nil {
 		t.Fatal(err)
 	}
@@ -426,15 +435,13 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 				h := newHarness(t, svc)
 				h.click(h.App.S.Settings.Title)
 				for _, label := range []string{h.App.S.Settings.Appearance, h.App.S.Settings.Requests,
-					h.App.S.Settings.History, h.App.S.Settings.Data} {
+					h.App.S.Settings.ThemePreview, h.App.S.Settings.Data} {
 					if !h.shows(label) {
 						t.Errorf("settings page does not show %q", label)
 					}
 				}
 				settingsAssertLayout(t, h)
-				if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 600, DeltaY: 1000, Precise: true}); err != nil {
-					t.Fatal(err)
-				}
+				h.click(h.App.S.Settings.About)
 				for _, label := range []string{h.App.S.Settings.About, h.App.S.Common.AppName, settingsVersion} {
 					if !h.shows(label) {
 						t.Errorf("scrolling settings does not show %q", label)
@@ -446,7 +453,7 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 	}
 }
 
-func TestSettingsRailAndGearOpenSettings(t *testing.T) {
+func TestSettingsRailOpensSettings(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		t.Run(lang, func(t *testing.T) {
 			svc := fake.New()
@@ -456,11 +463,6 @@ func TestSettingsRailAndGearOpenSettings(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			titlebarClick(t, h, h.App.S.Settings.Title)
-			if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.Appearance) {
-				t.Fatal("Settings gear did not open the Settings page")
-			}
-			titlebarClick(t, h, h.App.S.Shell.Workbench)
 			for _, hit := range h.D.Snapshot().Hits {
 				bounds := hit.Bounds
 				if hit.Label == h.App.S.Shell.Settings && bounds.X < RailWidth && bounds.Y >= TitlebarHeight {
@@ -487,17 +489,17 @@ func TestSettingsPageScrollsAtMinimumWindowSize(t *testing.T) {
 		t.Fatal(err)
 	}
 	settingsAssertLayout(t, h)
+	h.click(h.App.S.Settings.Requests)
 	h.click(h.App.S.Settings.VerifyTLS)
 	if !settingsShowsWrapped(h, h.App.S.Settings.TLSWarning) {
 		t.Fatal("TLS warning is not visible at the minimum window size")
 	}
-	if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 500, DeltaY: 1000, Precise: true}); err != nil {
-		t.Fatal(err)
-	}
+	h.click(h.App.S.Settings.About)
 	settingsAssertLayout(t, h)
 	if !h.shows(settingsVersion) {
-		t.Fatal("About is not reachable by scrolling at the minimum window size")
+		t.Fatal("About is not reachable at the minimum window size")
 	}
+	h.click(h.App.S.Settings.Data)
 	for i := 0; i < 10; i++ {
 		for _, hit := range h.D.Snapshot().Hits {
 			if hit.Label == h.App.S.Settings.OpenFolder {

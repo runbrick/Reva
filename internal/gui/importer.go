@@ -139,12 +139,6 @@ func (s *importerState) dismiss() {
 	s.invalidateReview()
 }
 
-func (a *App) importButton(c ui.C) {
-	if ui.Button(c, a.S.Import.Title).Outline().Clicked() {
-		a.openImportDialog()
-	}
-}
-
 func (a *App) openImportDialog() {
 	s := &a.importer
 	s.dismiss()

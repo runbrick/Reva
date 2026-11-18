@@ -71,21 +71,22 @@ type syncResult struct {
 	snippetID string
 }
 
+func (a *App) loadSyncSettings() {
+	s := &a.settings.sync
+	if a.settings.dirError == nil {
+		var config syncConfig
+		if err := storage.ReadJSON(filepath.Join(a.settings.dir, "sync-config.json"), &config); err == nil {
+			s.config = config
+		} else if !errors.Is(err, os.ErrNotExist) {
+			s.errorText = err.Error()
+		}
+	}
+	s.autoStarted = true
+}
+
 func (a *App) syncSettings(c ui.C) {
 	s := &a.settings.sync
 	labels := &a.S.Settings
-	if !s.autoStarted {
-		if a.settings.dirError == nil {
-			var config syncConfig
-			if err := storage.ReadJSON(filepath.Join(a.settings.dir, "sync-config.json"), &config); err == nil {
-				s.config = config
-			} else if !errors.Is(err, os.ErrNotExist) {
-				s.errorText = err.Error()
-			}
-		}
-		s.autoStarted = true
-	}
-	a.scheduleAutoSync(c)
 	settingsCard(c, labels.BackupSync, func() {
 		ui.Text(c, labels.BackupFile).Bold().MarginTop(Space2)
 		settingsRow(c, labels.BackupDescription, "", func() {

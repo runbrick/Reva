@@ -76,7 +76,7 @@ func (a *App) tabBar(c ui.C) {
 	}
 
 	theme := c.Theme()
-	height := a.tabBarHeight()
+	height := TabBarHeight
 	ui.Column(c).FillWidth().Height(height).Shrink(0).Background(a.palette.Sidebar).Children(func() {
 		ui.Row(c).FillWidth().Grow(1).Items(ui.Center).Children(func() {
 			area := ui.Scroll(c).Grow(1).FillHeight().Sideways()
@@ -103,9 +103,6 @@ func (a *App) tabBar(c ui.C) {
 						background, foreground := a.palette.Sidebar, theme.MutedForeground
 						if i == a.active {
 							background, foreground = theme.Card, theme.Foreground
-							if a.desktopLayout() {
-								foreground = theme.AccentForeground
-							}
 						}
 						row := ui.Row(tc).Width(requestTabWidth).FillHeight().PadX(Space2).Gap(Space2).Items(ui.Center)
 						row.Background(background).
@@ -122,12 +119,7 @@ func (a *App) tabBar(c ui.C) {
 								row.Background(theme.Accent)
 							}
 							if i == a.active {
-								indicator := ui.Row(tc).Absolute().Left(0).Right(0).Height(Space1 / 2).Background(theme.Primary)
-								if a.desktopLayout() {
-									indicator.Bottom(0)
-								} else {
-									indicator.Top(0)
-								}
+								ui.Row(tc).Absolute().Left(0).Right(0).Top(0).Height(Space1 / 2).Background(theme.Primary)
 							}
 							if t.Kind == collectionSettingsTabKind {
 								kind := a.S.Collections.Settings

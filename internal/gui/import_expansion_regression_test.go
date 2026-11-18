@@ -366,7 +366,7 @@ func TestImportedAuthSendPreservesHierarchy(t *testing.T) {
 	}
 	h.click("Live inherited")
 	live := h.App.Active()
-	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.SelectEnvironment)
 	collectionsOption(h, "Imported environment")
 	selected, _ := svc.Collections.Get(live.CollectionID)
 	if selected.EnvironmentScope.ActiveID != svc.Environments.List()[0].ID || svc.Settings.Get().ActiveEnvID != "" {

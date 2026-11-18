@@ -64,7 +64,7 @@ func TestCollectionEnvironmentSelectionAndVisibilityPersist(t *testing.T) {
 	clickCollectionEnvironmentCheckbox(h, global.Name)
 	clickCollectionEnvironmentCheckbox(h, other.Name)
 	h.click(h.App.S.Collections.Save)
-	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.SelectEnvironment)
 	if h.App.env.activeID != "" {
 		t.Fatal("hidden environment was still active")
 	}
@@ -105,7 +105,7 @@ func TestCollectionOnlyEnvironmentEditorAndRunner(t *testing.T) {
 		t.Fatal("collection environment did not stay in its owner")
 	}
 	private := stored.EnvironmentScope.Local[0]
-	h.click(h.App.S.Env.Title)
+	h.click(h.App.S.Env.SelectEnvironment)
 	collectionsOption(h, private.Name)
 	if got := h.App.Vars(); len(got) != 1 || got[0].Value != "owner-only" {
 		t.Fatalf("private environment was not applied: %+v", got)

@@ -248,8 +248,8 @@ func (a *App) collectionsPane(c ui.C) {
 	}
 	ui.Column(c).Fill().Pad(Space2).Gap(Space2).Children(func() {
 		ui.Row(c).FillWidth().Items(ui.Center).Children(func() {
-			ui.Text(c, text.Title).Bold().Grow(1)
-			add := ui.Button(c, text.Add).Icon(icons.Plus).IconOnly().Ghost()
+			ui.Text(c, a.S.Shell.APIs).Bold().Grow(1).FontSize(theme.Metrics.FontSizeL - Space1)
+			add := ui.Button(c, text.Add).Icon(icons.Plus).IconOnly().Tooltip(text.Add)
 			if add.Clicked() {
 				s.addOpen = !s.addOpen
 			}

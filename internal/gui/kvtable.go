@@ -124,29 +124,37 @@ func requestParseBulk(text string, previous []model.KV) []model.KV {
 // kvTable reports edits, including deferred insertions and deletions. Callers
 // deriving the URL also schedule their update with c.After.
 func (a *App) kvTable(c ui.C, s *kvTableState, rows *[]model.KV) bool {
-	changed := s.syncBulk(rows)
-	changed = s.sync(*rows) || changed
-	theme, labels := c.Theme(), &a.S.Request
+	labels := &a.S.Request
 	key, value, add := labels.ParamName, labels.ParamValue, labels.AddParam
 	if s.headers {
 		key, value, add = labels.HeaderName, labels.HeaderValue, labels.AddHeader
 	}
+	return a.kvTableWithLabels(c, s, rows, "", key, value, labels.Description, add)
+}
+
+func (a *App) kvTableWithLabels(c ui.C, s *kvTableState, rows *[]model.KV, title, key, value, description, add string) bool {
+	changed := s.syncBulk(rows)
+	changed = s.sync(*rows) || changed
+	theme, labels := c.Theme(), &a.S.Request
 	ui.Column(c).FillWidth().Gap(Space1).Children(func() {
 		toggle := labels.BulkEdit
 		if s.bulk {
 			toggle = labels.TableEdit
 		}
-		if ui.ButtonBase(c, toggle).Self(ui.End).Height(Space6).PadX(Space2).
-			Radius(theme.Metrics.RadiusControl).Hover(ui.Look{}.Background(theme.Hover)).
-			Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
-			ui.Text(c, toggle).FontSize(theme.Metrics.FontSizeS).Color(theme.AccentForeground).Bold()
-		}).Clicked() {
-			if !s.bulk {
-				s.syncedBulk = requestBulkText(*rows)
-				s.bulkText.SetText(s.syncedBulk)
+		ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
+			if title != "" {
+				ui.Text(c, title).Bold().Grow(1).Ellipsis()
+			} else {
+				ui.Spacer(c)
 			}
-			s.bulk = !s.bulk
-		}
+			if ui.Button(c, toggle).Icon(icons.Pencil).Outline().Shrink(0).Clicked() {
+				if !s.bulk {
+					s.syncedBulk = requestBulkText(*rows)
+					s.bulkText.SetText(s.syncedBulk)
+				}
+				s.bulk = !s.bulk
+			}
+		})
 		if s.bulk {
 			ui.Text(c, labels.BulkHelp).Muted().FontSize(theme.Metrics.FontSizeS)
 			if ui.TextArea(c, &s.bulkText, labels.BulkContent, "").Mono().FillWidth().Height(Space6 * 6).Changed() {
@@ -162,7 +170,7 @@ func (a *App) kvTable(c ui.C, s *kvTableState, rows *[]model.KV) bool {
 				ui.Divider(c).Vertical()
 				ui.Text(c, value).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold()
 				ui.Divider(c).Vertical()
-				ui.Text(c, labels.Description).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold()
+				ui.Text(c, description).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold().Ellipsis()
 				ui.Row(c).Width(theme.Metrics.ControlHeight).Shrink(0)
 			})
 			for i := range *rows {

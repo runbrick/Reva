@@ -23,14 +23,12 @@ import (
 	"time"
 
 	"github.com/runbrick/reva/internal/execution"
-	"github.com/runbrick/reva/internal/gui/icons"
 	"github.com/runbrick/reva/internal/gui/themes"
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
 	"github.com/runbrick/reva/internal/storage"
 	"github.com/vivaui/viva/app"
-	"github.com/vivaui/viva/gfx"
 	"github.com/vivaui/viva/ui"
 )
 
@@ -99,12 +97,6 @@ const (
 // Sections lists the rail items in display order.
 var Sections = []Section{SectionAPIs, SectionEnvironments, SectionSettings}
 
-// railParts names each rail item's hit identity.
-var railParts = map[Section]string{
-	SectionAPIs:         "apis",
-	SectionEnvironments: "environments", SectionSettings: "settings",
-}
-
 // MainPage is what the titlebar navigation selects: the main area's content.
 type MainPage int
 
@@ -121,12 +113,10 @@ var Pages = []MainPage{PageWorkbench, PageHistory, PageSettings}
 type App struct {
 	Svc service.Services
 	// S is the active string table; replace it to switch language.
-	S           *i18n.Strings
-	theme       ui.Theme
-	palette     Palette
-	themeStyle  themes.Style
-	themeMode   string
-	themeLayout themes.Layout
+	S         *i18n.Strings
+	theme     ui.Theme
+	palette   Palette
+	themeMode string
 	// Platform is the OS the window runs on ("darwin", "windows", "linux");
 	// tests set it to check each platform's titlebar.
 	Platform string
@@ -173,7 +163,7 @@ func New(svc service.Services) *App {
 // follows the OS appearance (re-read every paint by syncTheme).
 func (a *App) ApplySettings(s model.Settings) {
 	a.S = i18n.For(i18n.Lang(s.Language))
-	a.themeStyle, a.themeMode = themes.Decode(s.Theme)
+	a.themeMode = themes.Mode(s.Theme)
 	a.syncTheme()
 }
 
@@ -190,7 +180,7 @@ func (a *App) Dark() bool {
 
 func (a *App) syncTheme() {
 	dark := a.Dark()
-	a.theme, a.palette, a.themeLayout = themes.Resolve(a.themeStyle, dark)
+	a.theme, a.palette = themes.Resolve(dark)
 	if dark {
 		app.SetNativeAppearance(app.AppearanceDark)
 	} else {
@@ -369,21 +359,11 @@ func (a *App) Page(c ui.C) {
 	// Preview hides raw background data without moving asynchronous work
 	// into a different declaration scope or changing independent UI state.
 	previewing := a.requestPreviewOpen()
-	theme := c.Theme()
-	classic := a.desktopLayout()
 	height := c.Bounds().Height - TitlebarHeight
-	if classic {
-		height -= desktopToolbarHeight
-		if !previewing {
-			height -= statusStripHeight(theme)
-		}
-	}
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
 		ui.Row(c).FillWidth().Height(max(0, height)).Shrink(0).Children(func() {
-			if !classic {
-				a.rail(c)
-			}
+			a.studioRail(c)
 			switch a.Main {
 			case PageHistory:
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.historyPage(c) })
@@ -392,77 +372,19 @@ func (a *App) Page(c ui.C) {
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
 					if !previewing {
-						sidebar := ui.Column(c).Fill()
-						if !classic {
-							sidebar.PadBottom(statusStripHeight(theme))
-						}
-						sidebar.Children(func() { a.sidebar(c) })
-						if !classic {
-							a.statusStrip(c, false)
-						}
+						a.sidebar(c)
 					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
 				a.workbench(c)
 			}
 		})
-		if classic && !previewing {
-			a.statusStrip(c, true)
-		}
 	})
 	if !previewing {
 		a.dialogs(c)
 		a.searchPalette(c)
 		ui.Toasts(c, &a.toaster)
 	}
-}
-
-// rail is the left icon navigation. It selects Section, and on the
-// Settings item the Settings page.
-func (a *App) rail(c ui.C) {
-	theme := c.Theme()
-	ui.Column(c).Width(RailWidth).FillHeight().Background(a.palette.Rail).PadY(Space3).Gap(Space2).
-		Items(ui.Center).FocusGroup(ui.FocusVertical).Label(a.S.Shell.RailLabel).Children(func() {
-		for _, s := range Sections {
-			icon, label := a.sectionIcon(s), a.sectionLabel(s)
-			active := a.Main == PageWorkbench && a.Section == s || s == SectionSettings && a.Main == PageSettings
-			fg := theme.MutedForeground
-			if active {
-				fg = theme.AccentForeground
-			}
-			// The hit's identity is named by its section's word; a Key set
-			// before ui.ID would be replaced by a Part, giving every item one ID.
-			id := ui.ID(c.Part(railParts[s]))
-			item := ui.Column(c.KeyInt(int(s))).Width(RailWidth-2*Space1).Height(Space6*3).Center().Gap(Space2).
-				Radius(theme.Metrics.RadiusControl).HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: active}).Clip().
-				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
-			if active {
-				item.Background(a.palette.RailActive)
-			}
-			item.Children(func() {
-				ui.Icon(c, icon).Size(Space6, Space6).Color(fg)
-				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS - 2).Color(fg)
-				if active {
-					ui.Slot(c).Absolute().Left(0).Top(0).Bottom(0).Width(Space1).Background(theme.Primary)
-				}
-			})
-			if item.Clicked() {
-				a.SelectSection(s)
-			}
-		}
-	})
-	ui.Divider(c).Vertical()
-}
-
-// pageLabel names a titlebar navigation item.
-func (a *App) pageLabel(p MainPage) string {
-	switch p {
-	case PageHistory:
-		return a.S.Shell.History
-	case PageSettings:
-		return a.S.Shell.Settings
-	}
-	return a.S.Shell.Workbench
 }
 
 // SelectSection shows section s: the Settings item opens the Settings page,
@@ -485,16 +407,6 @@ func (a *App) sectionLabel(s Section) string {
 	return a.S.Shell.APIs
 }
 
-func (a *App) sectionIcon(s Section) gfx.Icon {
-	switch s {
-	case SectionEnvironments:
-		return icons.Package
-	case SectionSettings:
-		return icons.Settings
-	}
-	return icons.Send
-}
-
 // sidebar shows the selected section's list.
 func (a *App) sidebar(c ui.C) {
 	ui.Column(c).Fill().Children(func() {
@@ -504,29 +416,6 @@ func (a *App) sidebar(c ui.C) {
 		default:
 			a.collectionsPane(c)
 		}
-	})
-}
-
-func statusStripHeight(theme *ui.Theme) float32 { return theme.Metrics.ControlHeight + 1 }
-
-func (a *App) statusStrip(c ui.C, fullWidth bool) {
-	theme := c.Theme()
-	label, color := a.S.Shell.Ready, theme.Success
-	if a.Active().Sending {
-		label, color = a.S.Response.Sending, theme.AccentForeground
-	}
-	strip := ui.Column(c).Height(statusStripHeight(theme)).Shrink(0)
-	if fullWidth {
-		strip.FillWidth().Background(a.palette.Rail)
-	} else {
-		strip.Absolute().Left(0).Right(0).Bottom(0).Background(a.palette.Sidebar)
-	}
-	strip.Children(func() {
-		ui.Divider(c)
-		ui.Row(c).FillWidth().Grow(1).PadX(Space4).Gap(Space2).Items(ui.Center).Children(func() {
-			statusDot(c, color)
-			ui.Text(c, label).FontSize(theme.Metrics.FontSizeS).Muted().Ellipsis()
-		})
 	})
 }
 
@@ -552,25 +441,34 @@ func (a *App) workbench(c ui.C) {
 			a.websocketPane(c.KeyInt(t.ID), t)
 			return
 		}
-		a.workbenchPanel(c, ui.Column(c).FillWidth().Height(a.mainSplit.Pos), !previewing, func() {
-			a.requestPane(c.KeyInt(t.ID), t)
-		})
-		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
-		a.workbenchPanel(c, ui.Column(c).FillWidth().Grow(1), !previewing, func() {
-			if previewing {
-				return
-			}
-			if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
-				a.scriptFailurePane(c.KeyInt(t.ID), t)
-			} else {
-				a.responsePane(c.KeyInt(t.ID), t)
+		ui.Row(c).FillWidth().Grow(1).MinHeight(0).Children(func() {
+			ui.Column(c).Grow(1).MinWidth(0).FillHeight().Children(func() { a.httpWorkbench(c, t, previewing) })
+			if !previewing && a.studioInspectorFits(c) {
+				a.studioRequestInspector(c, t)
 			}
 		})
 	})
 }
 
+func (a *App) httpWorkbench(c ui.C, t *Tab, previewing bool) {
+	a.workbenchPanel(c, ui.Column(c).FillWidth().Height(a.mainSplit.Pos), !previewing, func() {
+		a.requestPane(c.KeyInt(t.ID), t)
+	})
+	ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
+	a.workbenchPanel(c, ui.Column(c).FillWidth().Grow(1), !previewing, func() {
+		if previewing {
+			return
+		}
+		if t.Response == nil && !t.Sending && (len(t.Tests) > 0 || len(a.scriptTab(t).logs) > 0) {
+			a.scriptFailurePane(c.KeyInt(t.ID), t)
+		} else {
+			a.responsePane(c.KeyInt(t.ID), t)
+		}
+	})
+}
+
 func (a *App) workbenchPanel(c ui.C, panel ui.Box, visible bool, content func()) {
-	if visible && a.desktopLayout() {
+	if visible {
 		theme := c.Theme()
 		panel.MarginX(Space1).MarginY(Space1).Background(theme.Card).
 			Border(1, theme.Border).Radius(theme.Metrics.RadiusSurface).Clip()

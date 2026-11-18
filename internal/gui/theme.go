@@ -26,20 +26,10 @@ type Palette = themes.Palette
 
 func (a *App) Palette() *Palette { return &a.palette }
 
-func (a *App) desktopLayout() bool { return a.themeLayout == themes.LayoutDesktop }
+const studioInspectorWidth = Space6 * 11
 
-func (a *App) railWidth() float32 {
-	if a.desktopLayout() {
-		return 0
-	}
-	return RailWidth
-}
-
-func (a *App) tabBarHeight() float32 {
-	if a.desktopLayout() {
-		return Space6 + Space4
-	}
-	return TabBarHeight
+func (a *App) studioInspectorFits(c ui.C) bool {
+	return c.Bounds().Width-a.sideSplit.Pos-RailWidth >= studioInspectorWidth+Space6*29
 }
 
 func (a *App) MethodBadge(c ui.C, method model.Method) ui.Box {

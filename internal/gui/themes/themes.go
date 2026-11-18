@@ -1,4 +1,4 @@
-// Package themes registers Reva's built-in colors, metrics and layout profiles.
+// Package themes defines Reva's light and dark appearance.
 package themes
 
 import (
@@ -8,75 +8,14 @@ import (
 	"github.com/vivaui/viva/ui"
 )
 
-type Style string
-
-const (
-	Modern  Style = "modern"
-	Classic Style = "classic"
-)
-
-type Layout uint8
-
-const (
-	LayoutRail Layout = iota
-	LayoutDesktop
-)
-
-type definition struct {
-	style  Style
-	layout Layout
-	paint  func(dark bool) (ui.Theme, Palette)
-}
-
-var builtins = [...]definition{
-	{Modern, LayoutRail, modernTheme},
-	{Classic, LayoutDesktop, classicTheme},
-}
-
-func Styles() []Style {
-	styles := make([]Style, len(builtins))
-	for index, entry := range builtins {
-		styles[index] = entry.style
+// Mode preserves the appearance in settings saved with a layout prefix.
+func Mode(value string) string {
+	if _, mode, qualified := strings.Cut(value, ":"); qualified {
+		value = mode
 	}
-	return styles
-}
-
-func lookup(style Style) definition {
-	for _, entry := range builtins {
-		if entry.style == style {
-			return entry
-		}
-	}
-	return builtins[0]
-}
-
-func Resolve(style Style, dark bool) (ui.Theme, Palette, Layout) {
-	entry := lookup(style)
-	theme, palette := entry.paint(dark)
-	return theme, palette, entry.layout
-}
-
-// Decode preserves the unprefixed settings used before style selection existed.
-func Decode(value string) (Style, string) {
-	style, mode, qualified := strings.Cut(value, ":")
-	if !qualified {
-		return Modern, normalizeMode(value)
-	}
-	return lookup(Style(style)).style, normalizeMode(mode)
-}
-
-func Encode(style Style, mode string) string {
-	mode = normalizeMode(mode)
-	if entry := lookup(style); entry.style != Modern {
-		return string(entry.style) + ":" + mode
-	}
-	return mode
-}
-
-func normalizeMode(mode string) string {
-	switch mode {
+	switch value {
 	case "dark", "system":
-		return mode
+		return value
 	default:
 		return "light"
 	}

@@ -19,7 +19,7 @@ func TestRailItemsSelectTheirOwnSection(t *testing.T) {
 		t.Fatalf("APIs click: section=%d main=%d, want APIs on the workbench", h.App.Section, h.App.Main)
 	}
 	for _, hit := range h.D.Snapshot().Hits {
-		if hit.Label == h.App.S.Shell.Collections {
+		if hit.Label == h.App.S.Shell.Collections && hit.Bounds.Y >= TitlebarHeight && hit.Bounds.X < RailWidth {
 			t.Fatal("collections rail entry is still visible")
 		}
 	}

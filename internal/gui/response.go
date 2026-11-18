@@ -23,6 +23,10 @@ import (
 
 const responseDisplayLimit = 2 * 1024 * 1024
 
+var responseSections = []responseSection{responseBody, responseHeaders, responseCookies, responseTimeline, responseTests}
+var responseStreamSections = []responseSection{responseEvents, responseBody, responseHeaders, responseCookies, responseTimeline, responseTests}
+var responseModes = []responseMode{responsePretty, responseRaw, responsePreview}
+
 type responseSection int
 
 const (
@@ -50,6 +54,7 @@ type responseView struct {
 	source                      *model.Response
 	raw, pretty, duration, size string
 	rawLimited, prettyLimited   bool
+	json                        bool
 	testsCount                  int
 	testsPattern, testsLabel    string
 	rawTokens, prettyTokens     [][]format.Token
@@ -95,7 +100,8 @@ func (v *responseView) prepare(r *model.Response) {
 	// Format the received body before limiting its display, so a large valid
 	// JSON response still shows an indented prefix in Pretty mode. Invalid or
 	// incomplete JSON falls back to the original text.
-	if format.IsJSON(r.Header("Content-Type"), r.Body) {
+	v.json = format.IsJSON(r.Header("Content-Type"), r.Body)
+	if v.json {
 		if pretty, err := format.PrettyJSON(r.Body); err == nil {
 			v.pretty, v.prettyLimited = responseDisplayText(pretty)
 		}
@@ -195,14 +201,14 @@ func (a *App) pruneResponseViews() {
 // responsePane declares the response of t: status, duration, size, headers
 // and body (pretty / raw).
 func (a *App) responsePane(c ui.C, t *Tab) {
+	if t.Response != nil && (t.sse != nil && t.sse.status != 0 || !t.Sending && t.Err == "") {
+		a.responseResult(c, t)
+		return
+	}
 	ui.Column(c).Fill().Pad(Space4).Gap(Space2).Background(a.palette.Surface).Children(func() {
 		switch {
 		case t.sse != nil && t.sse.status != 0:
-			if t.Response != nil {
-				a.responseResult(c, t)
-			} else {
-				a.responseSSE(c, t)
-			}
+			a.responseSSE(c, t)
 		case t.Sending:
 			ui.Row(c).Gap(Space2).Items(ui.Center).Children(func() {
 				ui.Spinner(c)
@@ -216,11 +222,11 @@ func (a *App) responsePane(c ui.C, t *Tab) {
 			ui.Scroll(c).FillWidth().Grow(1).Children(func() {
 				ui.Paragraph(c, t.Err, 0).Color(c.Theme().Danger)
 			})
-		case t.Response != nil:
-			a.responseResult(c, t)
 		default:
 			ui.Column(c).Fill().Center().Gap(Space3).Children(func() {
-				ui.Icon(c, icons.Send).Size(Space6, Space6).Color(c.Theme().MutedForeground)
+				theme := c.Theme()
+				ui.Row(c).Size(Space6*2, Space6*2).Radius(theme.Metrics.RadiusSurface).Background(theme.Muted).
+					Center().Children(func() { ui.Icon(c, icons.Send).Size(Space6, Space6).Color(theme.MutedForeground) })
 				ui.Paragraph(c, a.S.Response.EmptyHint, 0).Muted()
 			})
 		}
@@ -236,9 +242,9 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 		v = &responseView{}
 		a.response.views[t.ID] = v
 	}
-	sections := []responseSection{responseBody, responseHeaders, responseCookies, responseTimeline, responseTests}
+	sections := responseSections
 	if t.sse != nil && t.sse.status != 0 {
-		sections = append([]responseSection{responseEvents}, sections...)
+		sections = responseStreamSections
 		if v.source != t.Response {
 			v.section = responseEvents
 		}
@@ -258,51 +264,78 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 	}
 	theme := c.Theme()
 	statusColor := a.palette.StatusColor(theme, t.Response.StatusCode)
-	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-		ui.Tabs(c, &v.section, sections, func(section responseSection) string {
-			switch section {
-			case responseEvents:
-				return a.S.Response.SSEEvents
-			case responseHeaders:
-				return a.S.Response.Headers
-			case responseCookies:
-				return a.S.Response.Cookies
-			case responseTimeline:
-				return a.S.Response.Timeline
-			case responseTests:
-				if len(t.Tests) > 0 {
-					return v.testsLabel
-				}
-				return a.S.Response.Tests
-			default:
-				return a.S.Response.Body
-			}
-		}).Line().Grow(1)
-		ui.Slot(c).Size(Space2, Space2).Radius(Space1).Background(statusColor)
-		ui.Text(c, t.Response.Status).FontSize(theme.Metrics.FontSizeS).Color(statusColor).Shrink(0)
-		ui.Icon(c, icons.Clock).Size(Space4, Space4).Color(theme.MutedForeground)
-		ui.Text(c, v.duration).FontSize(theme.Metrics.FontSizeS).Shrink(0)
-		ui.Icon(c, icons.HardDrive).Size(Space4, Space4).Color(theme.MutedForeground)
-		ui.Text(c, v.size).FontSize(theme.Metrics.FontSizeS).Shrink(0)
+	labels := &a.S.Response
+	ui.Row(c).FillWidth().Height(TabBarHeight).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
+		Background(a.palette.Sidebar).Children(func() {
+		a.responseTabs(c, v, sections)
+		ui.Row(c).MaxWidth(Space6 * 9).Shrink(0).PadX(Space2).PadY(Space1).Gap(Space1).Items(ui.Center).
+			Radius(gfx.RadiusFull).Background(statusColor.WithAlpha(0.12)).Children(func() {
+			statusDot(c, statusColor)
+			ui.Text(c, t.Response.Status).FontSize(theme.Metrics.FontSizeS).Color(statusColor).Ellipsis()
+		})
+		ui.Text(c, v.duration).FontSize(theme.Metrics.FontSizeS).Muted().Shrink(0)
+		ui.Text(c, v.size).FontSize(theme.Metrics.FontSizeS).Muted().Shrink(0)
+		ui.Divider(c).Vertical().Height(Space4)
 		a.responseCopyButton(c, t.Response)
 	})
+	ui.Divider(c)
 	if t.Response.Truncated {
-		ui.Paragraph(c, a.S.Response.Truncated, 0).Color(a.palette.Warning)
+		ui.Paragraph(c, labels.Truncated, 0).Pad(Space2).Color(a.palette.Warning)
 	}
-	switch v.section {
-	case responseEvents:
-		a.responseSSE(c, t)
-	case responseHeaders:
-		a.responseHeaderTable(c, t.Response)
-	case responseCookies:
-		a.responseCookieTable(c, v)
-	case responseTimeline:
-		a.responseTimelineChart(c, v)
-	case responseTests:
-		a.testsSection(c, t)
-	default:
-		a.responseBodyView(c, v)
+	if v.section == responseBody {
+		a.responseWorkbench(c, v)
+		return
 	}
+	ui.Column(c).FillWidth().Grow(1).Pad(Space4).Gap(Space2).Children(func() {
+		switch v.section {
+		case responseEvents:
+			a.responseSSE(c, t)
+		case responseHeaders:
+			a.responseHeaderTable(c, t.Response)
+		case responseCookies:
+			a.responseCookieTable(c, v)
+		case responseTimeline:
+			a.responseTimelineChart(c, v)
+		case responseTests:
+			a.testsSection(c, t)
+		}
+	})
+}
+
+func (a *App) responseTabs(c ui.C, v *responseView, sections []responseSection) {
+	theme, labels := c.Theme(), &a.S.Response
+	ui.Scroll(c).FillHeight().Grow(1).MinWidth(0).Sideways().Children(func() {
+		ui.Row(c).Height(TabBarHeight).Gap(Space1).FocusGroup(ui.FocusHorizontal).Children(func() {
+			for _, section := range sections {
+				label := labels.Body
+				switch section {
+				case responseEvents:
+					label = labels.SSEEvents
+				case responseHeaders:
+					label = labels.Headers
+				case responseCookies:
+					label = labels.Cookies
+				case responseTimeline:
+					label = labels.Timeline
+				case responseTests:
+					label = labels.Tests
+					if v.testsCount > 0 {
+						label = v.testsLabel
+					}
+				}
+				ui.TabBase(c.KeyInt(int(section)), &v.section, section, label).FillHeight().PadX(Space2).
+					Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
+					text := ui.Text(c, label)
+					if v.section == section {
+						text.Color(theme.AccentForeground).Bold()
+						ui.Slot(c).Absolute().Left(0).Right(0).Bottom(0).Height(Space1 / 2).Background(theme.Primary)
+					} else {
+						text.Muted()
+					}
+				})
+			}
+		})
+	})
 }
 
 func (a *App) responseCopy(c ui.C, body string) {
@@ -319,8 +352,31 @@ func (a *App) responseCopyButton(c ui.C, r *model.Response) {
 	}
 }
 
+func (a *App) responseWorkbench(c ui.C, v *responseView) {
+	theme, labels := c.Theme(), &a.S.Response
+	workbenchWidth := c.Bounds().Width - a.sideSplit.Pos - RailWidth
+	wide := workbenchWidth >= Space6*36 && c.Bounds().Height >= Space6*28
+	success := v.source.StatusCode >= 200 && v.source.StatusCode < 300
+	ui.Row(c).FillWidth().Grow(1).Children(func() {
+		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, v) })
+		if !wide || !success || v.mode == responsePreview {
+			return
+		}
+		ui.Divider(c).Vertical()
+		ui.Column(c).Width(min(workbenchWidth*0.375, Space6*18)).FillHeight().Shrink(0).Center().Gap(Space2).
+			Background(a.palette.Sidebar).Children(func() {
+			ui.Row(c).Size(Space6*2, Space6*2).Center().Radius(theme.Metrics.RadiusSurface).
+				Background(theme.Accent).Children(func() {
+				ui.Icon(c, icons.CircleCheck).Size(Space6, Space6).Color(theme.AccentForeground)
+			})
+			ui.Text(c, labels.Success).Bold()
+			ui.Text(c, labels.Received).FontSize(theme.Metrics.FontSizeS).Muted()
+		})
+	})
+}
+
 func (a *App) responseBodyView(c ui.C, v *responseView) {
-	pane := ui.Column(c).FillWidth().Grow(1).Gap(Space2)
+	pane := ui.Column(c).FillWidth().Grow(1)
 	if pane.Shortcut(ui.Primary, "f") && v.mode != responsePreview {
 		v.find = true
 	}
@@ -336,8 +392,14 @@ func (a *App) responseBodyView(c ui.C, v *responseView) {
 }
 
 func (a *App) responseBodyContent(c ui.C, v *responseView) {
-	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-		ui.Choice(c, &v.mode, []responseMode{responsePretty, responseRaw, responsePreview}, func(mode responseMode) string {
+	theme := c.Theme()
+	ui.Row(c).FillWidth().Height(TabBarHeight).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
+		Background(a.palette.TableHeader).Children(func() {
+		if v.json {
+			ui.Text(c, "JSON").FontSize(theme.Metrics.FontSizeS).Bold().Muted().PadX(Space2).
+				Background(theme.Secondary).Radius(theme.Metrics.RadiusControl).Shrink(0)
+		}
+		ui.Choice(c, &v.mode, responseModes, func(mode responseMode) string {
 			switch mode {
 			case responseRaw:
 				return a.S.Response.Raw
@@ -351,13 +413,12 @@ func (a *App) responseBodyContent(c ui.C, v *responseView) {
 			v.wrap = !v.wrap
 		}
 		ui.Spacer(c)
-		a.responseCopyButton(c, v.source)
 		if ui.Button(c, a.S.Response.Search).Icon(icons.Search).IconOnly().Ghost().Tooltip(a.S.Response.Search).Disabled(v.mode == responsePreview).Clicked() {
 			v.find = !v.find
 		}
 	})
 	if v.mode == responsePreview {
-		a.responsePreviewView(c, v)
+		ui.Column(c).FillWidth().Grow(1).Pad(Space4).Children(func() { a.responsePreviewView(c, v) })
 		return
 	}
 	body, tokens, limited := v.pretty, v.prettyTokens, v.prettyLimited
@@ -366,7 +427,7 @@ func (a *App) responseBodyContent(c ui.C, v *responseView) {
 	}
 	v.code.set(body, tokens)
 	if limited {
-		ui.Paragraph(c, a.S.Response.DisplayLimit, 0).Muted()
+		ui.Paragraph(c, a.S.Response.DisplayLimit, 0).Pad(Space2).Muted()
 	}
 	if v.find {
 		a.responseFindBar(c, v)

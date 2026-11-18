@@ -96,7 +96,7 @@ const (
 )
 
 // Sections lists the rail items in display order.
-var Sections = []Section{SectionAPIs, SectionEnvironments}
+var Sections = []Section{SectionAPIs, SectionEnvironments, SectionSettings}
 
 // railParts names each rail item's hit identity.
 var railParts = map[Section]string{
@@ -370,7 +370,7 @@ func (a *App) Page(c ui.C) {
 	theme := c.Theme()
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
-		ui.Row(c).FillWidth().Grow(1).Children(func() {
+		ui.Row(c).FillWidth().Height(max(0, c.Bounds().Height-TitlebarHeight)).Shrink(0).Children(func() {
 			a.rail(c)
 			switch a.Main {
 			case PageHistory:
@@ -380,7 +380,8 @@ func (a *App) Page(c ui.C) {
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
 					if !previewing {
-						a.sidebar(c)
+						ui.Column(c).Fill().PadBottom(theme.Metrics.ControlHeight + 1).Children(func() { a.sidebar(c) })
+						a.sidebarStatus(c)
 					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
@@ -406,20 +407,23 @@ func (a *App) rail(c ui.C) {
 			active := a.Main == PageWorkbench && a.Section == s || s == SectionSettings && a.Main == PageSettings
 			fg := theme.MutedForeground
 			if active {
-				fg = theme.Primary
+				fg = theme.AccentForeground
 			}
 			// The hit's identity is named by its section's word; a Key set
 			// before ui.ID would be replaced by a Part, giving every item one ID.
 			id := ui.ID(c.Part(railParts[s]))
-			item := ui.Column(c.KeyInt(int(s))).Width(RailWidth-2*Space1).PadY(Space2).Gap(Space1).Items(ui.Center).
-				Radius(theme.Metrics.RadiusSurface).Hit(id, label).
+			item := ui.Column(c.KeyInt(int(s))).Width(RailWidth-2*Space1).Height(Space6*3).Center().Gap(Space2).
+				Radius(theme.Metrics.RadiusControl).HitWith(id, label, gfx.HitOptions{Role: gfx.RoleButton, Selected: active}).Clip().
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring.WithAlpha(0.5)))
 			if active {
 				item.Background(a.palette.RailActive)
 			}
 			item.Children(func() {
-				ui.Icon(c, icon).Size(22, 22).Color(fg)
+				ui.Icon(c, icon).Size(Space6, Space6).Color(fg)
 				ui.Text(c, label).FontSize(theme.Metrics.FontSizeS - 2).Color(fg)
+				if active {
+					ui.Slot(c).Absolute().Left(0).Top(0).Bottom(0).Width(Space1).Background(theme.Primary)
+				}
 			})
 			if item.Clicked() {
 				a.SelectSection(s)
@@ -463,11 +467,11 @@ func (a *App) sectionLabel(s Section) string {
 func (a *App) sectionIcon(s Section) gfx.Icon {
 	switch s {
 	case SectionEnvironments:
-		return icons.Globe
+		return icons.Package
 	case SectionSettings:
 		return icons.Settings
 	}
-	return icons.Layers
+	return icons.Send
 }
 
 // sidebar shows the selected section's list.
@@ -480,7 +484,22 @@ func (a *App) sidebar(c ui.C) {
 			a.collectionsPane(c)
 		}
 	})
-	ui.Divider(c).Vertical()
+}
+
+func (a *App) sidebarStatus(c ui.C) {
+	theme := c.Theme()
+	label, color := a.S.Shell.Ready, theme.Success
+	if a.Active().Sending {
+		label, color = a.S.Response.Sending, theme.AccentForeground
+	}
+	ui.Column(c).Absolute().Left(0).Right(0).Bottom(0).Height(theme.Metrics.ControlHeight + 1).
+		Background(a.palette.Sidebar).Children(func() {
+		ui.Divider(c)
+		ui.Row(c).FillWidth().Grow(1).PadX(Space4).Gap(Space2).Items(ui.Center).Children(func() {
+			statusDot(c, color)
+			ui.Text(c, label).FontSize(theme.Metrics.FontSizeS).Muted().Ellipsis()
+		})
+	})
 }
 
 // workbench is the tab bar over the request editor and the response. While

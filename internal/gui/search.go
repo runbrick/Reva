@@ -68,8 +68,8 @@ func (a *App) searchBox(c ui.C) {
 	if a.Platform == "darwin" {
 		hint = a.S.Search.MacHint
 	}
-	box := ui.Row(c).Width(320).Height(32).Shrink(0).PadX(Space3).Gap(Space2).Items(ui.Center).
-		Background(theme.Muted).Radius(theme.Metrics.RadiusControl).
+	box := ui.Row(c).Width(Space6*12).Height(theme.Metrics.ControlHeight-Space1).Shrink(0).PadX(Space3).Gap(Space2).Items(ui.Center).
+		Background(theme.Muted).Border(1, theme.Border).Radius(gfx.RadiusFull).
 		Hit(ui.ID(c.Part("global-search")), a.S.Search.Title).
 		Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
 		ui.Icon(c, icons.Search).Size(Space4, Space4).Color(theme.MutedForeground)
@@ -383,12 +383,7 @@ func (a *App) runSearch(r searchResult) {
 		case searchSettings:
 			a.SelectSection(SectionSettings)
 		case searchToggleTheme:
-			settings := a.Svc.Settings.Get()
-			settings.Theme = "dark"
-			if a.Dark() {
-				settings.Theme = "light"
-			}
-			a.saveSearchSettings(settings)
+			a.toggleTheme()
 		case searchSwitchLanguage:
 			settings := a.Svc.Settings.Get()
 			settings.Language = "en"
@@ -398,6 +393,15 @@ func (a *App) runSearch(r searchResult) {
 			a.saveSearchSettings(settings)
 		}
 	}
+}
+
+func (a *App) toggleTheme() {
+	settings := a.Svc.Settings.Get()
+	settings.Theme = "dark"
+	if a.Dark() {
+		settings.Theme = "light"
+	}
+	a.saveSearchSettings(settings)
 }
 
 func (a *App) saveSearchSettings(settings model.Settings) {

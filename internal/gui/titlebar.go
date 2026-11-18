@@ -50,27 +50,43 @@ func (a *App) titlebarStrip(c ui.C) {
 	if compact {
 		gap = Space1
 	}
-	ui.Row(c).FillWidth().Height(TitlebarHeight).Shrink(0).Background(a.palette.Rail).
+	ui.Row(c).FillWidth().Height(TitlebarHeight).Shrink(0).Background(a.palette.Sidebar).
 		PadLeft(leading + Space4).PadRight(trailing + Space4).Gap(gap).Items(ui.Center).
 		Draw(drawTitlebarBorder).Children(func() {
 		ui.Row(c).Gap(Space2).Items(ui.Center).Shrink(0).Children(func() {
-			ui.Row(c).Size(28, 28).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
+			ui.Row(c).Size(Space6, Space6).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
 				Center().Children(func() {
 				ui.Icon(c, icons.Send).Size(Space4, Space4).Color(theme.PrimaryForeground)
 			})
 			ui.Text(c, a.S.Common.AppName).Bold()
 		})
 		a.titlebarNavigation(c, compact)
+		ui.Divider(c).Vertical().Height(Space6)
+		if ui.Button(c, a.S.Titlebar.NewRequestTab).Icon(icons.Plus).IconOnly().Ghost().Tooltip(a.S.Titlebar.NewRequestTab).Clicked() {
+			c.After(func() { a.NewTab(); a.SelectSection(SectionAPIs) })
+		}
 		ui.Row(c).Grow(1).MinWidth(Space4).FillHeight().MovesWindow()
 		// Search may declare a fixed preferred width. This slot yields space to
 		// the tools, clipping both paint and hits before the window controls.
 		ui.Row(c).Shrink(1).MinWidth(0).Clip().Children(func() { a.searchBox(c) })
-		ui.Row(c).Gap(Space2).Items(ui.Center).Shrink(0).Children(func() {
+		ui.Row(c).Gap(gap).Items(ui.Center).Shrink(0).Children(func() {
 			a.envSelector(c)
 			a.importButton(c)
+			ui.Divider(c).Vertical().Height(Space6)
+			a.titlebarThemeButton(c)
 			a.settingsButton(c)
 		})
 	})
+}
+
+func (a *App) titlebarThemeButton(c ui.C) {
+	label, icon := a.S.Titlebar.DarkTheme, icons.Moon
+	if a.Dark() {
+		label, icon = a.S.Titlebar.LightTheme, icons.Sun
+	}
+	if ui.Button(c, label).Icon(icon).IconOnly().Ghost().Tooltip(label).Clicked() {
+		c.After(a.toggleTheme)
+	}
 }
 
 func drawTitlebarBorder(d *ui.DrawContext) {
@@ -101,7 +117,7 @@ func (a *App) titlebarNavigation(c ui.C, compact bool) {
 			}
 			fg := theme.MutedForeground
 			if a.Main == p {
-				fg = theme.Primary
+				fg = theme.AccentForeground
 			}
 			item := ui.Row(kc).FillHeight().PadX(Space3).Gap(Space2).Items(ui.Center).
 				Hover(ui.Look{}.Background(theme.Hover)).

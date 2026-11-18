@@ -67,6 +67,35 @@ func TestResponseStatusDurationAndSizeAfterSend(t *testing.T) {
 	}
 }
 
+func TestResponseSuccessPanelKeepsNarrowAndErrorBodiesVisible(t *testing.T) {
+	h := responseHarness(t, model.Response{StatusCode: 200, Status: "200 OK", Body: []byte(`{"result":true}`)}, nil)
+	labels := h.App.S.Response
+	if !h.shows(labels.Success) || !h.shows(labels.Received) || !h.shows("JSON") {
+		t.Fatal("wide successful JSON response is missing its status or format")
+	}
+	if err := h.D.Resize(960, 600); err != nil {
+		t.Fatal(err)
+	}
+	if h.shows(labels.Success) || !h.shows("result") || !h.shows("200 OK") {
+		t.Fatal("narrow response did not keep its body and status without the side panel")
+	}
+	ready := false
+	for _, label := range h.D.Snapshot().Labels {
+		if label.Value == h.App.S.Shell.Ready && label.Bounds.Y+label.Bounds.Height <= 600 {
+			ready = true
+			break
+		}
+	}
+	if !ready {
+		t.Fatal("sidebar footer is not visible at the minimum window size")
+	}
+	h.App.Active().Response = &model.Response{StatusCode: 404, Status: "404 Not Found", Body: []byte("missing resource")}
+	responsePaint(h)
+	if h.shows(labels.Success) || !h.shows("missing resource") || !h.shows("404 Not Found") {
+		t.Fatal("error response should show its own status and body, not the success panel")
+	}
+}
+
 func TestResponseStatusColorsInBothThemes(t *testing.T) {
 	h := newHarness(t)
 	for _, theme := range []string{"light", "dark"} {

@@ -180,6 +180,7 @@ func (a *App) refreshCollections() {
 	if !s.ready {
 		s.closed, s.keys = make(map[string]bool), make(map[string]int)
 		s.tree.Node, s.tree.Key, s.label = s.node, s.rowKey, s.rowLabel
+		s.tree.RowHeight = a.theme.Metrics.ControlHeight
 		s.tree.CanDrop = s.canDrop
 		s.collectionLabel = func(id string) string { return s.collectionNames[id] }
 		s.folderLabel = func(id string) string {
@@ -300,7 +301,7 @@ func (a *App) collectionsPane(c ui.C) {
 				}
 			})
 		})
-		ui.TextField(c, &s.filter, text.Filter, text.Filter).Icon(icons.Search).FillWidth()
+		ui.TextField(c, &s.filter, text.Filter, text.Filter).Icon(icons.Search).FillWidth().Background(theme.Muted).Border(1, theme.Border)
 		// Read the bound string after declaring the editor, before the Tree reads
 		// its rows. Text input arrives in a regular repaint rather than a click.
 		if s.appliedFilter != s.filter {
@@ -326,16 +327,17 @@ func (a *App) collectionsPane(c ui.C) {
 					if !s.closed[s.nodeKey(n)] || s.filter != "" {
 						icon = icons.FolderOpen
 					}
-					ui.Icon(rc, icon).Size(Space4, Space4).Color(theme.MutedForeground)
+					ui.Icon(rc, icon).Size(Space4+Space1, Space4+Space1).Color(theme.MutedForeground)
 				} else {
 					a.MethodBadge(rc, n.method)
 				}
 				label := ui.Text(rc, n.name).Grow(1).Ellipsis()
 				if selected {
-					label.Color(theme.Primary)
+					label.Bold()
 				}
 				if n.branch {
-					ui.Text(rc, fmt.Sprintf(text.SidebarCount, n.requests)).Muted().FontSize(theme.Metrics.FontSizeS).Shrink(0)
+					ui.Text(rc, fmt.Sprintf(text.SidebarCount, n.requests)).Muted().FontSize(theme.Metrics.FontSizeS).
+						Background(theme.Muted).Radius(theme.Metrics.RadiusControl).PadX(Space1).Shrink(0)
 				}
 				if !n.branch {
 					more := ui.Button(rc, n.actions).Icon(icons.Ellipsis).IconOnly().Ghost().Size(Space6, Space6).Shrink(0)

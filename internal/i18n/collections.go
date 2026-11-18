@@ -4,6 +4,7 @@ package i18n
 type Collections struct {
 	Settings, FolderSettings, SettingsTitle, FolderSettingsTitle             string
 	General, DiscardReload, Unsaved, SettingsSaved, SettingsSaveFailed       string
+	Environments, LocalEnvironments, SharedEnvironments, NewLocalEnvironment string
 	SettingsMissing, SettingsHelp, SettingsNavigation, SettingsContent       string
 	DiscardHelp, SettingsFor, SettingsForTarget, RequestCount, SidebarCount  string
 	APISection, OrganizeSection, ExportSection, NativeJSON, NativeJSONHelp   string
@@ -30,6 +31,7 @@ type Collections struct {
 }
 
 var collectionsZh = Collections{
+	Environments: "集合环境", LocalEnvironments: "专用环境", SharedEnvironments: "共享环境", NewLocalEnvironment: "新建专用环境",
 	Settings: "集合设置", FolderSettings: "文件夹设置", SettingsTitle: "%s · 集合设置", FolderSettingsTitle: "%s · 文件夹设置",
 	General: "概览", DiscardReload: "放弃", DiscardHelp: "放弃更改并重新加载", Unsaved: "有未保存的更改", SettingsSaved: "设置已保存", SettingsSaveFailed: "无法保存设置，请重试。",
 	SettingsFor: "%s 的设置", SettingsForTarget: "%s 的设置（%s）", RequestCount: "共 %d 个请求", SidebarCount: "(%d)",
@@ -65,6 +67,7 @@ var collectionsZh = Collections{
 }
 
 var collectionsEn = Collections{
+	Environments: "Collection environments", LocalEnvironments: "Collection-only environments", SharedEnvironments: "Shared environments", NewLocalEnvironment: "New collection environment",
 	Settings: "Collection settings", FolderSettings: "Folder settings", SettingsTitle: "%s · Collection settings", FolderSettingsTitle: "%s · Folder settings",
 	General: "Overview", DiscardReload: "Discard", DiscardHelp: "Discard changes and reload", Unsaved: "Unsaved changes", SettingsSaved: "Settings saved", SettingsSaveFailed: "Could not save settings. Please try again.",
 	SettingsFor: "Settings for %s", SettingsForTarget: "Settings for %s (%s)", RequestCount: "%d requests", SidebarCount: "(%d)",

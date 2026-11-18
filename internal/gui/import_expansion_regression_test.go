@@ -364,13 +364,14 @@ func TestImportedAuthSendPreservesHierarchy(t *testing.T) {
 	if svc.Settings.Get().ActiveEnvID != "" || calls.Load() != 0 || len(svc.History.List()) != 0 {
 		t.Fatal("import activated an environment or performed a send")
 	}
-	h.click(h.App.S.Env.Title)
-	collectionsOption(h, "Imported environment")
-	if svc.Settings.Get().ActiveEnvID != svc.Environments.List()[0].ID {
-		t.Fatal("explicit GUI environment selection failed")
-	}
 	h.click("Live inherited")
 	live := h.App.Active()
+	h.click(h.App.S.Env.Title)
+	collectionsOption(h, "Imported environment")
+	selected, _ := svc.Collections.Get(live.CollectionID)
+	if selected.EnvironmentScope.ActiveID != svc.Environments.List()[0].ID || svc.Settings.Get().ActiveEnvID != "" {
+		t.Fatal("explicit GUI environment selection did not stay in the collection")
+	}
 	beforeLive := live.Request.Clone()
 	send := func() observed {
 		t.Helper()

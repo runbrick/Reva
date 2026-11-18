@@ -25,7 +25,7 @@ func (a *App) requestPreviewOpen() bool {
 
 func (a *App) requestPreviewSnapshot(t *Tab) preview.Snapshot {
 	col, _ := a.Svc.Collections.Get(t.CollectionID)
-	env, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
+	env, _ := a.activeEnvironment(col)
 	return preview.Build(t.Request, col, env)
 }
 
@@ -35,7 +35,7 @@ func (a *App) requestPreviewSnapshot(t *Tab) preview.Snapshot {
 func (a *App) requestPreviewEnvironmentName(candidate model.Environment) string {
 	t := a.Active()
 	col, _ := a.Svc.Collections.Get(t.CollectionID)
-	active, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
+	active, _ := a.activeEnvironment(col)
 	candidate.Variables = append(slices.Clone(candidate.Variables), active.Variables...)
 	return preview.Build(t.Request, col, candidate).EnvironmentName
 }

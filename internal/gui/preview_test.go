@@ -178,6 +178,7 @@ func TestPreviewRefreshesEnvironmentDraftAndAuthContext(t *testing.T) {
 		t.Fatalf("last enabled winner not refreshed: %s", previewLabels(h))
 	}
 	h.App.Active().Request.URL = "https://changed.test/{{host}}?two=second"
+	col, _ = svc.Collections.Get(col.ID)
 	col.Items = nil
 	if err := svc.Collections.Save(col); err != nil {
 		t.Fatal(err)

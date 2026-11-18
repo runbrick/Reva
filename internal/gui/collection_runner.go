@@ -78,7 +78,11 @@ func (a *App) collectionRunnerEnvironments() {
 	state := &a.collections.runner
 	state.environmentIDs = []string{""}
 	state.environmentNames = make(map[string]string)
-	for _, environment := range a.Svc.Environments.List() {
+	collection, ok := a.Svc.Collections.Get(state.collectionID)
+	if !ok {
+		return
+	}
+	for _, environment := range a.visibleEnvironments(collection) {
 		if environment.ID != "" {
 			state.environmentIDs = append(state.environmentIDs, environment.ID)
 			state.environmentNames[environment.ID] = environment.Name
@@ -98,7 +102,7 @@ func (a *App) startCollectionRun() {
 	}
 	var values []model.KV
 	if state.environmentID != "" {
-		environment, ok := a.Svc.Environments.Get(state.environmentID)
+		environment, ok := a.environmentFor(collection, state.environmentID)
 		if !ok {
 			state.problem = collectionRunMissingEnvironment
 			state.environmentID = ""

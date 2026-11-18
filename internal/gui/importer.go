@@ -793,6 +793,9 @@ func (a *App) importDestinationError(result importer.Result) string {
 		return a.S.Import.EnvironmentDestination
 	}
 	if result.Collection != nil {
+		if scope := result.Collection.EnvironmentScope; scope != nil && len(scope.Local) > 0 {
+			return a.S.Import.CollectionEnvironmentDestination
+		}
 		type variable struct {
 			value    string
 			disabled bool

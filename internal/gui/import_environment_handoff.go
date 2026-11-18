@@ -27,7 +27,7 @@ func (a *App) beginEnvironmentHandoff(collection model.Collection) {
 	s.invalidateReview()
 	s.input, s.fileName = "", ""
 	s.file, s.job = nil, nil
-	active, _ := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID)
+	active, _ := a.activeEnvironment(collection)
 	s.environmentHandoff = &importEnvironmentHandoff{collection: collection, activeURLs: importMissingURLNames(collection, active)}
 }
 

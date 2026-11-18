@@ -106,6 +106,18 @@ func (c *conversion) nativeCollection(m object) *model.Collection {
 	validateNativeAuth(col.Auth, "$.auth")
 	c.authDynamics(col.Auth, "$.auth")
 	c.nativeRows(col.Variables, "$.variables")
+	if scope := col.EnvironmentScope; scope != nil {
+		c.row(len(scope.VisibleIDs)+len(scope.Local), "$.environmentScope")
+		seen := make(map[string]bool, len(scope.Local))
+		for i, env := range scope.Local {
+			path := index("$.environmentScope.local", i)
+			if env.Version != model.SchemaVersion || env.ID == "" || seen[env.ID] || strings.TrimSpace(env.Name) == "" {
+				fail("invalid_structure", path)
+			}
+			seen[env.ID] = true
+			c.nativeRows(env.Variables, path+".variables")
+		}
+	}
 	var walk func([]model.Item, int, string)
 	walk = func(items []model.Item, depth int, path string) {
 		for i := range items {

@@ -9,6 +9,7 @@ type Import struct {
 	PathHandling, AddBasePath, AddHost, KeepPaths, SelectFile, PasteContent, Details, UploadHint               string
 	AutoHelp, NativeHelp, PostmanHelp, ApifoxHelp, ApiPostHelp, CurlHelp, HARHelp, FileLoaded                  string
 	SourceMismatch, EnvironmentDestination, MissingDestination, VariableConflict, AppendDestination            string
+	CollectionEnvironmentDestination                                                                           string
 	SwaggerHelp, SwaggerURLHelp, SchemaURL, SchemaURLPlaceholder, SwaggerCollection, OpenAPICollection         string
 	InvalidSourceURL, FetchFailed, UnsupportedReference, UnsupportedParameter, OpenAPIReview, OpenAPISelection string
 	OpenAPIEmptyServer, OpenAPISchemaChoice, OpenAPISchemaIncomplete, OpenAPINonstandardPath                   string
@@ -64,7 +65,8 @@ var importZh = Import{
 	FileLoaded: "已选择：%s · %.1f KiB", SourceMismatch: "内容与所选数据来源不符，请选择对应来源或「自动识别」。",
 	EnvironmentDestination: "环境文件请「作为新项目」导入，导入后可手动启用。", MissingDestination: "目标集合已不存在，请重新选择导入位置。",
 	VariableConflict: "目标集合存在值或启用状态不同的同名变量，请「作为新项目」导入。", AppendDestination: "追加到集合：%s（独立文件夹）",
-	Title: "导入", Description: "先检查内容和兼容性提示，确认后再导入。",
+	CollectionEnvironmentDestination: "此集合含有专用环境，请「作为新项目」导入以保留环境。",
+	Title:                            "导入", Description: "先检查内容和兼容性提示，确认后再导入。",
 	Input: "导入内容", Placeholder: "粘贴 Swagger / OpenAPI JSON、curl、Reva / Postman JSON 或 HAR…",
 	LoadFile: "打开文件", JSONFiles: "JSON 文件", HARFiles: "HAR 文件", AllFiles: "所有文件",
 	Submit: "确认导入", Cancel: "取消", Review: "检查导入", Back: "返回编辑", Parsing: "正在检查内容…",
@@ -122,7 +124,8 @@ var importEn = Import{
 	FileLoaded: "Selected: %s · %.1f KiB", SourceMismatch: "Content does not match the selected source. Choose the matching source or Auto detect.",
 	EnvironmentDestination: "Import environment files as a new project, then activate them manually.", MissingDestination: "The destination collection no longer exists. Choose an import location again.",
 	VariableConflict: "The destination has a variable with a different value or enabled state. Import as a new project.", AppendDestination: "Append to collection: %s (separate folder)",
-	Title: "Import", Description: "Review content and compatibility notices before confirming the import.",
+	CollectionEnvironmentDestination: "This collection has collection-only environments. Import as a new project to keep them.",
+	Title:                            "Import", Description: "Review content and compatibility notices before confirming the import.",
 	Input: "Import content", Placeholder: "Paste Swagger / OpenAPI JSON, curl, Reva / Postman JSON, or HAR…",
 	LoadFile: "Open file", JSONFiles: "JSON files", HARFiles: "HAR files", AllFiles: "All files",
 	Submit: "Confirm import", Cancel: "Cancel", Review: "Review import", Back: "Back to edit", Parsing: "Checking content…",

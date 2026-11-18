@@ -21,6 +21,23 @@ func fixture(t testing.TB, name string) []byte {
 	return data
 }
 
+func TestNativeCollectionEnvironmentRoundTrip(t *testing.T) {
+	env := model.Environment{Version: model.SchemaVersion, ID: "local", Name: "Collection sandbox", Variables: []model.KV{{Key: "base", Value: "sandbox"}}}
+	scope := &model.CollectionEnvironmentScope{VisibleIDs: []string{}, Local: []model.Environment{env}}
+	collection := model.Collection{Version: model.SchemaVersion, ID: "source", Name: "Source", Items: []model.Item{}, EnvironmentScope: scope}
+	data, err := json.Marshal(collection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Parse(string(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Collection == nil || !reflect.DeepEqual(result.Collection.EnvironmentScope, scope) {
+		t.Fatal("native import lost a private environment or an explicit empty visibility list")
+	}
+}
+
 func TestCurlFixtures(t *testing.T) {
 	var cases []struct {
 		Name, Command string

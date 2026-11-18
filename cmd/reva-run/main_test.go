@@ -48,6 +48,29 @@ func writeCollection(t *testing.T, dir string, col model.Collection) {
 	writeJSON(t, dir, filepath.Join("collections", col.ID+".json"), col)
 }
 
+func TestCLIExplicitCollectionEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	col := testCollection()
+	col.EnvironmentScope = &model.CollectionEnvironmentScope{
+		ActiveID: "local",
+		Local:    []model.Environment{{Version: model.SchemaVersion, ID: "local", Name: "Sandbox", Variables: []model.KV{{Key: "host", Value: "local"}}}},
+	}
+	writeCollection(t, dir, col)
+	input, code := loadInput(dir, col.ID, "")
+	if code != "" || len(input.environment) != 0 {
+		t.Fatal("CLI used the collection GUI selection by default")
+	}
+	input, code = loadInput(dir, col.ID, "local")
+	if code != "" || !reflect.DeepEqual(input.environment, col.EnvironmentScope.Local[0].Variables) {
+		t.Fatal("CLI did not load the explicitly selected collection-only environment")
+	}
+	col.ID, col.EnvironmentScope = "other", nil
+	writeCollection(t, dir, col)
+	if _, code := loadInput(dir, col.ID, "local"); code != "environment_invalid_or_unreadable" {
+		t.Fatal("CLI found a private environment outside its owning collection")
+	}
+}
+
 func invoke(t *testing.T, ctx context.Context, dir string, extra ...string) (int, string, string) {
 	t.Helper()
 	var stdout, stderr bytes.Buffer

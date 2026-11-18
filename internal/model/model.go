@@ -283,12 +283,13 @@ type Item struct {
 
 // Collection is a named tree of folders and requests, stored as one file.
 type Collection struct {
-	Version   int    `json:"version"`
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Auth      Auth   `json:"auth,omitzero"`
-	Items     []Item `json:"items"`
-	Variables []KV   `json:"variables,omitempty"`
+	Version          int                         `json:"version"`
+	ID               string                      `json:"id"`
+	Name             string                      `json:"name"`
+	Auth             Auth                        `json:"auth,omitzero"`
+	Items            []Item                      `json:"items"`
+	Variables        []KV                        `json:"variables,omitempty"`
+	EnvironmentScope *CollectionEnvironmentScope `json:"environmentScope,omitempty"`
 }
 
 // Environment is a named set of variables substituted into {{name}} placeholders.

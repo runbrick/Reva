@@ -71,7 +71,7 @@ func TestImportEnvironmentHandoffConfirmAndRetry(t *testing.T) {
 			h.click(text.Submit)
 			h.pump()
 			importSmokeLayout(t, h)
-			if !state.open || !h.shows(text.HandoffTitle) || !h.shows(text.HandoffActiveScope+" · base") || state.input != "" || state.preview != nil || state.acknowledged || len(svc.Collections.List()) != 1 || len(svc.Environments.List()) != 1 {
+			if !state.open || !h.shows(text.HandoffTitle) || !h.shows(text.HandoffActiveScope+" · base, activeOnly") || state.input != "" || state.preview != nil || state.acknowledged || len(svc.Collections.List()) != 1 || len(svc.Environments.List()) != 1 {
 				t.Fatal("collection confirmation did not open a fresh environment setup")
 			}
 			for _, hit := range h.hitLabels() {
@@ -153,11 +153,12 @@ func TestImportEnvironmentHandoffConfirmAndRetry(t *testing.T) {
 			if request.URL != "{{ base }}/{{fallback}}" || len(request.Params) != 1 || request.Params[0].Key != "marker" || request.Params[0].Value != "private-query" || request.PreScript != "" {
 				t.Fatal("import rewrote the URL or retained a Postman script")
 			}
+			h.click("Migrated request")
 			h.click(h.App.S.Env.Title)
 			collectionsOption(h, "New environment")
-			h.click("Migrated request")
 			h.click(h.App.S.Request.Preview)
-			if !h.shows(h.App.S.Request.PreviewTitle) || svc.Settings.Get().ActiveEnvID != envs[0].ID || sends.Load() != 0 {
+			stored, _ := svc.Collections.Get(collections[0].ID)
+			if !h.shows(h.App.S.Request.PreviewTitle) || stored.EnvironmentScope.ActiveID != envs[0].ID || svc.Settings.Get() != settings || sends.Load() != 0 {
 				t.Fatal("manual environment selection or pre-send preview did not behave independently")
 			}
 			h.click(h.App.S.Request.PreviewClose)

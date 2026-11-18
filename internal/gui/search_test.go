@@ -231,8 +231,10 @@ func TestSearchArrowsSkipGroupsAndClickEnvironment(t *testing.T) {
 	searchType(t, h, "Staging")
 	h.click("Staging")
 	h.pump()
-	if h.Svc.Settings.Get().ActiveEnvID == "" || h.App.search.open {
-		t.Fatal("click did not select and save the environment")
+	collection, _ := h.Svc.Collections.Get(h.App.Active().CollectionID)
+	env, _ := h.Svc.Environments.Get(collection.EnvironmentScope.ActiveID)
+	if env.Name != "Staging" || h.Svc.Settings.Get().ActiveEnvID != "" || h.App.search.open {
+		t.Fatal("click did not save the environment in the active collection")
 	}
 }
 

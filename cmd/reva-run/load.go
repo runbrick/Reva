@@ -73,10 +73,12 @@ func loadInput(dir, collectionID, environmentID string) (runInput, string) {
 		return runInput{}, "collection_invalid_or_unreadable"
 	}
 	if environmentID != "" {
-		var env model.Environment
-		if err := readNative(filepath.Join(dir, "environments", environmentID+".json"), &env); err != nil ||
-			env.Version != model.SchemaVersion || env.ID != environmentID || strings.TrimSpace(env.Name) == "" || len(env.Variables) > maxRows {
-			return runInput{}, "environment_invalid_or_unreadable"
+		env, local := in.collection.EnvironmentScope.FindLocal(environmentID)
+		if !local {
+			if err := readNative(filepath.Join(dir, "environments", environmentID+".json"), &env); err != nil ||
+				env.Version != model.SchemaVersion || env.ID != environmentID || strings.TrimSpace(env.Name) == "" || len(env.Variables) > maxRows {
+				return runInput{}, "environment_invalid_or_unreadable"
+			}
 		}
 		in.environment = env.Variables
 	}
@@ -109,6 +111,20 @@ func validCollection(col model.Collection) bool {
 	}
 	seen := make(map[string]bool)
 	items, rows := 0, len(col.Variables)
+	if scope := col.EnvironmentScope; scope != nil {
+		rows += len(scope.VisibleIDs) + len(scope.Local)
+		envIDs := make(map[string]bool, len(scope.Local))
+		for _, env := range scope.Local {
+			if !validID(env.ID) || envIDs[env.ID] || env.Version != model.SchemaVersion || strings.TrimSpace(env.Name) == "" {
+				return false
+			}
+			envIDs[env.ID] = true
+			rows += len(env.Variables)
+			if rows > maxRows {
+				return false
+			}
+		}
+	}
 	var walk func([]model.Item, int) bool
 	walk = func(nodes []model.Item, depth int) bool {
 		if len(nodes) != 0 && depth > maxItemDepth {

@@ -6,19 +6,19 @@ type Shell struct {
 	// Rail items.
 	APIs, Collections, Environments, Settings string
 	// Titlebar navigation items.
-	Workbench, History string
+	Workbench, History, Ready string
 	// Accessible names of the navigation regions.
 	RailLabel, NavLabel, SidebarLabel, SplitLabel string
 }
 
 var shellZh = Shell{
 	APIs: "接口", Collections: "集合", Environments: "环境", Settings: "设置",
-	Workbench: "工作台", History: "历史记录",
+	Workbench: "工作台", History: "历史记录", Ready: "就绪",
 	RailLabel: "主导航", NavLabel: "页面导航", SidebarLabel: "调整侧栏宽度", SplitLabel: "调整请求与响应高度",
 }
 
 var shellEn = Shell{
 	APIs: "APIs", Collections: "Collections", Environments: "Environments", Settings: "Settings",
-	Workbench: "Workbench", History: "History",
+	Workbench: "Workbench", History: "History", Ready: "Ready",
 	RailLabel: "Main navigation", NavLabel: "Page navigation", SidebarLabel: "Resize sidebar", SplitLabel: "Resize request and response",
 }

@@ -36,7 +36,7 @@ type requestTabBinding struct {
 	id  int
 }
 
-const requestTabWidth float32 = 220
+const requestTabWidth float32 = 232
 
 // tabBar declares the strip of open request tabs above the editor.
 func (a *App) tabBar(c ui.C) {
@@ -76,7 +76,7 @@ func (a *App) tabBar(c ui.C) {
 	}
 
 	theme := c.Theme()
-	ui.Column(c).FillWidth().Height(TabBarHeight).Background(a.palette.Surface).Children(func() {
+	ui.Column(c).FillWidth().Height(TabBarHeight).Shrink(0).Background(a.palette.Sidebar).Children(func() {
 		ui.Row(c).FillWidth().Grow(1).Items(ui.Center).Children(func() {
 			area := ui.Scroll(c).Grow(1).FillHeight().Sideways()
 			// Keep the selected tab visible after shortcuts, opens, and duplication.
@@ -99,13 +99,16 @@ func (a *App) tabBar(c ui.C) {
 					for i, t := range a.Tabs() {
 						tc := c.KeyInt(t.ID)
 						title := a.requestTabTitle(t)
-						background, foreground := a.palette.Surface, theme.MutedForeground
+						background, foreground := a.palette.Sidebar, theme.MutedForeground
 						if i == a.active {
-							background, foreground = theme.Background, theme.Foreground
+							background, foreground = theme.Card, theme.Foreground
 						}
 						row := ui.Row(tc).Width(requestTabWidth).FillHeight().PadX(Space2).Gap(Space2).Items(ui.Center)
 						row.Background(background).
 							Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
+						if i == a.active {
+							row.Radius(theme.Metrics.RadiusControl).Clip()
+						}
 						var id gfx.ID
 						row.Children(func() {
 							id = ui.ID(tc.Part("tab"))
@@ -115,7 +118,7 @@ func (a *App) tabBar(c ui.C) {
 								row.Background(theme.Accent)
 							}
 							if i == a.active {
-								ui.Row(tc).Absolute().Top(0).Left(0).Right(0).Height(2).Background(theme.Primary)
+								ui.Row(tc).Absolute().Top(0).Left(0).Right(0).Height(Space1 / 2).Background(theme.Primary)
 							}
 							if t.Kind == collectionSettingsTabKind {
 								kind := a.S.Collections.Settings
@@ -131,7 +134,10 @@ func (a *App) tabBar(c ui.C) {
 							if t.Kind == collectionSettingsTabKind && !a.requestPreviewOpen() {
 								caption = a.collectionSettingsName(t)
 							}
-							ui.Text(tc, caption).Grow(1).Ellipsis().Color(foreground)
+							label := ui.Text(tc, caption).Grow(1).Ellipsis().Color(foreground)
+							if i == a.active {
+								label.Bold()
+							}
 							ui.Stack(tc).Size(Space6, Space6).Children(func() {
 								close := ui.ButtonBase(tc, a.S.Tabs.Close).Tooltip(a.S.Tabs.Close).Size(Space6, Space6).
 									Radius(theme.Metrics.RadiusControl).Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))

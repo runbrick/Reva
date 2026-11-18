@@ -97,7 +97,7 @@ func TestTitlebarNavigationShowsPages(t *testing.T) {
 func TestTitlebarWindowControlsFollowThemeAndLanguage(t *testing.T) {
 	h := newHarness(t)
 	config := h.App.windowConfig(app.Config{})
-	if config.WindowMode != app.WindowCustomTitlebar || config.TitlebarHeight != 48 || config.WindowControls == nil {
+	if config.WindowMode != app.WindowCustomTitlebar || config.TitlebarHeight != TitlebarHeight || config.WindowControls == nil {
 		t.Fatal("custom titlebar configuration is incomplete")
 	}
 	settings := h.Svc.Settings.Get()
@@ -119,6 +119,23 @@ func TestTitlebarWindowControlsFollowThemeAndLanguage(t *testing.T) {
 	}
 	if dark.Minimize != "Minimize" || dark.Maximize != "Maximize" || dark.Restore != "Restore" || dark.CloseName != "Close" {
 		t.Fatalf("window controls did not follow English switch: %+v", dark)
+	}
+}
+
+func TestTitlebarThemeToggleAndNewRequestFromHistory(t *testing.T) {
+	h := newHarness(t)
+	titlebarClick(t, h, h.App.S.Titlebar.DarkTheme)
+	if !h.App.Dark() || h.Svc.Settings.Get().Theme != "dark" {
+		t.Fatal("theme button did not persist and apply dark mode")
+	}
+	titlebarClick(t, h, h.App.S.Titlebar.LightTheme)
+	if h.App.Dark() || h.Svc.Settings.Get().Theme != "light" {
+		t.Fatal("theme button did not persist and apply light mode")
+	}
+	titlebarClick(t, h, h.App.S.Shell.History)
+	titlebarClick(t, h, h.App.S.Titlebar.NewRequestTab)
+	if h.App.Main != PageWorkbench || h.App.Section != SectionAPIs || len(h.App.Tabs()) != 2 || h.App.Active() != h.App.Tabs()[1] {
+		t.Fatal("new-request button did not open a new workbench tab")
 	}
 }
 

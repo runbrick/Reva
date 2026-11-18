@@ -120,7 +120,7 @@ func (a *App) requestPane(c ui.C, t *Tab) {
 		requestURLFromParams(&t.Request)
 		s.url = t.Request.URL
 	}
-	ui.Column(c).Fill().Pad(Space4).Gap(Space2).Children(func() {
+	ui.Column(c).Fill().PadX(Space4).PadY(Space4).Gap(Space2).Children(func() {
 		a.requestURLBar(c, t, s)
 		a.requestSectionTabs(c, t, s)
 		ui.Scroll(c).FillWidth().Grow(1).Children(func() {
@@ -438,31 +438,23 @@ func requestURLFromParams(req *model.Request) {
 
 func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 	theme, labels := c.Theme(), &a.S.Request
-	height := theme.Metrics.ControlHeight + Space2
+	height := theme.Metrics.ControlHeight + Space1
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-		ui.Row(c).Grow(1).Height(height).Items(ui.Center).Border(1, theme.Input).
-			Radius(theme.Metrics.RadiusControl).Background(theme.Background).Children(func() {
-			method := ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
-				Width(Space6*4 + Space4).Height(height).Radius(0)
-			if method.Changed() {
-				t.Dirty = true
-			}
-			ui.Divider(c).Vertical()
-			field := ui.TextField(c, &t.Request.URL, labels.URL, "https://").Grow(1).Height(height-Space1).
-				Border(0, theme.Border).Radius(0).Background(theme.Background).PadX(Space3)
-			if field.Changed() {
-				t.Dirty = true
-				requestParamsFromURL(&t.Request)
-				s.url = t.Request.URL
-			}
-			if field.Submitted() && !t.Sending && !s.graphQLError {
-				a.Send(t)
-			}
-		})
-		if ui.Button(c, labels.Preview).Icon(icons.Eye).Outline().Height(height).Clicked() {
-			c.After(func() { s.previewOpen = true })
+		if ui.Select(c, &t.Request.Method, model.Methods, requestMethodLabel).Label(labels.Method).
+			Width(Space6 * 4).Height(height).Shrink(0).Changed() {
+			t.Dirty = true
 		}
-		ui.Row(c).Height(height).Items(ui.Center).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).Children(func() {
+		field := ui.TextField(c, &t.Request.URL, labels.URL, "https://").Grow(1).MinWidth(Space6*4).Height(height).
+			Border(1, theme.Input).Background(theme.Muted).PadX(Space3)
+		if field.Changed() {
+			t.Dirty = true
+			requestParamsFromURL(&t.Request)
+			s.url = t.Request.URL
+		}
+		if field.Submitted() && !t.Sending && !s.graphQLError {
+			a.Send(t)
+		}
+		ui.Row(c).Height(height).Items(ui.Center).Shrink(0).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).Children(func() {
 			if t.Sending {
 				if ui.Button(c, labels.Cancel).Icon(icons.X).Height(height).Clicked() {
 					a.Cancel(t)
@@ -521,7 +513,7 @@ func (a *App) requestURLBar(c ui.C, t *Tab, s *requestTabState) {
 
 func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
 	theme := c.Theme()
-	ui.Row(c).FillWidth().Gap(Space2).FocusGroup(ui.FocusHorizontal).Children(func() {
+	ui.Row(c).FillWidth().Gap(Space1).Items(ui.Center).FocusGroup(ui.FocusHorizontal).Children(func() {
 		for _, section := range requestSections {
 			count := 0
 			var rows []model.KV
@@ -557,14 +549,17 @@ func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
 				}
 			}
 			tab := ui.TabBase(c.KeyInt(int(section)), &s.section, section, caption.accessible).
-				Height(theme.Metrics.ControlHeight + Space2).PadX(Space2).Gap(Space1).
+				Height(theme.Metrics.ControlHeight + Space1).PadX(Space2).Gap(Space1).
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
 			fg := theme.MutedForeground
 			if s.section == section {
-				fg = theme.Primary
+				fg = theme.AccentForeground
 			}
 			tab.Children(func() {
-				ui.Text(c, label).Color(fg).FontSize(theme.Metrics.FontSizeM)
+				title := ui.Text(c, label).Color(fg).FontSize(theme.Metrics.FontSizeM)
+				if s.section == section {
+					title.Bold()
+				}
 				if count > 0 {
 					ui.Text(c, caption.countLabel).Color(fg).Background(theme.Accent).FontSize(theme.Metrics.FontSizeS).
 						PadX(Space1).Radius(theme.Metrics.RadiusControl)
@@ -573,6 +568,11 @@ func (a *App) requestSectionTabs(c ui.C, t *Tab, s *requestTabState) {
 					ui.Row(c).Absolute().Left(0).Right(0).Bottom(0).Height(Space1 / 2).Background(theme.Primary)
 				}
 			})
+		}
+		ui.Spacer(c)
+		label := a.S.Request.Preview
+		if ui.Button(c, label).Icon(icons.Eye).IconOnly().Ghost().Tooltip(label).Shrink(0).Clicked() {
+			c.After(func() { s.previewOpen = true })
 		}
 	})
 	ui.Divider(c)

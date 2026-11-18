@@ -131,12 +131,16 @@ func (a *App) kvTable(c ui.C, s *kvTableState, rows *[]model.KV) bool {
 	if s.headers {
 		key, value, add = labels.HeaderName, labels.HeaderValue, labels.AddHeader
 	}
-	ui.Column(c).FillWidth().Gap(Space2).Children(func() {
+	ui.Column(c).FillWidth().Gap(Space1).Children(func() {
 		toggle := labels.BulkEdit
 		if s.bulk {
 			toggle = labels.TableEdit
 		}
-		if ui.Button(c, toggle).Ghost().Small().Self(ui.End).Clicked() {
+		if ui.ButtonBase(c, toggle).Self(ui.End).Height(Space6).PadX(Space2).
+			Radius(theme.Metrics.RadiusControl).Hover(ui.Look{}.Background(theme.Hover)).
+			Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
+			ui.Text(c, toggle).FontSize(theme.Metrics.FontSizeS).Color(theme.AccentForeground).Bold()
+		}).Clicked() {
 			if !s.bulk {
 				s.syncedBulk = requestBulkText(*rows)
 				s.bulkText.SetText(s.syncedBulk)
@@ -154,11 +158,11 @@ func (a *App) kvTable(c ui.C, s *kvTableState, rows *[]model.KV) bool {
 			ui.Row(c).FillWidth().Height(theme.Metrics.ControlHeight).Items(ui.Center).Background(a.palette.TableHeader).Children(func() {
 				ui.Row(c).Width(theme.Metrics.ControlHeight + Space4).Shrink(0)
 				ui.Divider(c).Vertical()
-				ui.Text(c, key).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Bold()
+				ui.Text(c, key).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold()
 				ui.Divider(c).Vertical()
-				ui.Text(c, value).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Bold()
+				ui.Text(c, value).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold()
 				ui.Divider(c).Vertical()
-				ui.Text(c, labels.Description).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Bold()
+				ui.Text(c, labels.Description).Basis(0).Grow(1).PadX(Space3).FontSize(theme.Metrics.FontSizeS).Muted().Bold()
 				ui.Row(c).Width(theme.Metrics.ControlHeight).Shrink(0)
 			})
 			for i := range *rows {
@@ -198,7 +202,8 @@ func (a *App) kvTable(c ui.C, s *kvTableState, rows *[]model.KV) bool {
 				})
 			}
 			ui.Divider(c)
-			if ui.ButtonBase(c, a.S.Common.Add).FillWidth().Height(theme.Metrics.ControlHeight).Justify(ui.Start).PadX(Space3).Gap(Space2).
+			if ui.ButtonBase(c, a.S.Common.Add).FillWidth().Height(theme.Metrics.ControlHeight).Justify(ui.Start).PadX(Space4).Gap(Space2).
+				Background(a.palette.TableHeader).
 				Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
 				ui.Icon(c, icons.Plus).Size(Space4, Space4).Color(theme.MutedForeground)
 				ui.Text(c, add).Color(theme.MutedForeground)

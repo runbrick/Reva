@@ -375,7 +375,7 @@ func TestSettingsPageBothLanguagesAndThemes(t *testing.T) {
 	}
 }
 
-func TestSettingsRailOmittedAndGearAvailable(t *testing.T) {
+func TestSettingsRailAndGearOpenSettings(t *testing.T) {
 	for _, lang := range []string{"zh", "en"} {
 		t.Run(lang, func(t *testing.T) {
 			svc := fake.New()
@@ -385,15 +385,24 @@ func TestSettingsRailOmittedAndGearAvailable(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			for _, hit := range h.D.Snapshot().Hits {
-				if hit.Label == h.App.S.Settings.Title && hit.Bounds.X < RailWidth && hit.Bounds.Y >= TitlebarHeight {
-					t.Fatal("Settings still appears in the left rail")
-				}
-			}
-			h.click(h.App.S.Settings.Title)
+			titlebarClick(t, h, h.App.S.Settings.Title)
 			if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.Appearance) {
 				t.Fatal("Settings gear did not open the Settings page")
 			}
+			titlebarClick(t, h, h.App.S.Shell.Workbench)
+			for _, hit := range h.D.Snapshot().Hits {
+				bounds := hit.Bounds
+				if hit.Label == h.App.S.Shell.Settings && bounds.X < RailWidth && bounds.Y >= TitlebarHeight {
+					if err := h.D.Click(bounds.X+bounds.Width/2, bounds.Y+bounds.Height/2); err != nil {
+						t.Fatal(err)
+					}
+					if h.App.Main != PageSettings || !h.shows(h.App.S.Settings.Appearance) {
+						t.Fatal("Settings rail item did not open the Settings page")
+					}
+					return
+				}
+			}
+			t.Fatal("Settings rail item is missing")
 		})
 	}
 }

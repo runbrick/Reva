@@ -65,6 +65,7 @@ func (v *responseCodeView) draw(d *ui.DrawContext) {
 	// The component uses MutedForeground for its line-number lane.
 	theme := *d.Theme
 	theme.MutedForeground = d.Fade(v.palette.CodeLineNo)
+	theme.Input = theme.Border
 	v.view.Paint(d.Canvas, theme, d.Rect, v.snapshot)
 }
 

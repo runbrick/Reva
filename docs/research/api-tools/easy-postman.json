@@ -1,0 +1,286 @@
+{
+  "slug": "easy-postman",
+  "project": "EasyPostman",
+  "repository": "https://github.com/lakernote/easy-postman",
+  "category": "desktop-client",
+  "license": {
+    "spdx": "Apache-2.0",
+    "scope": "GitHub 元数据与 v6.3.3、master 根 LICENSE 的 Apache License 2.0 文本一致（OSI 开源）；只确认公开仓库源码，不覆盖随包 JRE、第三方插件、商标或再分发审计。",
+    "source": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/LICENSE"
+  },
+  "retrieved_at": "2026-11-18T06:55:57Z",
+  "reva_baseline": "ac988d92424de2a238baa90395ebce8d88f33ecf",
+  "summary": "本地优先的 Java API 调试、功能回归与压测桌面工具。其编辑器空态、带环境的迁移与按工作区重放值得参考；Reva v0.3.0 已有可重播指南、脱敏请求预览和 reva-run，不改当前首练优先顺序。三个后续增量是集合到环境的导入接力、桌面安全运行摘要和有界 SSE 检视。补充报告不计入原 12 项基线。",
+  "architecture": "Swing、OkHttp、GraalJS、JGit，原生安装包及 Windows 便携包附带运行时，独立 JAR 需 Java 17+。集合及功能 CLI 复用工作区执行器，Mock、压测核心与 MCP 适配拆分。稳定版 v6.3.3 发布于 2026-11-14T11:26:23Z，标签提交 ed0baa04a477b9cc1db6f20d66c623b573ecde6d；默认 refs/heads/master 实测 db1d014dc1d9897af1998e00fea5a794776bb2c1，比标签超前两项 cURL 解析修复（604b070 表单 + 解码、db1d014 Bash 单引号内保留 ^），不计为已发行功能。",
+  "features": [
+    {
+      "name": "请求编辑器空态",
+      "status": "已实现（v6.3.3 固定源码）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/editor/RequestEditorEmptyStatePanel.java",
+      "detail": "点击或键盘可激活新建请求，空态显示快捷键；另有显式剪贴板 cURL 控制器。没有证据表明存在强制教程、账号或自动发示例请求。"
+    },
+    {
+      "name": "迁移入口与信息保留",
+      "status": "已实现（v6.3.3 固定源码；Swagger 文档状态滞后）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/tree/CollectionTreeToolbar.java",
+      "detail": "Postman、cURL（可多条）、HAR、ApiPost、Swagger 2/OpenAPI 3.0/3.1 JSON 接到导入菜单。Postman 保留脚本和示例；ApiPost 解析所支持结构的环境及 baseUrl。非任意版本无损迁移，不推断 YAML、所有路径重写或运行时 schema 校验。"
+    },
+    {
+      "name": "HTTP、增量 SSE 和 WebSocket",
+      "status": "已实现（v6.3.3 固定源码与官方文档）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-http-runtime/src/main/java/com/laker/postman/http/runtime/sse/SseEventReader.java",
+      "detail": "HTTP/1.1、HTTP/2、SSE 回调及事件表、WebSocket 文本和二进制接收；SSE 是 HTTP 路径，未找到原生 gRPC 或 GraphQL 请求模式。"
+    },
+    {
+      "name": "认证、会话与证书",
+      "status": "已实现（v6.3.3 固定源码与官方文档）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-request-core/src/main/java/com/laker/postman/request/model/RequestAuthTypes.java",
+      "detail": "继承、None、API key、Basic、Bearer、Digest，另有 Cookie 管理、脚本 Cookie Jar 与按主机配置客户端证书。未找到 OAuth2 获取/刷新/PKCE 的实现证据。"
+    },
+    {
+      "name": "多作用域变量和脚本链",
+      "status": "已实现（v6.3.3 固定源码与兼容表）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/variable/VariableResolver.java",
+      "detail": "优先级提供者、至多十轮嵌套展开和无变化停机；GraalJS 支持前后置脚本、pm.test、跨请求变量和回调式 pm.sendRequest。禁用宿主类查找不等于没有 HostAccess.ALL 注入对象或网络桥接；不保证兼容完整 Postman SDK。"
+    },
+    {
+      "name": "桌面功能测试与两种 CI 入口",
+      "status": "已实现（v6.3.3 固定源码与官方文档）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/COLLECTION_CLI_zh.md",
+      "detail": "桌面有功能回归和断言结果；collection run 按集合/文件夹，functional run 按 functional_config.json 选择/排序，复用执行器并支持 CSV/JSON、遇错停止、JSON 报告。报表可含工作区路径、请求名、URL、错误和断言；未核实 JUnit。"
+    },
+    {
+      "name": "本地/Git 工作区与 WebDAV 快照",
+      "status": "已实现（v6.3.3 固定源码；WebDAV v6.0.8 有发布记录）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/plugin/git/GitWorkspacePluginService.java",
+      "detail": "本地工作区，Git 克隆、拉取、提交、推送和 diff，可选 WebDAV 快照及定时上传；跳过较新或时间未知的远端。不等于多人实时协作，也未核实所有数据的加密范围。"
+    },
+    {
+      "name": "限定输出面上的脱敏",
+      "status": "已实现（v6.3.3 MCP 适配层；不外推普通 CLI 或本地文件）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/mcp/McpSensitiveDataRedactor.java",
+      "detail": "按 URL user-info、常见敏感 query、认证字样、部分响应键值和已知值脱敏，错误路径遮盖；环境列表不含值，明细及响应有上限。不是 DLP、凭据保险库或普通 CLI 的输出保密保证。"
+    },
+    {
+      "name": "保存响应和本地 Mock",
+      "status": "已实现（Mock v6.0.19 有发布记录；v6.3.3 含无头 CLI）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-mock-core/src/main/java/com/laker/postman/mock/runtime/LocalMockServer.java",
+      "detail": "保存原请求与响应快照，可用集合 Example 或独立路由跑静态/脚本 Mock，有匹配、延迟、有界日志和 mock run；不是托管云或团队权限系统，示例可能含敏感数据。"
+    },
+    {
+      "name": "专用本地及多 worker 压测",
+      "status": "已实现（v6.3.3 固定源码与官方文档；无基准实测）",
+      "evidence_url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/PERFORMANCE_CLUSTER_LOAD_TEST_zh.md",
+      "detail": "固定、阶梯、爬坡、尖峰计划与专用 CLI、worker 服务、报表和趋势；汇总各 worker 报告不是全量原始样本的全局 P99。"
+    }
+  ],
+  "differences": [
+    {
+      "area": "首次请求与保存",
+      "project_capability": "空态直接引导到请求草稿和快捷键。",
+      "reva_capability": "启动即有草稿；设置指南可跳过与重播，并独立保存完成标记；已有显式发送与保存。",
+      "reva_evidence": "internal/gui/app.go:NewTab；internal/gui/onboarding.go:onboardingEntry/onboardingDialog；internal/gui/collections.go:RequestSave",
+      "opportunity": "保持已有低摩擦首练优先级，验收草稿或导入→显式发送→响应→保存，不加账号、门槛或自动网络请求。"
+    },
+    {
+      "area": "导入与迁移",
+      "project_capability": "可原生解析所支持的 ApiPost 环境和 baseUrl，保留部分 Postman 脚本/示例，并支持多条 cURL。标签含 Swagger/OpenAPI JSON 入口。",
+      "reva_capability": "原生、Postman 2.0/2.1、独立环境、HAR、单条 cURL、Swagger/OpenAPI JSON 及显式 URL；有界审查和确认，专有 ApiPost/Apifox 走兼容导出路径。Postman 脚本/示例带告知省略，不静默降级未知认证。",
+      "reva_evidence": "internal/importer/result.go:ParseWithOptions；internal/gui/importer.go:reviewImport/performImport；internal/importer/openapi.go:openapi；README.md",
+      "opportunity": "优先做集合和环境的两步接力，不自动激活，不因便利执行脚本或引入专有格式。"
+    },
+    {
+      "area": "认证、变量及脚本",
+      "project_capability": "Digest、客户端证书、Cookie Jar、多作用域递归变量和有网络桥接的 GraalJS/Postman 子集。",
+      "reva_capability": "Bearer/Basic/API key 及文件夹/集合继承，环境覆盖集合、单次展开，限时 ES5 脚本与有限 pm.*；解析展示 Set-Cookie，但无 Cookie Jar、Digest、OAuth2 生命周期、客户端证书或脚本网络桥。",
+      "reva_evidence": "internal/auth/auth.go:Resolve；internal/gui/env.go:VarsFor；internal/vars/vars.go:Expand；internal/execution/execution.go:Run；internal/script/script.go:RunPre/RunTests；internal/service/request/options.go:client/responseCookies",
+      "opportunity": "保留明确的状态和脚本边界，不从导入或兼容目标引入暗中联网。"
+    },
+    {
+      "area": "HTTP、协议、SSE",
+      "project_capability": "HTTP 与原生 WebSocket；逐条 SSE 事件；未发现专用 GraphQL/gRPC 模式。",
+      "reva_capability": "HTTP、网络时间线、GraphQL query/variables 编辑和原生 WebSocket；HTTP 服务完成响应流后返回，无 SSE 增量或原生 gRPC。",
+      "reva_evidence": "internal/service/request/request.go:Send；internal/gui/graphql.go:graphQLBodySection；internal/websocket/client.go:Dial/ReadMessage",
+      "opportunity": "先做有界交互 SSE，重型协议栈留给专用工具。"
+    },
+    {
+      "area": "回归与报告",
+      "project_capability": "桌面编排、集合/功能 CLI、文件夹或配置选择、CSV/JSON 迭代、详细 JSON 报告。",
+      "reva_capability": "v0.3.0 已含可从源码构建的 reva-run 和共享串行 runner。显式环境、取消/遇错停止，安全报告只输出允许字段和序号。无桌面编排、迭代或跨请求变量。",
+      "reva_evidence": "cmd/reva-run/main.go:run；internal/runner/runner.go:Run；internal/runner/report.go:Report；README.md",
+      "opportunity": "桌面仅显示同一执行器的安全摘要，不重复做 CLI，不扩张版本化报告的字段。"
+    },
+    {
+      "area": "持久化、共享和脱敏",
+      "project_capability": "可用本地/Git 工作区、WebDAV 快照；仅 MCP 输出面做模式和已知值脱敏。",
+      "reva_capability": "REVA_HOME JSON、加密备份和可选 WebDAV/S3/Gist 自动同步；已有脚本前的只读脱敏预览和最小化 CLI 报告。预览不等于实际报文或凭据保险库，原生文件仍可能含秘密。",
+      "reva_evidence": "README.md；internal/syncing/sync.go:Seal/Shared/Merge；internal/gui/sync.go:makeRemote/scheduleAutoSync；internal/preview/preview.go:Build；internal/gui/preview.go:requestPreview",
+      "opportunity": "继续按输出表面明确约束，审查后共享；不急于内置 Git、保险库或接入自动代发。"
+    },
+    {
+      "area": "示例、Mock、压测与 schema",
+      "project_capability": "示例快照、自托管 Mock、专用压测运行时；Swagger/OpenAPI 只核实模板导入。",
+      "reva_capability": "响应查看、复制、历史元数据与 OpenAPI 模板导入，不持久化响应正文，不等于 Example、Mock、集群压测或运行时契约覆盖。",
+      "reva_evidence": "internal/gui/response.go:responseResult/responseCopy；internal/model/model.go:HistoryEntry；internal/importer/openapi.go:openapi",
+      "opportunity": "分布式负载交 k6/JMeter，有状态 Mock 交 WireMock，运行时 schema/契约覆盖交 Schemathesis；只做可审查的手动格式交接。"
+    }
+  ],
+  "issues": [
+    {
+      "number": 95,
+      "title": "[Feature]: 再导入接口时建议把环境变量导入，同时对所有的path路径前增加{{baseUrl}}",
+      "url": "https://github.com/lakernote/easy-postman/issues/95",
+      "state": "closed",
+      "labels": ["enhancement", "workspace", "import-export", "environment"],
+      "updated_at": "2026-02-03T13:14:42Z",
+      "need": "迁移 ApiPost 时带环境并给路径补 baseUrl。",
+      "delivery_status": "部分已发行（closed/completed）；维护者指向 v4.3.14，现行标签确认环境与 baseUrl 导入，未确认批量重写所有路径。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/apipost/ApiPostCollectionParser.java"
+    },
+    {
+      "number": 97,
+      "title": "[Feature]: 添加“程序配置文件维护”功能",
+      "url": "https://github.com/lakernote/easy-postman/issues/97",
+      "state": "open",
+      "labels": ["enhancement", "workspace", "import-export", "environment"],
+      "updated_at": "2026-01-24T14:10:15Z",
+      "need": "GUI 配置多套 JVM 内存参数并按需切换和重启。",
+      "delivery_status": "开放提案，未找到交付；手动 JVM 参数不是 GUI 配置。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/issues/97"
+    },
+    {
+      "number": 100,
+      "title": "[Feature]: 支持环境变量嵌套引用",
+      "url": "https://github.com/lakernote/easy-postman/issues/100",
+      "state": "closed",
+      "labels": ["enhancement", "workspace", "import-export", "environment"],
+      "updated_at": "2026-02-10T01:49:13Z",
+      "need": "多层变量替换、循环/深度限制和提示。",
+      "delivery_status": "核心已发行（closed/completed）；维护者指向 v4.3.21，现行标签确认上限及无变化停机，不证明完整环诊断或全部提示。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/variable/VariableResolver.java"
+    },
+    {
+      "number": 136,
+      "title": "[Feature]: 增加自定义Webdav同步EasyPostman所有的设置和配置的功能",
+      "url": "https://github.com/lakernote/easy-postman/issues/136",
+      "state": "closed",
+      "labels": ["enhancement", "workspace", "import-export"],
+      "updated_at": "2026-06-23T11:55:45Z",
+      "need": "用自定义 WebDAV 跨设备同步本地数据。",
+      "delivery_status": "已发行（closed/completed）；v6.0.8 发布说明确认 WebDAV 快照上传/恢复，提报者确认使用，不等于实时协作。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/releases/tag/v6.0.8"
+    },
+    {
+      "number": 152,
+      "title": "[Feature]: Mock Server功能",
+      "url": "https://github.com/lakernote/easy-postman/issues/152",
+      "state": "closed",
+      "labels": ["enhancement", "workspace", "import-export"],
+      "updated_at": "2026-08-18T08:52:38Z",
+      "need": "可按请求条件和脚本返回不同的 Mock 响应。",
+      "delivery_status": "已发行（closed/completed）；v6.0.19 发行说明列静态/Code Mock、匹配、延迟、会话状态，现行标签带运行时。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/releases/tag/v6.0.19"
+    },
+    {
+      "number": 156,
+      "title": "[Feature]: 添加路径参数支持",
+      "url": "https://github.com/lakernote/easy-postman/issues/156",
+      "state": "closed",
+      "labels": ["enhancement", "workspace", "import-export", "environment"],
+      "updated_at": "2026-08-20T09:54:39Z",
+      "need": "将 /xxx/{id} 参数作为独立的可编辑字段。",
+      "delivery_status": "关闭但未核实交付（closed/completed）；评论无维护者发版确认，通用 {{…}} 替换不是独立路径参数编辑。",
+      "delivery_evidence": "https://github.com/lakernote/easy-postman/issues/156"
+    }
+  ],
+  "recommendations": [
+    {
+      "title": "导入集合后接续导入环境",
+      "priority": "P1",
+      "scenario": "从 Postman 或通过其兼容格式迁移后，用户需要找齐环境才能手动复发。",
+      "gap": "现有导入器一次确认一个实体；用户须自己发现并关联独立环境。",
+      "smallest_pr": "集合审查接力到单独环境导入并列缺失变量名，维持两次确认，不自动激活、改 URL、写回值或新增专有格式。类比数据库预检与 apply；二阶减少手抄，三阶防止默绑业务环境，其他 adapter 可复用。",
+      "dependencies": "复用现有 importer、reviewImport、performImport 和请求预览，不引入跨文件事务；维护成本是两步状态和双语文案。",
+      "acceptance": "离线 fixture 验证审查无网络、脚本或写入；保存集合后导入独立环境，退出、冲突、取消或重试不误激活；用户选用环境，预览检查作用域，只在手动发送时访问 httptest。"
+    },
+    {
+      "title": "桌面只读运行摘要",
+      "priority": "P1",
+      "scenario": "在桌面复验已保存集合，然后用 reva-run 在 CI 重放。",
+      "gap": "共享 runner 和安全报告已存在，缺桌面触发和结果浏览。",
+      "smallest_pr": "显式选择已保存集合与可选环境，复用 runner.Run，只显示安全序号、结果和计数；不做 CSV、并行、完整报表。类比 IDE 与 CI 同一单测结果；二阶降低语义漂移，三阶让格式适配复用最小结果契约。",
+      "dependencies": "既有 Effect、runner 和 Report；维护 Effect 生命周期、序号映射，保持 CLI 报告 v1。",
+      "acceptance": "GUI Driver 和 httptest 测试显式启动、顺序、取消/遇错停止、无环境或历史副作用；与 CLI fixture 状态和计数一致，快照与输出无秘密。"
+    },
+    {
+      "title": "有界交互式 SSE 检视",
+      "priority": "P1",
+      "scenario": "长连接尚未关闭时定位首事件和流式响应异常。",
+      "gap": "普通 HTTP 读完才返回，现有时间线不能展示 SSE 单个事件。",
+      "smallest_pr": "仅实际 text/event-stream 使用有界事件视图，可取消不自动重连，不改 CLI 或持久格式。类比受限日志 tail；二阶区分首事件与总耗时，三阶避免把流持久化或纳入无界报告。",
+      "dependencies": "复用显式发送、HTTP 认证和取消；新增从传输到 UI 的背压边界和测试。",
+      "acceptance": "httptest 分批 flush，首条在连接关闭前可见；覆盖多行、CRLF、注释、超限、主动取消，以及普通 HTTP/下载回归。"
+    }
+  ],
+  "sources": [
+    { "url": "https://github.com/lakernote/easy-postman", "title": "规范仓库" },
+    { "url": "https://api.github.com/repos/lakernote/easy-postman", "title": "默认分支、仓库许可元数据" },
+    { "url": "https://api.github.com/repos/lakernote/easy-postman/releases/latest", "title": "当前最新稳定版 API" },
+    { "url": "https://github.com/lakernote/easy-postman/releases/tag/v6.3.3", "title": "v6.3.3 发布说明与资产" },
+    { "url": "https://github.com/lakernote/easy-postman/releases.atom", "title": "发布订阅" },
+    { "url": "https://github.com/lakernote/easy-postman/compare/v6.3.3...db1d014dc1d9897af1998e00fea5a794776bb2c1", "title": "开发分支相对发行版的两项修复" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/LICENSE", "title": "标签源码根许可证" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/db1d014dc1d9897af1998e00fea5a794776bb2c1/LICENSE", "title": "开发分支根许可证" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/db1d014dc1d9897af1998e00fea5a794776bb2c1/easy-postman-app/src/main/java/com/laker/postman/service/curl/CurlCommandTokenizer.java", "title": "开发分支 cURL 词法器" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/README_zh.md", "title": "中文说明与运行时要求" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/ARCHITECTURE_MODULES_zh.md", "title": "模块及执行边界" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/FEATURES_zh.md", "title": "官方功能说明，部分迁移文案滞后" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/editor/RequestEditorEmptyStatePanel.java", "title": "空态操作入口" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/editor/request/RequestCurlImportController.java", "title": "编辑器剪贴板 cURL 入口" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/tree/CollectionTreeToolbar.java", "title": "实际导入菜单与处理入口" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-collection-core/src/main/java/com/laker/postman/collection/importer/postman/PostmanCollectionParser.java", "title": "Postman 迁移 parser" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/apipost/ApiPostCollectionParser.java", "title": "ApiPost 环境与请求 parser" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/swagger/SwaggerParser.java", "title": "Swagger/OpenAPI JSON 格式分派" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-http-runtime/src/main/java/com/laker/postman/http/runtime/sse/SseEventReader.java", "title": "阻塞 HTTP 路径的 SSE 事件解析" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/editor/request/sub/SSEResponsePanel.java", "title": "SSE 事件面板接收" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/panel/collections/editor/request/WebSocketRequestExecutor.java", "title": "WebSocket 消息回调" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-request-core/src/main/java/com/laker/postman/request/model/RequestItemProtocolEnum.java", "title": "已定义的请求协议枚举" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-request-core/src/main/java/com/laker/postman/request/model/RequestAuthTypes.java", "title": "认证类型" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/CLIENT_CERTIFICATES.md", "title": "按主机使用客户端证书" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/SCRIPT_API_REFERENCE_zh.md", "title": "脚本、Cookie Jar 与兼容表" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/variable/VariableResolver.java", "title": "变量提供者和迭代上限" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/js/JsScriptExecutor.java", "title": "GraalJS 执行器" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/js/JsContextPool.java", "title": "脚本宿主和权限配置" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/workspace/cli/WorkspaceRunExecutor.java", "title": "共享工作区执行器" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/COLLECTION_CLI_zh.md", "title": "原生集合 CLI、CI 和迭代" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/FUNCTIONAL_CLI_zh.md", "title": "功能回归 CLI 和功能配置" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/workspace/cli/WorkspaceRunReport.java", "title": "原生工作区 JSON 报告字段" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/util/WorkspaceStorageUtil.java", "title": "本地工作区目录和路径" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/plugin/git/GitWorkspacePluginService.java", "title": "工作区 Git 操作" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/service/sync/WebDavSyncScheduler.java", "title": "WebDAV 定时快照策略" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/MCP_SERVER_DESIGN_zh.md", "title": "MCP 脱敏边界文档" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/mcp/McpSensitiveDataRedactor.java", "title": "URL、错误与部分响应脱敏规则" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/mcp/McpWorkspaceToolService.java", "title": "环境列表及响应投影边界" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-request-core/src/main/java/com/laker/postman/request/model/SavedResponse.java", "title": "保存响应及原请求信息" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-mock-core/src/main/java/com/laker/postman/mock/runtime/LocalMockServer.java", "title": "JDK Mock 运行时" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/mock/cli/MockRunCliCommand.java", "title": "独立 Mock 命令" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-performance-core/src/main/java/com/laker/postman/performance/core/threadgroup/PerformanceCoreThreadGroupPlanner.java", "title": "压测线程组计划" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/performance/cli/PerformanceRunCliCommand.java", "title": "压测 CLI" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/easy-postman-app/src/main/java/com/laker/postman/performance/worker/PerformanceWorkerServer.java", "title": "压测 worker 服务" },
+    { "url": "https://github.com/lakernote/easy-postman/blob/ed0baa04a477b9cc1db6f20d66c623b573ecde6d/docs/PERFORMANCE_CLUSTER_LOAD_TEST_zh.md", "title": "集群聚合的范围与限制" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/95", "title": "ApiPost 迁移环境需求" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/97", "title": "JVM 配置提案" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/100", "title": "嵌套变量需求" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/136", "title": "WebDAV 跨设备需求" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/152", "title": "条件式 Mock 需求" },
+    { "url": "https://github.com/lakernote/easy-postman/issues/156", "title": "独立路径参数需求" },
+    { "url": "https://github.com/lakernote/easy-postman/releases/tag/v6.0.8", "title": "WebDAV 上传/恢复发行依据" },
+    { "url": "https://github.com/lakernote/easy-postman/releases/tag/v6.0.19", "title": "Code Mock 发行依据" }
+  ],
+  "limitations": [
+    "抓取窗口为本机 UTC 2026-11-18T06:55:57Z 至 2026-11-18T07:02:38Z；仓库元数据、HEAD、稳定标签和开发分支不混用。公开 API 偶有超时或限流，可用固定 raw 和发布订阅复核。",
+    "没有安装、构建或运行 EasyPostman，未使用互联网目标做请求测试；不比较启动速度、包体、内存、实际吞吐或平台行为，也未审计发布资产及第三方许可证。",
+    "GitHub state=all 默认排序前 100 条中抽取真实 feature issue，排除 PR；labels 仅保留相关子集，不代表频率、完整路线图或首次发布追溯。开放、关闭及交付独立记录。",
+    "Reva 判断限于 v0.3.0 固定源码，非进行中 onboarding PR。TASK.md、本地 Viva skill 与本目录上层的范围 AGENTS.md 未见，研究只改文档。"
+  ]
+}

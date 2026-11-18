@@ -48,6 +48,10 @@ func New() *Service {
 // Send resolves variables, sends req, and reads the complete response while
 // retaining at most MaxBodyBytes bytes. Size includes bytes beyond that cap.
 func (s *Service) Send(ctx context.Context, req model.Request, variables []model.KV) (model.Response, error) {
+	return s.send(ctx, req, variables, SSEObserver{})
+}
+
+func (s *Service) send(ctx context.Context, req model.Request, variables []model.KV, observer SSEObserver) (model.Response, error) {
 	if err := ctx.Err(); err != nil {
 		return model.Response{}, err
 	}
@@ -143,12 +147,23 @@ func (s *Service) Send(ctx context.Context, req model.Request, variables []model
 	}
 	defer resp.Body.Close()
 	downloadStart := time.Now()
-	kept, err := io.ReadAll(io.LimitReader(resp.Body, limit))
-	size := int64(len(kept))
-	if err == nil {
-		var discarded int64
-		discarded, err = io.Copy(io.Discard, resp.Body)
-		size += discarded
+	var kept []byte
+	var size int64
+	if observer.Event != nil && isSSE(resp.Header.Get("Content-Type")) {
+		if observer.Opened != nil {
+			observer.Opened(resp.StatusCode)
+		}
+		capture := sseCapture{reader: resp.Body, limit: int(min(limit, maxSSERawBytes))}
+		err = readSSE(ctx, &capture, observer.Event)
+		kept, size = capture.body, capture.size
+	} else {
+		kept, err = io.ReadAll(io.LimitReader(resp.Body, limit))
+		size = int64(len(kept))
+		if err == nil {
+			var discarded int64
+			discarded, err = io.Copy(io.Discard, resp.Body)
+			size += discarded
+		}
 	}
 	// A local round trip can complete within one Windows clock tick. Preserve
 	// a positive measurement even when the clock cannot resolve the interval.

@@ -45,6 +45,8 @@ type importerState struct {
 	preview                            *importer.Result
 	reviewedInput                      string
 	acknowledged                       bool
+	continueWithEnvironment            bool
+	environmentHandoff                 *importEnvironmentHandoff
 	warnings                           *ui.ListState
 	filters                            [3]app.FileFilter
 }
@@ -108,22 +110,30 @@ func parseImport(ctx context.Context, job *importParseJob) (importer.Result, err
 }
 
 func (s *importerState) content() string {
-	if s.source == importSwaggerURL {
+	if s.usesImportURL() {
 		return s.url
 	}
 	return s.input
 }
 
 func (s *importerState) pathOptions() importer.Options {
+	if s.environmentHandoff != nil {
+		return importer.Options{}
+	}
 	return importer.Options{AddBasePath: s.basePath, AddHost: s.host}
 }
 
 func (s *importerState) invalidateReview() {
 	s.preview, s.reviewedInput, s.acknowledged, s.err = nil, "", false, ""
+	s.continueWithEnvironment = false
 	s.warnings = nil
 }
 
 func (s *importerState) dismiss() {
+	if s.environmentHandoff != nil {
+		s.environmentHandoff = nil
+		s.input, s.fileName = "", ""
+	}
 	s.open, s.loading, s.parsing, s.committing = false, false, false, false
 	s.file, s.job = nil, nil
 	s.invalidateReview()
@@ -131,29 +141,33 @@ func (s *importerState) dismiss() {
 
 func (a *App) importButton(c ui.C) {
 	if ui.Button(c, a.S.Import.Title).Outline().Clicked() {
-		a.importer.dismiss()
-		s := &a.importer
-		s.collectionIDs = s.collectionIDs[:0]
-		s.collectionNames = make(map[string]string)
-		for _, col := range a.Svc.Collections.List() {
-			s.collectionIDs = append(s.collectionIDs, col.ID)
-			s.collectionNames[col.ID] = col.Name
-		}
-		if _, ok := s.collectionNames[s.collectionID]; !ok {
-			s.collectionID = ""
-			s.appendToCollection = false
-			if tab := a.Active(); tab != nil {
-				s.collectionID = tab.CollectionID
-			}
-			if s.collectionID == "" && len(s.collectionIDs) > 0 {
-				s.collectionID = s.collectionIDs[0]
-			}
-		}
-		if s.collectionLabel == nil {
-			s.collectionLabel = func(id string) string { return s.collectionNames[id] }
-		}
-		a.importer.open = true
+		a.openImportDialog()
 	}
+}
+
+func (a *App) openImportDialog() {
+	s := &a.importer
+	s.dismiss()
+	s.collectionIDs = s.collectionIDs[:0]
+	s.collectionNames = make(map[string]string)
+	for _, col := range a.Svc.Collections.List() {
+		s.collectionIDs = append(s.collectionIDs, col.ID)
+		s.collectionNames[col.ID] = col.Name
+	}
+	if _, ok := s.collectionNames[s.collectionID]; !ok {
+		s.collectionID = ""
+		s.appendToCollection = false
+		if tab := a.Active(); tab != nil {
+			s.collectionID = tab.CollectionID
+		}
+		if s.collectionID == "" && len(s.collectionIDs) > 0 {
+			s.collectionID = s.collectionIDs[0]
+		}
+	}
+	if s.collectionLabel == nil {
+		s.collectionLabel = func(id string) string { return s.collectionNames[id] }
+	}
+	s.open = true
 }
 
 func (a *App) importDialog(c ui.C) {
@@ -183,32 +197,44 @@ func (a *App) importDialog(c ui.C) {
 		if result, err, ok := s.parse.Take(); ok {
 			s.parsing = false
 			// Even a programmatic edit cannot apply a result for older input.
-			if s.job.input == s.content() && s.job.url == (s.source == importSwaggerURL) && s.job.options == s.pathOptions() {
+			if s.job.input == s.content() && s.job.url == s.usesImportURL() && s.job.options == s.pathOptions() {
 				if err != nil {
 					s.err = a.importError(err, a.S.Import.Unknown)
 				} else if !s.accepts(result.Kind) {
 					s.err = a.S.Import.SourceMismatch
+					if s.environmentHandoff != nil {
+						s.err = a.S.Import.HandoffEnvironmentOnly
+					}
 				} else if destinationError := a.importDestinationError(result); destinationError != "" {
 					s.err = destinationError
 				} else {
 					s.preview, s.reviewedInput, s.acknowledged = &result, s.job.input, false
+					if handoff := s.environmentHandoff; handoff != nil {
+						handoff.candidateURLs = importMissingURLNames(handoff.collection, *result.Environment)
+					}
 				}
 			}
 		}
 	}
 	busy := s.loading || s.parsing || s.committing
-	ui.ModalWith(c, &s.open, a.S.Import.ManualTitle, ui.ModalSpec{
-		Description: a.S.Import.Description, Width: Space6 * 44, Height: min(Space6*31, c.Bounds().Height-Space4*2),
+	title, description := a.S.Import.ManualTitle, a.S.Import.Description
+	if s.environmentHandoff != nil {
+		title, description = a.S.Import.HandoffTitle, a.S.Import.HandoffDescription
+	}
+	ui.ModalWith(c, &s.open, title, ui.ModalSpec{
+		Description: description, Width: Space6 * 44, Height: min(Space6*31, c.Bounds().Height-Space4*2),
 	}, func() {
 		gap := Space2
 		if c.Bounds().Height < Space6*30 {
 			gap = Space1
 		}
 		ui.Column(c).Fill().Gap(gap).Children(func() {
-			if s.preview == nil {
-				a.importSetup(c, busy)
-			} else {
+			if s.preview != nil {
 				a.importReview(c)
+			} else if s.environmentHandoff != nil {
+				a.importEnvironmentSetup(c.Key("environment-handoff"), busy)
+			} else {
+				a.importSetup(c, busy)
 			}
 			if s.loading {
 				ui.Text(c, a.S.Import.Loading).Muted()
@@ -233,7 +259,9 @@ func (a *App) importDialog(c ui.C) {
 		} else {
 			if ui.Button(c, a.S.Import.Back).Outline().Disabled(busy).Clicked() {
 				s.invalidateReview()
-				s.paste = true
+				if s.environmentHandoff == nil {
+					s.paste = true
+				}
 			}
 			allowed := s.preview != nil && (len(s.preview.Warnings) == 0 || s.acknowledged)
 			if ui.Button(c, a.S.Import.Submit).Disabled(busy || !allowed).Clicked() {
@@ -250,6 +278,9 @@ func (a *App) importDialog(c ui.C) {
 }
 
 func (s *importerState) accepts(kind importer.Kind) bool {
+	if s.environmentHandoff != nil {
+		return kind == importer.KindPostmanEnvironment || kind == importer.KindNativeEnvironment
+	}
 	switch s.source {
 	case importNative:
 		return kind == importer.KindNativeCollection || kind == importer.KindNativeEnvironment
@@ -548,7 +579,12 @@ func (a *App) chooseImportFile() {
 		{Name: a.S.Import.HARFiles, Pattern: "*.har"},
 		{Name: a.S.Import.AllFiles, Pattern: "*"},
 	}
-	paths, err := app.OpenFiles(app.OpenFileOptions{Title: a.S.Import.LoadFile, Filters: s.filters[:]})
+	filters := s.filters[:]
+	if s.environmentHandoff != nil {
+		filters[1] = filters[2]
+		filters = filters[:2]
+	}
+	paths, err := app.OpenFiles(app.OpenFileOptions{Title: a.S.Import.LoadFile, Filters: filters})
 	if errors.Is(err, app.ErrCanceled) {
 		return
 	}
@@ -577,7 +613,7 @@ func (a *App) reviewImport() {
 	if s.parse == nil {
 		s.parse = ui.NewEffectKeyed(parseImport)
 	}
-	s.job = &importParseJob{input: s.content(), url: s.source == importSwaggerURL, options: s.pathOptions()}
+	s.job = &importParseJob{input: s.content(), url: s.usesImportURL(), options: s.pathOptions()}
 	s.parsing = true
 }
 
@@ -616,11 +652,16 @@ func (a *App) importReview(c ui.C) {
 	ui.Text(c, fmt.Sprintf(text.Format, format)).Bold()
 	ui.Wrap(c, fmt.Sprintf(text.Destination, name)).FillWidth().MaxLines(2)
 	ui.Text(c, fmt.Sprintf(text.Counts, requests, folders, variables))
-	if s.appendToCollection {
+	if s.environmentHandoff != nil {
+		a.importEnvironmentReadiness(c, true)
+	} else if s.appendToCollection {
 		ui.Wrap(c, fmt.Sprintf(text.AppendDestination, s.collectionNames[s.collectionID])).FillWidth()
 		ui.Wrap(c, text.CurrentHelp).FillWidth().FontSize(c.Theme().Metrics.FontSizeS).Muted()
 	} else {
 		ui.Wrap(c, text.NewEntity).FillWidth().FontSize(c.Theme().Metrics.FontSizeS).Muted()
+	}
+	if s.canContinueWithEnvironment(r.Kind) {
+		ui.Checkbox(c, &s.continueWithEnvironment, text.HandoffOptIn).Changed()
 	}
 	if len(r.Warnings) == 0 {
 		ui.Wrap(c, text.NoWarnings).Color(c.Theme().Success).FillWidth()
@@ -673,10 +714,8 @@ func (a *App) performImport() {
 		return
 	}
 	s.err = ""
-	if s.appendToCollection {
-		if s.err = a.importDestinationError(*r); s.err != "" {
-			return
-		}
+	if s.err = a.importDestinationError(*r); s.err != "" {
+		return
 	}
 	title, name := a.S.Import.Success, ""
 	switch {
@@ -702,6 +741,10 @@ func (a *App) performImport() {
 		}
 		if err != nil {
 			s.err = a.S.Import.SaveError
+			return
+		}
+		if s.canContinueWithEnvironment(r.Kind) && s.continueWithEnvironment {
+			a.beginEnvironmentHandoff(col)
 			return
 		}
 		name = col.Name
@@ -739,7 +782,7 @@ func (a *App) performImport() {
 // Recheck immediately before saving, so a deleted destination or a variable
 // edited since review cannot silently change the meaning of imported requests.
 func (a *App) importDestinationError(result importer.Result) string {
-	if !a.importer.appendToCollection {
+	if a.importer.environmentHandoff != nil || !a.importer.appendToCollection {
 		return ""
 	}
 	col, ok := a.Svc.Collections.Get(a.importer.collectionID)

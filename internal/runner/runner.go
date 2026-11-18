@@ -69,10 +69,22 @@ type Result struct {
 	Requests []RequestResult `json:"-"`
 }
 
-type job struct {
-	id   string
-	plan *execution.Plan
-	err  error
+// Snapshot owns the saved inputs of a run. Create it before dispatching work
+// when the caller needs to fix the inputs on its own thread.
+type Snapshot struct {
+	collection model.Collection
+	settings   model.Settings
+	values     []model.KV
+}
+
+// NewSnapshot copies all execution inputs, including request and variable rows.
+func NewSnapshot(collection model.Collection, settings model.Settings, environment []model.KV) Snapshot {
+	collection = cloneCollection(collection)
+	return Snapshot{
+		collection: collection,
+		settings:   settings,
+		values:     append(append([]model.KV(nil), collection.Variables...), environment...),
+	}
 }
 
 // Run snapshots the entire collection, settings and environment before any send,
@@ -85,57 +97,69 @@ type job struct {
 // is outside the runner's isolation boundary.
 func Run(ctx context.Context, sender service.RequestService, collection model.Collection, settings model.Settings, environment []model.KV, options Options) Result {
 	start := time.Now()
-	collection = cloneCollection(collection)
-	values := append(append([]model.KV(nil), collection.Variables...), environment...)
-	var jobs []job
+	snapshot := NewSnapshot(collection, settings, environment)
+	details := make([]RequestResult, 0)
+	outcome := snapshot.run(ctx, sender, options, func(request RequestResult) {
+		details = append(details, request)
+	})
+	err := ctx.Err()
+	if err != nil {
+		outcome = Cancelled
+	}
+	return Result{Outcome: outcome, Err: err, Duration: time.Since(start), Requests: details}
+}
+
+func (s Snapshot) run(ctx context.Context, sender service.RequestService, options Options, record func(RequestResult)) Outcome {
+	outcome := Passed
+	ordinal := 0
+	stopped := false
 	var walk func([]model.Item)
 	walk = func(items []model.Item) {
 		for _, item := range items {
 			if item.Type == model.ItemRequest && item.Request != nil {
-				req := item.Request.Clone()
-				// Item identity, rather than a potentially stale embedded request ID,
-				// determines the folder path used for inherited authentication.
-				req.ID = item.ID
-				plan, err := execution.New(execution.Input{Request: req, Collection: collection, Settings: settings, Variables: values})
-				jobs = append(jobs, job{id: item.ID, plan: plan, err: err})
+				ordinal++
+				request := RequestResult{Ordinal: ordinal, ItemID: item.ID, Stage: "pending"}
+				switch {
+				case ctx.Err() != nil:
+					request.Outcome, request.Code = Skipped, CodeSkippedCancellation
+				case stopped:
+					request.Outcome, request.Code = Skipped, CodeSkippedFailure
+				default:
+					request = s.execute(ctx, sender, item, request)
+					if request.Outcome == Failed {
+						outcome = Failed
+						stopped = options.StopOnFailure
+					}
+				}
+				record(request)
 			}
 			walk(item.Items)
 		}
 	}
-	walk(collection.Items)
-	r := Result{Outcome: Passed, Requests: make([]RequestResult, 0, len(jobs))}
-	stopped := false
-	for i, job := range jobs {
-		request := RequestResult{Ordinal: i + 1, ItemID: job.id, Stage: "pending"}
-		switch {
-		case ctx.Err() != nil:
-			request.Outcome, request.Code = Skipped, CodeSkippedCancellation
-		case stopped:
-			request.Outcome, request.Code = Skipped, CodeSkippedFailure
-		default:
-			requestStart := time.Now()
-			if job.err != nil {
-				request.Outcome, request.Code, request.Stage, request.Err = Failed, CodeAuth, "prepare", job.err
-			} else {
-				guard := &checkedSender{sender: sender}
-				detail := job.plan.Run(ctx, guard)
-				request.Execution, request.Err = &detail, detail.Err
-				request.Stage, request.Sent = detail.Stage, guard.sent
-				request.Outcome, request.Code = classify(ctx, detail)
-			}
-			request.Duration = time.Since(requestStart)
-			if request.Outcome == Failed {
-				r.Outcome = Failed
-				stopped = options.StopOnFailure
-			}
-		}
-		r.Requests = append(r.Requests, request)
+	walk(s.collection.Items)
+	return outcome
+}
+
+func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item model.Item, request RequestResult) RequestResult {
+	req := *item.Request
+	req.ID = item.ID
+	plan, err := execution.New(execution.Input{Request: req, Collection: s.collection, Settings: s.settings, Variables: s.values})
+	if ctx.Err() != nil {
+		request.Outcome, request.Code = Skipped, CodeSkippedCancellation
+		return request
 	}
-	if r.Err = ctx.Err(); r.Err != nil {
-		r.Outcome = Cancelled
+	start := time.Now()
+	if err != nil {
+		request.Outcome, request.Code, request.Stage, request.Err = Failed, CodeAuth, "prepare", err
+	} else {
+		guard := &checkedSender{sender: sender}
+		detail := plan.Run(ctx, guard)
+		request.Execution, request.Err = &detail, detail.Err
+		request.Stage, request.Sent = detail.Stage, guard.sent
+		request.Outcome, request.Code = classify(ctx, detail)
 	}
-	r.Duration = time.Since(start)
-	return r
+	request.Duration = time.Since(start)
+	return request
 }
 
 func classify(ctx context.Context, r execution.Result) (Outcome, Code) {

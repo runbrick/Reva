@@ -59,7 +59,8 @@ type Tab struct {
 	Tests []TestResult
 
 	job  *sendJob
-	send *ui.EffectState[sendResult, *sendJob]
+	send *ui.EffectState[sendResult, sendKey]
+	sse  *sseState
 }
 
 // TestResult is one assertion reported by a test script.
@@ -73,6 +74,11 @@ type sendJob struct {
 	req  model.Request
 	vars []model.KV
 	plan *execution.Plan
+}
+
+type sendKey struct {
+	job    *sendJob
+	stream *sseMailbox
 }
 
 type sendResult struct {
@@ -209,7 +215,7 @@ func (a *App) Tabs() []*Tab { return a.tabs }
 func (a *App) NewTab() *Tab {
 	a.nextID++
 	t := &Tab{ID: a.nextID, Request: model.NewRequest(storage.NewID())}
-	t.send = ui.NewEffectKeyed[sendResult, *sendJob](a.run)
+	t.send = ui.NewEffectKeyed(a.run)
 	a.tabs = append(a.tabs, t)
 	a.active = len(a.tabs) - 1
 	return t
@@ -250,6 +256,13 @@ func (a *App) Send(t *Tab) {
 		a.authFailure(t, false)
 		return
 	}
+	if t.sse != nil {
+		t.sse.release()
+		if t.sse.status != 0 {
+			delete(a.response.views, t.ID)
+		}
+		t.sse = nil
+	}
 	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
 	a.resetScripts(t)
@@ -258,6 +271,10 @@ func (a *App) Send(t *Tab) {
 // Cancel stops t's request in flight.
 func (a *App) Cancel(t *Tab) {
 	if t.Sending {
+		if t.sse != nil {
+			t.sse.release()
+			t.sse.disconnected = true
+		}
 		t.Sending = false
 		t.Err = context.Canceled.Error()
 	}
@@ -268,23 +285,42 @@ func (a *App) Toast(title, description string, kind ui.ToastKind) {
 	a.toaster.Show(title, description, kind)
 }
 
-func (a *App) run(ctx context.Context, job *sendJob) (sendResult, error) {
-	return sendResult{job: job, result: job.plan.Run(ctx, a.Svc.Requests)}, nil
+func (a *App) run(ctx context.Context, key sendKey) (sendResult, error) {
+	if key.stream != nil {
+		if sender, ok := a.Svc.Requests.(sseSender); ok {
+			adapter := &ssePlanSender{sender: sender, stream: key.stream}
+			result := key.job.plan.Run(ctx, adapter)
+			if result.Response == nil {
+				result.Response = adapter.partial
+			}
+			return sendResult{job: key.job, result: result}, nil
+		}
+	}
+	return sendResult{job: key.job, result: key.job.plan.Run(ctx, a.Svc.Requests)}, nil
 }
 
 // declareSends declares each sending tab's effect and applies results.
 func (a *App) declareSends(c ui.C) {
+	a.pruneResponseViews()
 	for _, t := range a.tabs {
 		if !t.Sending {
 			continue
 		}
-		ui.Effect(c.KeyInt(t.ID), t.send, t.job)
+		tabContext := c.KeyInt(t.ID)
+		key := sendKey{job: t.job, stream: a.declareSSE(tabContext, t)}
+		ui.Effect(tabContext, t.send, key)
 		res, _, ok := t.send.Take()
 		if !ok || res.job != t.job {
 			continue
 		}
 		t.Sending = false
 		r := res.result
+		if t.sse != nil {
+			t.sse.finish(r.Err)
+			if t.sse.status == 0 {
+				t.sse = nil
+			}
+		}
 		a.applyScripts(t, r)
 		entry := model.HistoryEntry{At: time.Now(), Request: r.HistoryRequest}
 		if r.Err != nil {
@@ -295,7 +331,8 @@ func (a *App) declareSends(c ui.C) {
 			entry.Error = t.Err
 		} else if r.Pre.Err != nil {
 			t.Err = a.S.Scripts.PreScriptError
-		} else if r.Response != nil {
+		}
+		if r.Response != nil && (r.Err == nil || t.sse != nil) {
 			t.Response = r.Response
 			entry.StatusCode, entry.Duration = r.Response.StatusCode, r.Response.Duration
 		}
@@ -322,6 +359,11 @@ func (a *App) Page(c ui.C) {
 	}
 	a.declareSends(c)
 	a.declareWebSockets(c)
+	a.declareCollectionRunner(c)
+	if a.collections.runner.open {
+		a.collectionRunnerPage(c)
+		return
+	}
 	// Preview hides raw background data without moving asynchronous work
 	// into a different declaration scope or changing independent UI state.
 	previewing := a.requestPreviewOpen()

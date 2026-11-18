@@ -76,7 +76,8 @@ func (a *App) tabBar(c ui.C) {
 	}
 
 	theme := c.Theme()
-	ui.Column(c).FillWidth().Height(TabBarHeight).Shrink(0).Background(a.palette.Sidebar).Children(func() {
+	height := a.tabBarHeight()
+	ui.Column(c).FillWidth().Height(height).Shrink(0).Background(a.palette.Sidebar).Children(func() {
 		ui.Row(c).FillWidth().Grow(1).Items(ui.Center).Children(func() {
 			area := ui.Scroll(c).Grow(1).FillHeight().Sideways()
 			// Keep the selected tab visible after shortcuts, opens, and duplication.
@@ -85,7 +86,7 @@ func (a *App) tabBar(c ui.C) {
 				left := float32(a.active) * requestTabWidth
 				right := left + requestTabWidth
 				if a.active == len(a.Tabs())-1 {
-					right += TabBarHeight - Space2
+					right += height - Space2
 				}
 				if left < scroll.OffsetX {
 					scroll.ScrollToX(left)
@@ -95,13 +96,16 @@ func (a *App) tabBar(c ui.C) {
 				a.tabBarState.revealedID = a.Active().ID
 			}
 			area.Children(func() {
-				ui.Row(c).Height(TabBarHeight - 1).Items(ui.Center).Children(func() {
+				ui.Row(c).Height(height - 1).Items(ui.Center).Children(func() {
 					for i, t := range a.Tabs() {
 						tc := c.KeyInt(t.ID)
 						title := a.requestTabTitle(t)
 						background, foreground := a.palette.Sidebar, theme.MutedForeground
 						if i == a.active {
 							background, foreground = theme.Card, theme.Foreground
+							if a.desktopLayout() {
+								foreground = theme.AccentForeground
+							}
 						}
 						row := ui.Row(tc).Width(requestTabWidth).FillHeight().PadX(Space2).Gap(Space2).Items(ui.Center)
 						row.Background(background).
@@ -118,7 +122,12 @@ func (a *App) tabBar(c ui.C) {
 								row.Background(theme.Accent)
 							}
 							if i == a.active {
-								ui.Row(tc).Absolute().Top(0).Left(0).Right(0).Height(Space1 / 2).Background(theme.Primary)
+								indicator := ui.Row(tc).Absolute().Left(0).Right(0).Height(Space1 / 2).Background(theme.Primary)
+								if a.desktopLayout() {
+									indicator.Bottom(0)
+								} else {
+									indicator.Top(0)
+								}
 							}
 							if t.Kind == collectionSettingsTabKind {
 								kind := a.S.Collections.Settings

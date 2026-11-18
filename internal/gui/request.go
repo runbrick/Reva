@@ -120,7 +120,19 @@ func (a *App) requestPane(c ui.C, t *Tab) {
 		requestURLFromParams(&t.Request)
 		s.url = t.Request.URL
 	}
-	ui.Column(c).Fill().PadX(Space4).PadY(Space4).Gap(Space2).Children(func() {
+	padding := Space4
+	if a.desktopLayout() {
+		padding = Space2
+	}
+	ui.Column(c).Fill().Pad(padding).Gap(Space2).Children(func() {
+		if a.desktopLayout() {
+			theme := c.Theme()
+			ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
+				ui.Icon(c, icons.Pencil).Size(Space4, Space4).Color(theme.AccentForeground)
+				ui.Text(c, a.requestTabTitle(t)).FontSize(theme.Metrics.FontSizeL - Space1).Bold().Grow(1).Ellipsis()
+			})
+			ui.Divider(c)
+		}
 		a.requestURLBar(c, t, s)
 		a.requestSectionTabs(c, t, s)
 		ui.Scroll(c).FillWidth().Grow(1).Children(func() {

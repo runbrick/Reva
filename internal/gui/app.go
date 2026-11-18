@@ -24,6 +24,7 @@ import (
 
 	"github.com/runbrick/reva/internal/execution"
 	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/gui/themes"
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
@@ -120,11 +121,12 @@ var Pages = []MainPage{PageWorkbench, PageHistory, PageSettings}
 type App struct {
 	Svc service.Services
 	// S is the active string table; replace it to switch language.
-	S       *i18n.Strings
-	theme   ui.Theme
-	palette Palette
-	// themeName is the stored theme choice ("light", "dark" or "system").
-	themeName string
+	S           *i18n.Strings
+	theme       ui.Theme
+	palette     Palette
+	themeStyle  themes.Style
+	themeMode   string
+	themeLayout themes.Layout
 	// Platform is the OS the window runs on ("darwin", "windows", "linux");
 	// tests set it to check each platform's titlebar.
 	Platform string
@@ -171,13 +173,13 @@ func New(svc service.Services) *App {
 // follows the OS appearance (re-read every paint by syncTheme).
 func (a *App) ApplySettings(s model.Settings) {
 	a.S = i18n.For(i18n.Lang(s.Language))
-	a.themeName = s.Theme
+	a.themeStyle, a.themeMode = themes.Decode(s.Theme)
 	a.syncTheme()
 }
 
 // Dark reports whether the App currently paints with the dark theme.
 func (a *App) Dark() bool {
-	switch a.themeName {
+	switch a.themeMode {
 	case "dark":
 		return true
 	case "system":
@@ -187,11 +189,11 @@ func (a *App) Dark() bool {
 }
 
 func (a *App) syncTheme() {
-	if a.Dark() {
-		a.theme, a.palette = darkTheme()
+	dark := a.Dark()
+	a.theme, a.palette, a.themeLayout = themes.Resolve(a.themeStyle, dark)
+	if dark {
 		app.SetNativeAppearance(app.AppearanceDark)
 	} else {
-		a.theme, a.palette = lightTheme()
 		app.SetNativeAppearance(app.AppearanceLight)
 	}
 }
@@ -354,7 +356,7 @@ func (a *App) declareSends(c ui.C) {
 //	|      |                 |   or the History / Settings page      |
 //	+------+-----------------+---------------------------------------+
 func (a *App) Page(c ui.C) {
-	if a.themeName == "system" {
+	if a.themeMode == "system" {
 		a.syncTheme()
 	}
 	a.declareSends(c)
@@ -368,10 +370,20 @@ func (a *App) Page(c ui.C) {
 	// into a different declaration scope or changing independent UI state.
 	previewing := a.requestPreviewOpen()
 	theme := c.Theme()
+	classic := a.desktopLayout()
+	height := c.Bounds().Height - TitlebarHeight
+	if classic {
+		height -= desktopToolbarHeight
+		if !previewing {
+			height -= statusStripHeight(theme)
+		}
+	}
 	ui.Column(c).Fill().Background(a.palette.Surface).Children(func() {
 		a.titlebarStrip(c)
-		ui.Row(c).FillWidth().Height(max(0, c.Bounds().Height-TitlebarHeight)).Shrink(0).Children(func() {
-			a.rail(c)
+		ui.Row(c).FillWidth().Height(max(0, height)).Shrink(0).Children(func() {
+			if !classic {
+				a.rail(c)
+			}
 			switch a.Main {
 			case PageHistory:
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.historyPage(c) })
@@ -380,14 +392,23 @@ func (a *App) Page(c ui.C) {
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
 					if !previewing {
-						ui.Column(c).Fill().PadBottom(theme.Metrics.ControlHeight + 1).Children(func() { a.sidebar(c) })
-						a.sidebarStatus(c)
+						sidebar := ui.Column(c).Fill()
+						if !classic {
+							sidebar.PadBottom(statusStripHeight(theme))
+						}
+						sidebar.Children(func() { a.sidebar(c) })
+						if !classic {
+							a.statusStrip(c, false)
+						}
 					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
 				a.workbench(c, theme)
 			}
 		})
+		if classic && !previewing {
+			a.statusStrip(c, true)
+		}
 	})
 	if !previewing {
 		a.dialogs(c)
@@ -486,14 +507,21 @@ func (a *App) sidebar(c ui.C) {
 	})
 }
 
-func (a *App) sidebarStatus(c ui.C) {
+func statusStripHeight(theme *ui.Theme) float32 { return theme.Metrics.ControlHeight + 1 }
+
+func (a *App) statusStrip(c ui.C, fullWidth bool) {
 	theme := c.Theme()
 	label, color := a.S.Shell.Ready, theme.Success
 	if a.Active().Sending {
 		label, color = a.S.Response.Sending, theme.AccentForeground
 	}
-	ui.Column(c).Absolute().Left(0).Right(0).Bottom(0).Height(theme.Metrics.ControlHeight + 1).
-		Background(a.palette.Sidebar).Children(func() {
+	strip := ui.Column(c).Height(statusStripHeight(theme)).Shrink(0)
+	if fullWidth {
+		strip.FillWidth().Background(a.palette.Rail)
+	} else {
+		strip.Absolute().Left(0).Right(0).Bottom(0).Background(a.palette.Sidebar)
+	}
+	strip.Children(func() {
 		ui.Divider(c)
 		ui.Row(c).FillWidth().Grow(1).PadX(Space4).Gap(Space2).Items(ui.Center).Children(func() {
 			statusDot(c, color)
@@ -524,11 +552,11 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 			a.websocketPane(c.KeyInt(t.ID), t)
 			return
 		}
-		ui.Column(c).FillWidth().Height(a.mainSplit.Pos).Children(func() {
+		a.workbenchPanel(c, ui.Column(c).FillWidth().Height(a.mainSplit.Pos), !previewing, func() {
 			a.requestPane(c.KeyInt(t.ID), t)
 		})
 		ui.Splitter(c, &a.mainSplit).Mins(180, 180).Label(a.S.Shell.SplitLabel)
-		ui.Column(c).FillWidth().Grow(1).Children(func() {
+		a.workbenchPanel(c, ui.Column(c).FillWidth().Grow(1), !previewing, func() {
 			if previewing {
 				return
 			}
@@ -539,6 +567,15 @@ func (a *App) workbench(c ui.C, theme *ui.Theme) {
 			}
 		})
 	})
+}
+
+func (a *App) workbenchPanel(c ui.C, panel ui.Box, visible bool, content func()) {
+	if visible && a.desktopLayout() {
+		theme := c.Theme()
+		panel.MarginX(Space1).MarginY(Space1).Background(theme.Card).
+			Border(1, theme.Border).Radius(theme.Metrics.RadiusSurface).Clip()
+	}
+	panel.Children(content)
 }
 
 // dialogs declares every feature's modal dialogs; each returns at once when closed.

@@ -198,7 +198,7 @@ func (a *App) historyPage(c ui.C) {
 		a.historyFilters(c)
 		s.rebuild(entries, text, time.Now())
 		wide := c.Bounds().Width >= 75*Space4
-		s.list.RowWidth = max(42*Space4, c.Bounds().Width-RailWidth-2*Space6)
+		s.list.RowWidth = max(42*Space4, c.Bounds().Width-a.railWidth()-2*Space6)
 		if wide {
 			s.list.RowWidth = max(42*Space4, s.list.RowWidth-21*Space4)
 		}

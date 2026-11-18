@@ -166,7 +166,7 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 	col, item, ok := a.collectionSettingsTarget(t)
 	d.missing = !ok
 	a.syncCollectionSettingsDirty(t)
-	width := max(c.Bounds().Width-RailWidth-a.sideSplit.Pos-Space2, 0)
+	width := max(c.Bounds().Width-a.railWidth()-a.sideSplit.Pos-Space2, 0)
 	ui.Column(c).Width(width).Grow(1).MinHeight(0).PadX(Space4).PadTop(Space2).Gap(Space2).Children(func() {
 		ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
 			ui.Icon(c, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
@@ -262,7 +262,7 @@ func collectionRequestCounts(items []model.Item) (http, websocket int) {
 func (a *App) collectionOverview(c ui.C, t *Tab, col model.Collection, item *model.Item, exists bool) {
 	// C.Bounds is the window, so subtract the shell's actual sidebar allocation.
 	// Wide panes have independent scroll areas; narrow panes keep one reading order.
-	width := c.Bounds().Width - RailWidth - a.sideSplit.Pos - Space2 - 2*Space4
+	width := c.Bounds().Width - a.railWidth() - a.sideSplit.Pos - Space2 - 2*Space4
 	if width < 30*Space6 {
 		ui.Scroll(c).FillWidth().Grow(1).MinHeight(0).Scrollbars().Label(a.S.Collections.SettingsContent).Children(func() {
 			ui.Column(c).FillWidth().Gap(Space6).PadBottom(Space4).Children(func() {

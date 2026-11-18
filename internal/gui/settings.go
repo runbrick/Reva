@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/gui/themes"
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/storage"
@@ -52,6 +53,7 @@ func (a *App) ConfigureUpdates(quit func(), restartFailed bool) {
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
+var settingsStyles = themes.Styles()
 var settingsHistoryLimits = []int{50, 100, 200, 500, 1000}
 var settingsTimeouts = []int{10, 30, 60, 120, 300}
 
@@ -155,6 +157,7 @@ func (a *App) settingsPage(c ui.C) {
 		state.initialized = true
 	}
 	state.current = a.Svc.Settings.Get()
+	style, mode := themes.Decode(state.current.Theme)
 	state.language = i18n.Lang(state.current.Language)
 	state.followRedirects, state.verifyTLS = !state.current.NoFollowRedirects, !state.current.InsecureTLS
 	state.timeout = state.current.RequestTimeoutSec
@@ -164,15 +167,23 @@ func (a *App) settingsPage(c ui.C) {
 	s := &a.S.Settings
 	theme := c.Theme()
 	ui.Scroll(c).FillWidth().Grow(1).Basis(0).Scrollbars().Children(func() {
-		ui.Column(c).FillWidth().Pad(Space6).Items(ui.Center).Children(func() {
-			ui.Column(c).FillWidth().MaxWidth(720).Gap(Space4).Children(func() {
+		ui.Column(c).FillWidth().Pad(Space4).Items(ui.Center).Children(func() {
+			ui.Column(c).FillWidth().MaxWidth(720).Gap(Space3).Children(func() {
 				ui.Row(c).FillWidth().Items(ui.Center).Gap(Space3).Children(func() {
 					ui.Text(c, s.Title).FontSize(theme.Metrics.FontSizeL).Bold().Grow(1)
 					a.onboardingEntry(c)
 				})
 				settingsCard(c, s.Appearance, func() {
+					settingsRow(c, s.Style, "", func() {
+						if ui.Choice(c, &style, settingsStyles, a.settingsStyleLabel).Width(Space6 * 15).Changed() {
+							state.current.Theme = themes.Encode(style, mode)
+							a.saveSettingsAfter(c, state.current)
+						}
+					})
+					ui.Divider(c)
 					settingsRow(c, s.Theme, s.ThemeDescription, func() {
-						if ui.Choice(c, &state.current.Theme, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {
+						if ui.Choice(c, &mode, settingsThemes, a.settingsThemeLabel).Width(Space6 * 15).Changed() {
+							state.current.Theme = themes.Encode(style, mode)
 							a.saveSettingsAfter(c, state.current)
 						}
 					})
@@ -286,7 +297,7 @@ func (a *App) settingsPage(c ui.C) {
 // settingsCard and settingsRow adapt Viva's settings-row recipe to grouped controls.
 func settingsCard(c ui.C, title string, body func()) {
 	theme := c.Theme()
-	ui.Column(c).FillWidth().PadX(Space4).PadY(Space3).
+	ui.Column(c).FillWidth().PadX(Space4).PadY(Space2).
 		Background(theme.Card).Border(1, theme.Border).Radius(theme.Metrics.RadiusSurface).Children(func() {
 		ui.Text(c, title).Bold().Color(theme.Primary).MarginBottom(Space1)
 		body()
@@ -297,7 +308,9 @@ func settingsRow(c ui.C, title, description string, control func()) {
 	ui.Row(c).FillWidth().Gap(Space4).PadY(Space2).Items(ui.Center).Children(func() {
 		ui.Column(c).Grow(1).Gap(Space1).Children(func() {
 			ui.Text(c, title)
-			ui.Wrap(c, description).FillWidth().Muted().FontSize(c.Theme().Metrics.FontSizeS)
+			if description != "" {
+				ui.Wrap(c, description).FillWidth().Muted().FontSize(c.Theme().Metrics.FontSizeS)
+			}
 		})
 		ui.Row(c).Shrink(0).Items(ui.Center).Children(control)
 	})
@@ -323,6 +336,13 @@ func (a *App) settingsThemeLabel(theme string) string {
 	default:
 		return a.S.Settings.Light
 	}
+}
+
+func (a *App) settingsStyleLabel(style themes.Style) string {
+	if style == themes.Classic {
+		return a.S.Settings.ClassicStyle
+	}
+	return a.S.Settings.ModernStyle
 }
 
 func (a *App) settingsLanguageLabel(lang i18n.Lang) string {

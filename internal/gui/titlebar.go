@@ -11,6 +11,8 @@ import (
 // titlebarState is retained for the shell's feature state slot.
 type titlebarState struct{}
 
+const desktopToolbarHeight = Space6 + Space4
+
 // windowConfig sets the window chrome on base: a custom titlebar Reva paints
 // itself. Owned by the titlebar PR.
 func (a *App) windowConfig(base app.Config) app.Config {
@@ -42,7 +44,10 @@ func (a *App) titlebarInsets() (leading, trailing float32) {
 // titlebarStrip keeps content clear of native controls. Only the flexible empty
 // space moves the window; Viva supplies dragging and double-click maximize/zoom.
 func (a *App) titlebarStrip(c ui.C) {
-	theme := c.Theme()
+	if a.desktopLayout() {
+		a.desktopTitlebar(c)
+		return
+	}
 	leading, trailing := a.titlebarInsets()
 	// Free nav label space before the search slot contracts at the minimum width.
 	compact := c.Bounds().Width < 1200
@@ -53,18 +58,10 @@ func (a *App) titlebarStrip(c ui.C) {
 	ui.Row(c).FillWidth().Height(TitlebarHeight).Shrink(0).Background(a.palette.Sidebar).
 		PadLeft(leading + Space4).PadRight(trailing + Space4).Gap(gap).Items(ui.Center).
 		Draw(drawTitlebarBorder).Children(func() {
-		ui.Row(c).Gap(Space2).Items(ui.Center).Shrink(0).Children(func() {
-			ui.Row(c).Size(Space6, Space6).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
-				Center().Children(func() {
-				ui.Icon(c, icons.Send).Size(Space4, Space4).Color(theme.PrimaryForeground)
-			})
-			ui.Text(c, a.S.Common.AppName).Bold()
-		})
+		a.titlebarBrand(c)
 		a.titlebarNavigation(c, compact)
 		ui.Divider(c).Vertical().Height(Space6)
-		if ui.Button(c, a.S.Titlebar.NewRequestTab).Icon(icons.Plus).IconOnly().Ghost().Tooltip(a.S.Titlebar.NewRequestTab).Clicked() {
-			c.After(func() { a.NewTab(); a.SelectSection(SectionAPIs) })
-		}
+		a.titlebarNewRequest(c)
 		ui.Row(c).Grow(1).MinWidth(Space4).FillHeight().MovesWindow()
 		// Search may declare a fixed preferred width. This slot yields space to
 		// the tools, clipping both paint and hits before the window controls.
@@ -76,6 +73,64 @@ func (a *App) titlebarStrip(c ui.C) {
 			a.titlebarThemeButton(c)
 			a.settingsButton(c)
 		})
+	})
+}
+
+func (a *App) titlebarBrand(c ui.C) {
+	theme := c.Theme()
+	ui.Row(c).Gap(Space2).Items(ui.Center).Shrink(0).Children(func() {
+		ui.Row(c).Size(Space6, Space6).Radius(theme.Metrics.RadiusControl).Background(theme.Primary).
+			Center().Children(func() {
+			ui.Icon(c, icons.Send).Size(Space4, Space4).Color(theme.PrimaryForeground)
+		})
+		ui.Text(c, a.S.Common.AppName).Bold()
+	})
+}
+
+func (a *App) titlebarNewRequest(c ui.C) {
+	label := a.S.Titlebar.NewRequestTab
+	if ui.Button(c, label).Icon(icons.Plus).IconOnly().Ghost().Tooltip(label).Clicked() {
+		c.After(func() { a.NewTab(); a.SelectSection(SectionAPIs) })
+	}
+}
+
+func (a *App) desktopTitlebar(c ui.C) {
+	theme := c.Theme()
+	leading, trailing := a.titlebarInsets()
+	ui.Row(c).FillWidth().Height(TitlebarHeight).Shrink(0).Background(a.palette.Rail).
+		PadLeft(leading + Space4).PadRight(trailing + Space4).Gap(Space4).Items(ui.Center).
+		Draw(drawTitlebarBorder).Children(func() {
+		a.titlebarBrand(c)
+		a.titlebarNavigation(c, false)
+		ui.Row(c).Grow(1).FillHeight().MovesWindow()
+	})
+	ui.Row(c).FillWidth().Height(desktopToolbarHeight).Shrink(0).Background(a.palette.TableHeader).
+		PadX(Space4).Gap(Space2).Items(ui.Center).Draw(drawTitlebarBorder).Children(func() {
+		a.titlebarNewRequest(c)
+		active := a.Active()
+		canSave := a.Main == PageWorkbench && a.Section == SectionAPIs && active.Kind == requestTabKind && !a.requestPreviewOpen()
+		label := a.S.Common.Save
+		if ui.Button(c, label).Icon(icons.Save).IconOnly().Ghost().Tooltip(label).Disabled(!canSave).Clicked() {
+			c.After(func() { a.RequestSave(active) })
+		}
+		a.importButton(c)
+		ui.Divider(c).Vertical().Height(Space6)
+		for _, section := range [...]Section{SectionAPIs, SectionEnvironments} {
+			label := a.sectionLabel(section)
+			button := ui.Button(c.KeyInt(int(section)), label).Icon(a.sectionIcon(section)).Ghost().Tooltip(label).Shrink(0)
+			if a.Main == PageWorkbench && a.Section == section {
+				button.Secondary().Background(a.palette.RailActive).Color(theme.AccentForeground)
+			}
+			if button.Clicked() {
+				c.After(func() { a.SelectSection(section) })
+			}
+		}
+		ui.Spacer(c)
+		ui.Row(c).Shrink(1).MinWidth(0).Clip().Children(func() { a.searchBox(c) })
+		a.envSelector(c)
+		ui.Divider(c).Vertical().Height(Space6)
+		a.titlebarThemeButton(c)
+		a.settingsButton(c)
 	})
 }
 

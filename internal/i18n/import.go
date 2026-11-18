@@ -12,6 +12,9 @@ type Import struct {
 	SwaggerHelp, SwaggerURLHelp, SchemaURL, SchemaURLPlaceholder, SwaggerCollection, OpenAPICollection         string
 	InvalidSourceURL, FetchFailed, UnsupportedReference, UnsupportedParameter, OpenAPIReview, OpenAPISelection string
 	OpenAPIEmptyServer, OpenAPISchemaChoice, OpenAPISchemaIncomplete, OpenAPINonstandardPath                   string
+	HandoffOptIn, HandoffTitle, HandoffDescription, HandoffPlaceholder, HandoffEnvironmentOnly                 string
+	HandoffSelectionHelp, HandoffAdvisory, HandoffActiveScope, HandoffCandidateScope                           string
+	HandoffNoMissing, HandoffOmitted                                                                           string
 
 	Title, Description, Input, Placeholder                                                        string
 	LoadFile, JSONFiles, HARFiles, AllFiles, Submit, Cancel                                       string
@@ -28,6 +31,13 @@ type Import struct {
 }
 
 var importZh = Import{
+	HandoffOptIn: "保存集合后继续导入环境", HandoffTitle: "导入独立环境",
+	HandoffDescription: "集合已保存。请打开或粘贴单个 Postman 或 Reva 环境文件的 JSON，再单独检查并确认。",
+	HandoffPlaceholder: "粘贴 Postman 或 Reva 环境 JSON…", HandoffEnvironmentOnly: "此步骤仅接受单个 Postman 或 Reva 环境 JSON。",
+	HandoffSelectionHelp: "当前环境保持不变。保存后可在顶部手动选择新环境，再打开集合中的请求并查看发送前预览。",
+	HandoffAdvisory:      "有限提示，仅检查请求 URL 中的占位符名称。不运行脚本；禁用的环境变量会回退到启用的集合变量。",
+	HandoffActiveScope:   "使用当前环境时缺少", HandoffCandidateScope: "手动选择此环境后缺少",
+	HandoffNoMissing: "未发现缺少的名称", HandoffOmitted: "部分名称未显示",
 	ManualTitle: "导入项目（手动）", Sources: "数据来源", AutoSource: "自动识别", NativeSource: "Reva",
 	PostmanSource: "Postman", ApifoxSource: "Apifox", ApiPostSource: "Apipost", SwaggerSource: "Swagger", SwaggerURLSource: "Swagger URL",
 	YAPISource: "YApi", CurlSource: "cURL 导入", MarkdownSource: ".md 文件", HARSource: ".har 文件", InsomniaSource: "Insomnia",
@@ -79,6 +89,13 @@ var importZh = Import{
 }
 
 var importEn = Import{
+	HandoffOptIn: "Import an environment after saving this collection", HandoffTitle: "Import a standalone environment",
+	HandoffDescription: "Collection saved. Open or paste one Postman or Reva environment JSON export, then review and confirm it separately.",
+	HandoffPlaceholder: "Paste Postman or Reva environment JSON…", HandoffEnvironmentOnly: "This step accepts a single Postman or Reva environment JSON export.",
+	HandoffSelectionHelp: "The active environment won’t change. After saving, select the new one in the top bar, then open a collection request and check its pre-send preview.",
+	HandoffAdvisory:      "Limited check of placeholder names in request URLs. No scripts run. Disabled environment variables fall back to enabled collection variables.",
+	HandoffActiveScope:   "Missing with current environment", HandoffCandidateScope: "Missing if you select this environment",
+	HandoffNoMissing: "No missing names found", HandoffOmitted: "Some names omitted",
 	ManualTitle: "Import project (manual)", Sources: "Data source", AutoSource: "Auto detect", NativeSource: "Reva",
 	PostmanSource: "Postman", ApifoxSource: "Apifox", ApiPostSource: "Apipost", SwaggerSource: "Swagger", SwaggerURLSource: "Swagger URL",
 	YAPISource: "YApi", CurlSource: "cURL import", MarkdownSource: ".md file", HARSource: ".har file", InsomniaSource: "Insomnia",

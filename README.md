@@ -269,7 +269,7 @@ Run the following from the repository root on the corresponding host:
 | Host | Release command | Outputs |
 | --- | --- | --- |
 | Windows | `./scripts/build.ps1 -Arch amd64` in PowerShell | `dist/windows-amd64/reva-<version>-windows-amd64-setup.exe` (installer), `reva.exe`, and a portable ZIP |
-| macOS | `sh ./scripts/build.sh` | `dist/darwin-<host-arch>/reva`, `Reva.app`, and `reva-<version>-darwin-<host-arch>.dmg` |
+| macOS | `sh ./scripts/build.sh` | `dist/darwin-<host-arch>/reva`, `Reva.app`, a DMG, and an app ZIP for updates |
 
 Windows packaging requires NSIS (`makensis`). Install it with
 `winget install --id NSIS.NSIS --exact`, then run the Windows build command.
@@ -304,7 +304,7 @@ go tool viva package --target windows --arch amd64 --format nsis,zip --no-sign -
 ```sh
 # macOS host
 go tool viva build --target darwin --arch arm64 -o dist/reva
-go tool viva package --target darwin --arch arm64 --format app,dmg --no-sign --program dist/reva -o dist/Reva.app
+go tool viva package --target darwin --arch arm64 --format app,dmg,zip --no-sign --program dist/reva -o dist/Reva.app
 ```
 
 The scripts and CI create unsigned artifacts. Distribution signing is separate:
@@ -327,10 +327,19 @@ To publish a release, set `[app] version` in `viva.toml` and the matching
 `internal/update/update.go` `Current` constant, then push a matching `vX.Y.Z`
 tag. The [Release workflow](.github/workflows/release.yml) verifies the tag,
 runs the full test suite on Windows and macOS, packages their native artifacts,
-and publishes the Windows installer, ZIP, DMG, and `SHA256SUMS` to GitHub Releases. A release
-already published under that tag is never overwritten. The Settings page checks
-the latest published release only when you click **Check for updates**; it opens
-the GitHub download page for a newer version and does not replace the running app.
+and publishes the Windows amd64 installer and ZIP, macOS amd64 and arm64 DMGs
+and app ZIPs, and `SHA256SUMS` to GitHub Releases. A release already published
+under that tag is never overwritten.
+
+In **Settings > About**, click **Check for updates**, then **Download update**
+and confirm **Install and restart**. Reva checks the official GitHub release
+asset's byte length and SHA-256 digest before handing it to a helper. The helper
+waits for Reva to exit, runs the per-user installer or replaces the portable
+Windows executable or writable macOS app bundle, and reopens Reva. A failed
+replacement or launch attempts to restore the previous program. Saved data is
+separate; save unsaved edits before confirming. The download page remains
+available for manual updates, including missing packages or digests, read-only
+locations, and macOS apps running directly from a disk image.
 
 Measured on Windows/amd64 with Go 1.26.3 and Viva 0.6.0 using
 `./scripts/build.ps1` on this branch:

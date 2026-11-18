@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/runbrick/reva/internal/i18n"
@@ -42,6 +43,7 @@ func TestSettingsCheckUpdates(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(storage.EnvHome, t.TempDir())
 			h := newHarness(t)
+			h.App.ConfigureUpdates(func() { t.Error("manual update unexpectedly quit Reva") }, false)
 			h.App.settings.check = func(context.Context) (update.Release, error) { return tc.release, tc.err }
 			h.click(h.App.S.Settings.Title)
 			h.click("English")
@@ -51,6 +53,9 @@ func TestSettingsCheckUpdates(t *testing.T) {
 			h.click(h.App.S.Settings.CheckUpdates)
 			h.waitFor(tc.want, func() bool { return h.shows(tc.want) })
 			if tc.name == "new release" {
+				if !settingsShowsWrapped(h, h.App.S.Settings.UpdateManualOnly) {
+					t.Fatal("missing package did not explain the manual fallback")
+				}
 				h.click(h.App.S.Settings.OpenRelease)
 				if opened, ok := h.D.LastOpenedURL(); !ok || opened != tc.release.URL {
 					t.Fatalf("opened URL %q (ok=%t), want %q", opened, ok, tc.release.URL)
@@ -58,6 +63,72 @@ func TestSettingsCheckUpdates(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSettingsInstallUpdateConfirmsRetriesAndQuitsOnlyOnSuccess(t *testing.T) {
+	t.Setenv(storage.EnvHome, t.TempDir())
+	svc := fake.New()
+	settings := svc.Settings.Get()
+	settings.Language = "en"
+	if err := svc.Settings.Save(settings); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, svc)
+	state := &h.App.settings
+	version, _, _ := strings.Cut(settingsVersion, ".")
+	major, err := strconv.Atoi(version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.check = func(context.Context) (update.Release, error) {
+		return update.Release{Version: strconv.Itoa(major+1) + ".0.0"}, nil
+	}
+	var quit atomic.Bool
+	h.App.ConfigureUpdates(func() { quit.Store(true) }, false)
+	started := make(chan struct{}, 1)
+	result := make(chan error, 1)
+	state.install = func(ctx context.Context) error {
+		started <- struct{}{}
+		select {
+		case err := <-result:
+			return err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	s := h.App.S.Settings
+	h.click(s.Title)
+	if err := h.D.Scroll(gfx.ScrollEvent{X: 800, Y: 600, DeltaY: 1000, Precise: true}); err != nil {
+		t.Fatal(err)
+	}
+	h.click(s.CheckUpdates)
+	h.waitFor(s.UpdateAvailable, func() bool { return h.shows(s.UpdateAvailable) })
+	h.click(s.DownloadUpdate)
+	if !settingsShowsWrapped(h, s.RestartWarning) {
+		t.Fatal("confirmation did not warn about the restart")
+	}
+	h.click(s.Cancel)
+	if state.installing != nil || quit.Load() {
+		t.Fatal("cancelling confirmation started installation")
+	}
+	h.click(s.DownloadUpdate)
+	h.click(s.InstallUpdate)
+	h.waitFor(s.InstallingUpdate, func() bool { return settingsShowsWrapped(h, s.InstallingUpdate) })
+	<-started
+	if quit.Load() {
+		t.Fatal("app quit while downloading")
+	}
+	result <- errors.New("checksum mismatch")
+	h.waitFor(s.InstallFailed, func() bool { return settingsShowsWrapped(h, s.InstallFailed) })
+	if quit.Load() {
+		t.Fatal("app quit after a failed install")
+	}
+	h.click(s.InstallUpdate)
+	if state.installing == nil {
+		t.Fatalf("retry did not start: confirmation open=%t, hits=%v", state.updateConfirm, h.hitLabels())
+	}
+	result <- nil
+	h.waitFor("quit after helper launch", quit.Load)
 }
 
 func TestSettingsLanguageAppliesAndSavesImmediately(t *testing.T) {

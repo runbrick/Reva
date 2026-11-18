@@ -1,4 +1,4 @@
-// Package update checks the published GitHub release without changing the running app.
+// Package update checks and installs releases published by Reva on GitHub.
 package update
 
 import (
@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -16,18 +15,29 @@ import (
 
 const Current = "0.3.0"
 const Feed = "https://api.github.com/repos/runbrick/Reva/releases/latest"
+const releaseRoot = "https://github.com/runbrick/Reva/releases/"
 
 var ErrNoRelease = errors.New("no published release")
 
 type Release struct {
 	Version string
 	URL     string
+	assets  []releaseAsset
+}
+
+type releaseAsset struct {
+	Name   string `json:"name"`
+	URL    string `json:"browser_download_url"`
+	Size   int64  `json:"size"`
+	Digest string `json:"digest"`
 }
 
 // Latest reads only a bounded GitHub response. The caller chooses when to check.
 func Latest(ctx context.Context, client *http.Client, feed string) (Release, error) {
 	if client == nil {
-		client = &http.Client{Timeout: 15 * time.Second}
+		client = &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		}}
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feed, nil)
 	if err != nil {
@@ -47,23 +57,29 @@ func Latest(ctx context.Context, client *http.Client, feed string) (Release, err
 		return Release{}, fmt.Errorf("GitHub release API: %s", resp.Status)
 	}
 	var body struct {
-		Tag        string `json:"tag_name"`
-		URL        string `json:"html_url"`
-		Draft      bool   `json:"draft"`
-		Prerelease bool   `json:"prerelease"`
+		Tag        string         `json:"tag_name"`
+		URL        string         `json:"html_url"`
+		Draft      bool           `json:"draft"`
+		Prerelease bool           `json:"prerelease"`
+		Assets     []releaseAsset `json:"assets"`
 	}
-	decoder := json.NewDecoder(io.LimitReader(resp.Body, 1<<20))
-	if err := decoder.Decode(&body); err != nil {
+	const maxMetadataBytes = 1 << 20
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxMetadataBytes+1))
+	if err != nil {
+		return Release{}, err
+	}
+	if len(data) > maxMetadataBytes {
+		return Release{}, errors.New("GitHub release API: response is too large")
+	}
+	if err := json.Unmarshal(data, &body); err != nil {
 		return Release{}, fmt.Errorf("GitHub release API: %w", err)
 	}
 	version := strings.TrimPrefix(body.Tag, "v")
-	page, err := url.Parse(body.URL)
-	if _, valid := parse(version); !valid || body.Draft || body.Prerelease || err != nil ||
-		page.Scheme != "https" || !strings.EqualFold(page.Host, "github.com") ||
-		page.Path != "/runbrick/Reva/releases/tag/"+body.Tag || page.RawQuery != "" || page.Fragment != "" {
+	if _, valid := parse(version); !valid || body.Draft || body.Prerelease ||
+		body.Tag != "v"+version || body.URL != releaseRoot+"tag/"+body.Tag {
 		return Release{}, errors.New("GitHub release API: invalid release")
 	}
-	return Release{Version: version, URL: body.URL}, nil
+	return Release{Version: version, URL: body.URL, assets: body.Assets}, nil
 }
 
 func Newer(current, latest string) bool {
@@ -88,6 +104,9 @@ func parse(version string) ([3]int, bool) {
 	}
 	for i, field := range fields {
 		if field == "" || (len(field) > 1 && field[0] == '0') {
+			return parts, false
+		}
+		if strings.Trim(field, "0123456789") != "" {
 			return parts, false
 		}
 		n, err := strconv.Atoi(field)

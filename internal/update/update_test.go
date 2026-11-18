@@ -51,7 +51,7 @@ func TestLatestReadsReleaseAndHandlesMissingRelease(t *testing.T) {
 	}))
 	defer server.Close()
 	release, err := Latest(context.Background(), server.Client(), server.URL)
-	if err != nil || release.Version != "0.3.0" || !Newer(Current, release.Version) {
+	if err != nil || release.Version != "0.3.0" || release.URL != "https://github.com/runbrick/Reva/releases/tag/v0.3.0" {
 		t.Fatalf("release %+v, error %v", release, err)
 	}
 	_, err = Latest(context.Background(), server.Client(), server.URL+"/missing")

@@ -21,14 +21,21 @@ import (
 )
 
 func TestSettingsCheckUpdates(t *testing.T) {
+	majorVersion, _, _ := strings.Cut(settingsVersion, ".")
+	major, err := strconv.Atoi(majorVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nextVersion := strconv.Itoa(major+1) + ".0.0"
+	const releaseURL = "https://github.com/runbrick/Reva/releases/tag/v"
 	for _, tc := range []struct {
 		name    string
 		release update.Release
 		err     error
 		want    string
 	}{
-		{"new release", update.Release{Version: "0.3.0", URL: "https://github.com/runbrick/Reva/releases/tag/v0.3.0"}, nil, "New version available"},
-		{"current release", update.Release{Version: settingsVersion, URL: "https://github.com/runbrick/Reva/releases/tag/v0.2.0"}, nil, "You're up to date"},
+		{"new release", update.Release{Version: nextVersion, URL: releaseURL + nextVersion}, nil, "New version available"},
+		{"current release", update.Release{Version: settingsVersion, URL: releaseURL + settingsVersion}, nil, "You're up to date"},
 		{"no release", update.Release{}, update.ErrNoRelease, "No published release yet"},
 		{"offline", update.Release{}, errors.New("connection failed"), "connection failed"},
 	} {

@@ -1,6 +1,9 @@
 package gui
 
-import "github.com/vivaui/viva/ui"
+import (
+	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/vivaui/viva/ui"
+)
 
 // onboardingEntry keeps the optional guide in the settings heading.
 func (a *App) onboardingEntry(c ui.C) {
@@ -29,7 +32,23 @@ func (a *App) onboardingDialog(c ui.C) {
 		Width:       Space6 * 27,
 	}, func() {
 		ui.Column(c).FillWidth().Gap(Space4).Children(func() {
-			onboardingStep(c, s.GuideRequestTitle, s.GuideRequestDescription)
+			ui.Column(c).FillWidth().Gap(Space2).Children(func() {
+				onboardingStep(c, s.GuideRequestTitle, s.GuideRequestDescription)
+				ui.Flow(c).FillWidth().Gap(Space2).Children(func() {
+					if ui.Button(c, s.GuidePractice).Small().Outline().Icon(icons.Eye).Clicked() {
+						c.After(func() {
+							state.guideOpen = false
+							a.openOnboardingPractice(s.GuidePracticeName)
+						})
+					}
+					if ui.Button(c, s.GuideImport).Small().Outline().Icon(icons.Upload).Clicked() {
+						c.After(func() {
+							state.guideOpen = false
+							a.openImportDialog()
+						})
+					}
+				})
+			})
 			onboardingStep(c, s.GuideVariablesTitle, s.GuideVariablesDescription)
 			onboardingStep(c, s.GuideDataTitle, s.GuideDataDescription)
 			if state.guideError != "" {

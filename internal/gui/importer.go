@@ -131,29 +131,33 @@ func (s *importerState) dismiss() {
 
 func (a *App) importButton(c ui.C) {
 	if ui.Button(c, a.S.Import.Title).Outline().Clicked() {
-		a.importer.dismiss()
-		s := &a.importer
-		s.collectionIDs = s.collectionIDs[:0]
-		s.collectionNames = make(map[string]string)
-		for _, col := range a.Svc.Collections.List() {
-			s.collectionIDs = append(s.collectionIDs, col.ID)
-			s.collectionNames[col.ID] = col.Name
-		}
-		if _, ok := s.collectionNames[s.collectionID]; !ok {
-			s.collectionID = ""
-			s.appendToCollection = false
-			if tab := a.Active(); tab != nil {
-				s.collectionID = tab.CollectionID
-			}
-			if s.collectionID == "" && len(s.collectionIDs) > 0 {
-				s.collectionID = s.collectionIDs[0]
-			}
-		}
-		if s.collectionLabel == nil {
-			s.collectionLabel = func(id string) string { return s.collectionNames[id] }
-		}
-		a.importer.open = true
+		a.openImportDialog()
 	}
+}
+
+func (a *App) openImportDialog() {
+	s := &a.importer
+	s.dismiss()
+	s.collectionIDs = s.collectionIDs[:0]
+	s.collectionNames = make(map[string]string)
+	for _, col := range a.Svc.Collections.List() {
+		s.collectionIDs = append(s.collectionIDs, col.ID)
+		s.collectionNames[col.ID] = col.Name
+	}
+	if _, ok := s.collectionNames[s.collectionID]; !ok {
+		s.collectionID = ""
+		s.appendToCollection = false
+		if tab := a.Active(); tab != nil {
+			s.collectionID = tab.CollectionID
+		}
+		if s.collectionID == "" && len(s.collectionIDs) > 0 {
+			s.collectionID = s.collectionIDs[0]
+		}
+	}
+	if s.collectionLabel == nil {
+		s.collectionLabel = func(id string) string { return s.collectionNames[id] }
+	}
+	s.open = true
 }
 
 func (a *App) importDialog(c ui.C) {

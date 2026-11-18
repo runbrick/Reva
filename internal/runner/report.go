@@ -1,10 +1,12 @@
 package runner
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
 	"github.com/runbrick/reva/internal/execution"
+	"github.com/runbrick/reva/internal/service"
 )
 
 // ReportVersion versions only this report DTO, independently of model schemas.
@@ -56,25 +58,42 @@ type RequestReport struct {
 // Report projects only allowlisted metadata, including when callers have
 // modified exported diagnostic fields. Unknown enum values become fixed codes.
 func (r Result) Report() Report {
-	report := Report{Version: ReportVersion, Outcome: safeOutcome(r.Outcome), DurationNS: elapsed(r.Duration), Requests: make([]RequestReport, len(r.Requests))}
-	report.Counts.Total = len(r.Requests)
-	for i, request := range r.Requests {
-		entry := request.report(i + 1)
-		report.Requests[i] = entry
-		switch entry.Outcome {
-		case Passed:
-			report.Counts.Passed++
-		case Failed:
-			report.Counts.Failed++
-		case Cancelled:
-			report.Counts.Cancelled++
-		case Skipped:
-			report.Counts.Skipped++
-		}
-		report.Assertions.Passed += entry.Assertions.Passed
-		report.Assertions.Failed += entry.Assertions.Failed
+	report := Report{Version: ReportVersion, Outcome: safeOutcome(r.Outcome), DurationNS: elapsed(r.Duration), Requests: make([]RequestReport, 0, len(r.Requests))}
+	for _, request := range r.Requests {
+		report.record(request)
 	}
 	return report
+}
+
+// RunReport uses Run's execution loop and v1 projection, discarding each raw
+// execution result before the next request. Its duration starts after snapshotting.
+func (s Snapshot) RunReport(ctx context.Context, sender service.RequestService, options Options) Report {
+	start := time.Now()
+	report := Report{Version: ReportVersion, Requests: make([]RequestReport, 0)}
+	report.Outcome = s.run(ctx, sender, options, report.record)
+	if ctx.Err() != nil {
+		report.Outcome = Cancelled
+	}
+	report.DurationNS = elapsed(time.Since(start))
+	return report
+}
+
+func (r *Report) record(request RequestResult) {
+	r.Counts.Total++
+	entry := request.report(r.Counts.Total)
+	r.Requests = append(r.Requests, entry)
+	switch entry.Outcome {
+	case Passed:
+		r.Counts.Passed++
+	case Failed:
+		r.Counts.Failed++
+	case Cancelled:
+		r.Counts.Cancelled++
+	case Skipped:
+		r.Counts.Skipped++
+	}
+	r.Assertions.Passed += entry.Assertions.Passed
+	r.Assertions.Failed += entry.Assertions.Failed
 }
 
 // MarshalJSON makes ordinary json.Marshal(Result) safe by default.

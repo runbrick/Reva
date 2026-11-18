@@ -48,7 +48,10 @@ func (a *App) settingsButton(c ui.C) {
 	if ui.Button(c, a.S.Settings.Title).Icon(icons.Settings).IconOnly().Ghost().Tooltip(a.S.Settings.Title).Clicked() {
 		a.openSettings()
 	}
-	// Keep the effect declared while navigating away from the settings page.
+	a.declareSettingsEffects(c)
+}
+
+func (a *App) declareSettingsEffects(c ui.C) {
 	state := &a.settings
 	if state.reveal != nil {
 		ui.Effect(c, state.reveal, state.dir)

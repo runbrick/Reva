@@ -35,6 +35,7 @@ type collectionsState struct {
 	activeCollection, activeRequest string
 	activeSettings                  bool
 	settings                        map[int]*collectionSettingsDraft
+	runner                          collectionRunnerState
 
 	dialogOpen bool
 	dialog     collectionDialog

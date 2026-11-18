@@ -96,6 +96,9 @@ func TestClassicWorkbenchNavigationAndResponse(t *testing.T) {
 				t.Fatal("environments were not reachable from the toolbar")
 			}
 			h.click(h.App.S.Shell.APIs)
+			if !h.shows("12345") {
+				t.Fatal("the first parameter is not visible at the minimum window size")
+			}
 			h.click(h.App.S.Request.Send)
 			h.waitFor("the response", func() bool { return h.shows("200 OK") && !h.App.Active().Sending })
 			h.click(h.App.S.Response.Raw)
@@ -133,13 +136,17 @@ func classicWorkbenchFixture(t *testing.T, lang, mode string) *harness {
 		t.Fatal(err)
 	}
 	svc.Requests.(*fake.Requests).Fn = func(context.Context, model.Request) (model.Response, error) {
-		body := []byte(`{"code":0,"message":"success","data":{"id":12345,"name":"Reva"}}`)
-		return model.Response{StatusCode: 200, Status: "200 OK", Body: body, Size: int64(len(body)), Duration: 56 * time.Millisecond}, nil
+		return classicResponseFixture(), nil
 	}
 	h := newHarness(t, svc)
 	h.App.OpenRequest(request, collection.ID)
 	settingsRepaint(t, h)
 	return h
+}
+
+func classicResponseFixture() model.Response {
+	body := []byte(`{"code":0,"message":"success","data":{"id":12345,"name":"Reva"}}`)
+	return model.Response{StatusCode: 200, Status: "200 OK", Body: body, Size: int64(len(body)), Duration: 56 * time.Millisecond}
 }
 
 func TestClassicHeadlessCapture(t *testing.T) {
@@ -152,8 +159,11 @@ func TestClassicHeadlessCapture(t *testing.T) {
 		width, height int
 	}{{"zh", "light", 1440, 900}, {"en", "dark", 960, 600}} {
 		h := classicWorkbenchFixture(t, variant.lang, variant.mode)
-		h.click(h.App.S.Request.Send)
-		h.waitFor("the response", func() bool { return h.shows("200 OK") && !h.App.Active().Sending })
+		response := classicResponseFixture()
+		h.App.Active().Response = &response
+		if err := h.D.Resize(variant.width, variant.height); err != nil {
+			t.Fatal(err)
+		}
 		page := ui.NewPage(ui.PageConfig{View: h.App.Page, Theme: &h.App.theme})
 		session, err := headless.Open(page.Config(app.Config{Width: variant.width, Height: variant.height}), nil, headless.Options{Scale: 1})
 		if err != nil {
@@ -164,5 +174,31 @@ func TestClassicHeadlessCapture(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkInterfaceStylePaint(b *testing.B) {
+	for _, mode := range []string{"light", "classic:light"} {
+		b.Run(mode, func(b *testing.B) {
+			svc := fake.New()
+			settings := svc.Settings.Get()
+			settings.Theme = mode
+			if err := svc.Settings.Save(settings); err != nil {
+				b.Fatal(err)
+			}
+			a := New(svc)
+			page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
+			driver, err := app.NewDriver(page.Config(app.Config{Width: 1440, Height: 900}), nil)
+			if err != nil {
+				b.Fatal(err)
+			}
+			b.Cleanup(driver.Close)
+			b.ReportAllocs()
+			for round := 0; b.Loop(); round++ {
+				if err := driver.Resize(1440+round%2, 900); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }

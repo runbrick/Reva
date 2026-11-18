@@ -403,7 +403,7 @@ func (a *App) Page(c ui.C) {
 					}
 				})
 				ui.Splitter(c, &a.sideSplit).Mins(220, 640).Label(a.S.Shell.SidebarLabel)
-				a.workbench(c, theme)
+				a.workbench(c)
 			}
 		})
 		if classic && !previewing {
@@ -533,7 +533,7 @@ func (a *App) statusStrip(c ui.C, fullWidth bool) {
 // workbench is the tab bar over the request editor and the response. While
 // the Environments section is selected, the env PR's editor may take the
 // whole area instead.
-func (a *App) workbench(c ui.C, theme *ui.Theme) {
+func (a *App) workbench(c ui.C) {
 	previewing := a.requestPreviewOpen()
 	if a.Section == SectionEnvironments && a.envReady() {
 		ui.Column(c).Grow(1).FillHeight().Background(a.palette.Surface).Children(func() { a.envMain(c) })

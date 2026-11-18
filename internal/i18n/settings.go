@@ -12,6 +12,8 @@ type Settings struct {
 	DataDirectory, OpenFolder, About, Close                             string
 	CheckUpdates, CheckingUpdates, UpdateAvailable, OpenRelease         string
 	UpToDate, NoRelease, UpdateFailed                                   string
+	DownloadUpdate, InstallUpdate, UpdateConfirm, RestartWarning        string
+	InstallingUpdate, InstallFailed, UpdateRestored, UpdateManualOnly   string
 	BackupSync, BackupFile, BackupDescription, Export, Restore          string
 	Sync, Server, ServerDescription, WebDAV, AutoSync                   string
 	AutoSyncDescription, SyncNow, RestoreRemote, Configure              string
@@ -40,7 +42,12 @@ var settingsZh = Settings{
 	DataDirectory: "数据目录", OpenFolder: "打开文件夹", About: "关于", Close: "关闭",
 	CheckUpdates: "检查更新", CheckingUpdates: "正在检查更新…", UpdateAvailable: "发现新版本", OpenRelease: "打开下载页",
 	UpToDate: "已是最新版本", NoRelease: "尚无已发布版本", UpdateFailed: "检查更新失败",
-	BackupSync: "备份与同步", BackupFile: "备份文件", BackupDescription: "用密码加密导出收藏夹、环境、设置和历史记录。",
+	DownloadUpdate: "下载更新", InstallUpdate: "安装并重启", UpdateConfirm: "安装 Reva 更新",
+	RestartWarning:   "下载并校验后，Reva 会关闭、安装更新并重新打开。继续前请保存未保存的修改。",
+	InstallingUpdate: "正在下载并校验更新，完成后将重启 Reva…", InstallFailed: "安装更新失败",
+	UpdateRestored:   "已重新打开更新前的版本。可重试，或从下载页手动安装。",
+	UpdateManualOnly: "当前安装没有可用的应用内更新包，请从下载页手动安装。",
+	BackupSync:       "备份与同步", BackupFile: "备份文件", BackupDescription: "用密码加密导出收藏夹、环境、设置和历史记录。",
 	Export: "导出", Restore: "恢复", Sync: "同步", Server: "服务器", ServerDescription: "将加密备份存放在远端服务器。",
 	WebDAV: "WebDAV", AutoSync: "自动同步", AutoSyncDescription: "本次会话输入密码后，自动同步本机已保存的变更。",
 	SyncNow: "立即同步", RestoreRemote: "从远端恢复", Configure: "配置服务器", Address: "服务器地址", Username: "用户名",
@@ -73,7 +80,12 @@ var settingsEn = Settings{
 	DataDirectory: "Data directory", OpenFolder: "Open folder", About: "About", Close: "Close",
 	CheckUpdates: "Check for updates", CheckingUpdates: "Checking for updates…", UpdateAvailable: "New version available", OpenRelease: "Open download page",
 	UpToDate: "You're up to date", NoRelease: "No published release yet", UpdateFailed: "Update check failed",
-	BackupSync: "Backup & sync", BackupFile: "Backup file", BackupDescription: "Export collections, environments, settings and history in an encrypted file.",
+	DownloadUpdate: "Download update", InstallUpdate: "Install and restart", UpdateConfirm: "Install Reva update",
+	RestartWarning:   "Reva will download and verify the update, then close, install it, and reopen. Save any unsaved work before continuing.",
+	InstallingUpdate: "Downloading and verifying the update. Reva will restart when ready…", InstallFailed: "Update installation failed",
+	UpdateRestored:   "Reva reopened the previous version. Try again or use the download page to install manually.",
+	UpdateManualOnly: "No in-app update is available for this installation. Use the download page to update manually.",
+	BackupSync:       "Backup & sync", BackupFile: "Backup file", BackupDescription: "Export collections, environments, settings and history in an encrypted file.",
 	Export: "Export", Restore: "Restore", Sync: "Sync", Server: "Server", ServerDescription: "Store the encrypted backup on a remote server.",
 	WebDAV: "WebDAV", AutoSync: "Automatic sync", AutoSyncDescription: "Sync saved changes automatically after entering passwords for this session.",
 	SyncNow: "Sync now", RestoreRemote: "Restore from remote", Configure: "Configure server", Address: "Server address", Username: "Username",

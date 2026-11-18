@@ -27,13 +27,28 @@ type settingsState struct {
 	dirError                   error
 	reveal                     *ui.EffectState[struct{}, string]
 	check                      func(context.Context) (update.Release, error)
-	checking                   *ui.EffectState[update.Release, string]
-	latest                     update.Release
+	checking                   *ui.EffectState[settingsUpdate, string]
+	latest                     settingsUpdate
 	checkError                 error
 	checked                    bool
+	updateConfirm              bool
+	install                    func(context.Context) error
+	installing                 *ui.EffectState[struct{}, string]
+	installError               error
+	quit                       func()
+	restartFailed              bool
 	sync                       syncState
 	guideOpen                  bool
 	guideError                 string
+}
+
+type settingsUpdate struct {
+	release update.Release
+	offer   update.Offer
+}
+
+func (a *App) ConfigureUpdates(quit func(), restartFailed bool) {
+	a.settings.quit, a.settings.restartFailed = quit, restartFailed
 }
 
 var settingsThemes = []string{"light", "dark", "system"}
@@ -69,6 +84,16 @@ func (a *App) declareSettingsEffects(c ui.C) {
 			state.latest, state.checkError, state.checked = release, err, true
 		}
 	}
+	if state.installing != nil {
+		ui.Effect(c, state.installing, state.latest.release.Version)
+		if _, err, ok := state.installing.Take(); ok {
+			state.installing, state.installError = nil, err
+		}
+	}
+	if state.restartFailed {
+		state.restartFailed = false
+		a.Toast(a.S.Settings.InstallFailed, a.S.Settings.UpdateRestored, ui.ToastError)
+	}
 	a.declareSync(c)
 }
 
@@ -78,6 +103,49 @@ func (a *App) openSettings() { a.Main = PageSettings }
 func (a *App) settingsDialog(c ui.C) {
 	a.syncDialog(c)
 	a.onboardingDialog(c)
+	a.updateDialog(c)
+}
+
+func (a *App) updateDialog(c ui.C) {
+	state, s := &a.settings, &a.S.Settings
+	busy := state.installing != nil
+	ui.ModalWith(c, &state.updateConfirm, s.UpdateConfirm, ui.ModalSpec{NoClose: busy}, func() {
+		switch {
+		case busy:
+			ui.Wrap(c, s.InstallingUpdate)
+		case state.installError != nil:
+			ui.Wrap(c, s.InstallFailed+": "+state.installError.Error()).Color(c.Theme().Danger)
+		default:
+			ui.Wrap(c, s.RestartWarning)
+		}
+	}, func() {
+		if busy {
+			return
+		}
+		if ui.Button(c, s.Cancel).Outline().Clicked() {
+			state.updateConfirm = false
+		}
+		if ui.Button(c, s.InstallUpdate).Icon(icons.Download).Clicked() {
+			c.After(func() {
+				install := state.install
+				if install == nil {
+					install = state.latest.offer.Install
+				}
+				quit := state.quit
+				state.installError = nil
+				state.installing = ui.NewEffect[struct{}, string](func(ctx context.Context) (struct{}, error) {
+					err := install(ctx)
+					if err == nil {
+						quit()
+					}
+					return struct{}{}, err
+				})
+			})
+		}
+	})
+	if busy {
+		state.updateConfirm = true
+	}
 }
 
 func (a *App) settingsPage(c ui.C) {
@@ -171,9 +239,10 @@ func (a *App) settingsPage(c ui.C) {
 								if check == nil {
 									check = func(ctx context.Context) (update.Release, error) { return update.Latest(ctx, nil, update.Feed) }
 								}
-								state.checked, state.checkError, state.latest = false, nil, update.Release{}
-								state.checking = ui.NewEffectKeyed[update.Release, string](func(ctx context.Context, _ string) (update.Release, error) {
-									return check(ctx)
+								state.checked, state.checkError, state.latest = false, nil, settingsUpdate{}
+								state.checking = ui.NewEffect[settingsUpdate, string](func(ctx context.Context) (settingsUpdate, error) {
+									release, err := check(ctx)
+									return settingsUpdate{release: release, offer: release.Offer()}, err
 								})
 							})
 						}
@@ -186,17 +255,24 @@ func (a *App) settingsPage(c ui.C) {
 							ui.Text(c, s.NoRelease).Muted()
 						case state.checkError != nil:
 							ui.Wrap(c, s.UpdateFailed+": "+state.checkError.Error()).FillWidth().Color(theme.Danger)
-						case update.Newer(settingsVersion, state.latest.Version):
+						case update.Newer(settingsVersion, state.latest.release.Version):
+							canInstall := state.quit != nil && (state.latest.offer.Available() || state.install != nil)
 							ui.Row(c).FillWidth().Items(ui.Center).Gap(Space2).Children(func() {
-								ui.Text(c, s.UpdateAvailable+" v"+state.latest.Version).Color(theme.Success)
+								ui.Text(c, s.UpdateAvailable+" v"+state.latest.release.Version).Color(theme.Success).Grow(1)
+								if canInstall && ui.Button(c, s.DownloadUpdate).Icon(icons.Download).Clicked() {
+									state.updateConfirm, state.installError = true, nil
+								}
 								if ui.Button(c, s.OpenRelease).Icon(icons.ExternalLink).Outline().Clicked() {
 									c.After(func() {
-										if err := app.OpenURL(state.latest.URL); err != nil {
+										if err := app.OpenURL(state.latest.release.URL); err != nil {
 											a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
 										}
 									})
 								}
 							})
+							if !canInstall {
+								ui.Wrap(c, s.UpdateManualOnly).FillWidth().Muted()
+							}
 						default:
 							ui.Text(c, s.UpToDate).Muted()
 						}

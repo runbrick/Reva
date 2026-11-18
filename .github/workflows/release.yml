@@ -20,8 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: windows-latest, platform: windows-amd64 }
-          - { os: macos-15, platform: darwin-amd64 }
+          - { os: windows-latest, platform: windows-amd64, arch: amd64 }
+          - { os: macos-15, platform: darwin-amd64, arch: amd64 }
+          - { os: macos-15, platform: darwin-arm64, arch: arm64 }
     steps:
       - name: Preserve LF line endings
         shell: pwsh
@@ -59,7 +60,9 @@ jobs:
         run: ./scripts/build.ps1 -Arch amd64
       - name: Package macOS
         if: runner.os == 'macOS'
-        run: sh ./scripts/build.sh amd64
+        env:
+          RELEASE_ARCH: ${{ matrix.arch }}
+        run: sh ./scripts/build.sh "$RELEASE_ARCH"
       - uses: actions/upload-artifact@v4
         with:
           name: reva-${{ matrix.platform }}
@@ -78,18 +81,24 @@ jobs:
           pattern: reva-*
           path: release
           merge-multiple: true
-      - name: Verify both packages and generate checksums
+      - name: Verify release packages and generate checksums
         shell: bash
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version="${RELEASE_TAG#v}"
-          mapfile -t zip < <(find release -maxdepth 1 -name "reva-${version}-windows-amd64.zip" -type f)
-          mapfile -t installer < <(find release -maxdepth 1 -name "reva-${version}-windows-amd64-setup.exe" -type f)
-          mapfile -t dmg < <(find release -maxdepth 1 -name "reva-${version}-darwin-amd64.dmg" -type f)
-          test "${#zip[@]}" -eq 1 && test "${#installer[@]}" -eq 1 && test "${#dmg[@]}" -eq 1
-          (cd release && sha256sum "${installer[0]##*/}" "${zip[0]##*/}" "${dmg[0]##*/}" > SHA256SUMS)
+          cd release
+          packages=(
+            "reva-${version}-windows-amd64-setup.exe"
+            "reva-${version}-windows-amd64.zip"
+            "reva-${version}-darwin-amd64.dmg"
+            "reva-${version}-darwin-amd64.zip"
+            "reva-${version}-darwin-arm64.dmg"
+            "reva-${version}-darwin-arm64.zip"
+          )
+          for package in "${packages[@]}"; do test -s "$package"; done
+          sha256sum "${packages[@]}" > SHA256SUMS
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}

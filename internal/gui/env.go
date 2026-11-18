@@ -41,11 +41,9 @@ func (a *App) Vars() []model.KV {
 // VarsFor uses the passed tab's collection, including when another tab is active.
 // Pre-request script variables are appended by prepareSend at send start.
 func (a *App) VarsFor(t *Tab) []model.KV {
-	var out []model.KV
-	if col, ok := a.Svc.Collections.Get(t.CollectionID); ok {
-		out = append(out, col.Variables...)
-	}
-	if env, ok := a.Svc.Environments.Get(a.Svc.Settings.Get().ActiveEnvID); ok {
+	col, _ := a.Svc.Collections.Get(t.CollectionID)
+	out := slices.Clone(col.Variables)
+	if env, ok := a.activeEnvironment(col); ok {
 		for _, kv := range env.Variables {
 			if !kv.Disabled {
 				out = append(out, kv)
@@ -53,6 +51,49 @@ func (a *App) VarsFor(t *Tab) []model.KV {
 		}
 	}
 	return out
+}
+
+func (a *App) environmentCollection() model.Collection {
+	if a.Main == PageWorkbench && a.Section != SectionEnvironments {
+		col, _ := a.Svc.Collections.Get(a.Active().CollectionID)
+		return col
+	}
+	return model.Collection{}
+}
+
+func (a *App) environmentFor(col model.Collection, id string) (model.Environment, bool) {
+	if !col.EnvironmentScope.Shows(id) {
+		return model.Environment{}, false
+	}
+	if env, ok := col.EnvironmentScope.FindLocal(id); ok {
+		return env, true
+	}
+	return a.Svc.Environments.Get(id)
+}
+
+func (a *App) activeEnvironment(col model.Collection) (model.Environment, bool) {
+	if col.EnvironmentScope != nil {
+		return a.environmentFor(col, col.EnvironmentScope.ActiveID)
+	}
+	return a.environmentFor(col, a.Svc.Settings.Get().ActiveEnvID)
+}
+
+func (a *App) availableEnvironments(col model.Collection) []model.Environment {
+	envs := a.Svc.Environments.List()
+	if scope := col.EnvironmentScope; scope != nil {
+		envs = slices.DeleteFunc(slices.Clone(envs), func(env model.Environment) bool {
+			_, local := scope.FindLocal(env.ID)
+			return local
+		})
+		envs = append(envs, scope.Local...)
+	}
+	return envs
+}
+
+func (a *App) visibleEnvironments(col model.Collection) []model.Environment {
+	return slices.DeleteFunc(a.availableEnvironments(col), func(env model.Environment) bool {
+		return !col.EnvironmentScope.Shows(env.ID)
+	})
 }
 
 // UnresolvedVars lists distinct missing names in URL then enabled-header order.
@@ -93,13 +134,15 @@ func (a *App) UnresolvedVars() []string {
 // envSelector is a compact titlebar menu with an action after the choices.
 func (a *App) envSelector(c ui.C) {
 	s, theme := &a.env, c.Theme()
-	s.activeID = a.Svc.Settings.Get().ActiveEnvID
+	col := a.environmentCollection()
+	active, hasActive := a.activeEnvironment(col)
+	s.activeID = active.ID
 	previewing := a.requestPreviewOpen()
 	name := a.S.Env.NoEnvironment
-	if env, ok := a.Svc.Environments.Get(s.activeID); ok {
-		name = env.Name
+	if hasActive {
+		name = active.Name
 		if previewing {
-			name = a.requestPreviewEnvironmentName(env)
+			name = a.requestPreviewEnvironmentName(active)
 		}
 	}
 	trigger := ui.ButtonBase(c, a.S.Env.Title).Height(Space4 * 2).MaxWidth(Space6 * 10).
@@ -115,18 +158,21 @@ func (a *App) envSelector(c ui.C) {
 	}
 	ui.Menu(c, trigger, &s.picker, func(menu *ui.MenuItems) {
 		if menu.Item(a.S.Env.NoEnvironment).Chosen(s.activeID == "").Clicked() {
-			c.After(func() { a.setActiveEnvironment("") })
+			c.After(func() { a.selectEnvironment(col.ID, "") })
 		}
-		for _, env := range a.Svc.Environments.List() {
+		for _, env := range a.visibleEnvironments(col) {
 			name := env.Name
 			if previewing {
 				name = a.requestPreviewEnvironmentName(env)
 			}
 			if menu.Item(name).Chosen(env.ID == s.activeID).Clicked() {
-				c.After(func() { a.setActiveEnvironment(env.ID) })
+				c.After(func() { a.selectEnvironment(col.ID, env.ID) })
 			}
 		}
 		menu.Separator()
+		if col.ID != "" && menu.Item(a.S.Collections.Environments).Icon(icons.Settings).Clicked() {
+			c.After(func() { a.openCollectionSettings(collectionNode{collectionID: col.ID}, collectionSettingsEnvironments) })
+		}
 		if menu.Item(a.S.Env.Manage).Icon(icons.Globe).Clicked() {
 			c.After(a.openEnvironments)
 		}
@@ -143,6 +189,30 @@ func (a *App) envSelector(c ui.C) {
 }
 
 func (a *App) setActiveEnvironment(id string) {
+	a.selectEnvironment(a.environmentCollection().ID, id)
+}
+
+func (a *App) selectEnvironment(collectionID, id string) {
+	if collectionID != "" {
+		col, ok := a.Svc.Collections.Get(collectionID)
+		if !ok {
+			return
+		}
+		if id != "" {
+			if _, ok := a.environmentFor(col, id); !ok {
+				return
+			}
+		}
+		col.EnvironmentScope = col.EnvironmentScope.Clone()
+		if col.EnvironmentScope == nil {
+			col.EnvironmentScope = &model.CollectionEnvironmentScope{}
+		}
+		col.EnvironmentScope.ActiveID = id
+		if err := a.Svc.Collections.Save(col); err != nil {
+			a.Toast(a.S.Env.Error, "", ui.ToastError)
+		}
+		return
+	}
 	settings := a.Svc.Settings.Get()
 	settings.ActiveEnvID = id
 	if err := a.Svc.Settings.Save(settings); err != nil {
@@ -273,7 +343,7 @@ func (a *App) envSidebar(c ui.C) {
 func (a *App) envActions(c ui.C, menu *ui.MenuItems, d *envDraft) {
 	s := &a.env
 	if menu.Item(a.S.Env.SetActive).Icon(icons.Check).Disabled(a.Svc.Settings.Get().ActiveEnvID == d.id).Clicked() {
-		c.After(func() { a.setActiveEnvironment(d.id) })
+		c.After(func() { a.selectEnvironment("", d.id) })
 	}
 	menu.Separator()
 	if menu.Item(a.S.Env.Rename).Clicked() {

@@ -158,6 +158,7 @@ func validateID(id string) error {
 func cloneCollection(col model.Collection) model.Collection {
 	col.Items = cloneItems(col.Items)
 	col.Variables = slices.Clone(col.Variables)
+	col.EnvironmentScope = col.EnvironmentScope.Clone()
 	return col
 }
 

@@ -110,7 +110,7 @@ func (s *Collections) Get(id string) (model.Collection, bool) {
 }
 
 func (s *Collections) Create(name string) (model.Collection, error) {
-	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: name}
+	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: name, EnvironmentScope: &model.CollectionEnvironmentScope{}}
 	s.Cols = append(s.Cols, col)
 	return col, nil
 }
@@ -197,6 +197,9 @@ func (s *Collections) DeleteItem(colID, itemID string) error {
 
 func (s *Collections) Import(col model.Collection) (model.Collection, error) {
 	col.ID, col.Version = storage.NewID(), model.SchemaVersion
+	if col.EnvironmentScope == nil {
+		col.EnvironmentScope = &model.CollectionEnvironmentScope{}
+	}
 	s.Cols = append(s.Cols, col)
 	return col, nil
 }

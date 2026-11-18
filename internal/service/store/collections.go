@@ -37,7 +37,7 @@ func (c collectionService) Get(id string) (model.Collection, bool) {
 }
 
 func (c collectionService) Create(name string) (model.Collection, error) {
-	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: name, Items: []model.Item{}}
+	col := model.Collection{Version: model.SchemaVersion, ID: storage.NewID(), Name: name, Items: []model.Item{}, EnvironmentScope: &model.CollectionEnvironmentScope{}}
 	return col, c.Save(col)
 }
 
@@ -65,6 +65,15 @@ func validateCollection(col model.Collection) error {
 	}
 	if err := validateName(col.Name); err != nil {
 		return err
+	}
+	if scope := col.EnvironmentScope; scope != nil {
+		seen := make(map[string]bool, len(scope.Local))
+		for _, env := range scope.Local {
+			if seen[env.ID] || env.Version != model.SchemaVersion || validateID(env.ID) != nil || validateName(env.Name) != nil {
+				return errors.New("invalid collection environment")
+			}
+			seen[env.ID] = true
+		}
 	}
 	var validateItems func([]model.Item) error
 	validateItems = func(items []model.Item) error {
@@ -192,6 +201,9 @@ func (c collectionService) Import(col model.Collection) (model.Collection, error
 	defer c.s.mu.Unlock()
 	col = cloneCollection(col)
 	col.ID, col.Version = storage.NewID(), model.SchemaVersion
+	if col.EnvironmentScope == nil {
+		col.EnvironmentScope = &model.CollectionEnvironmentScope{}
+	}
 	var reID func([]model.Item)
 	reID = func(items []model.Item) {
 		for i := range items {

@@ -311,7 +311,7 @@ func (a *App) indexSearch() {
 		seen[entry.Request.URL] = true
 		add(searchResult{kind: searchHistory, name: requestName(entry.Request), detail: entry.Request.URL, request: entry.Request})
 	}
-	for _, env := range a.Svc.Environments.List() {
+	for _, env := range a.visibleEnvironments(a.environmentCollection()) {
 		add(searchResult{kind: searchEnvironment, name: env.Name, environmentID: env.ID})
 	}
 	commands := [...]string{text.NewRequest, text.NewCollection, text.Import, text.Settings, text.ToggleTheme, text.SwitchLanguage}
@@ -367,9 +367,7 @@ func (a *App) runSearch(r searchResult) {
 			}
 		}
 	case searchEnvironment:
-		settings := a.Svc.Settings.Get()
-		settings.ActiveEnvID = r.environmentID
-		a.saveSearchSettings(settings)
+		a.setActiveEnvironment(r.environmentID)
 	case searchCommand:
 		switch r.action {
 		case searchNewRequest:

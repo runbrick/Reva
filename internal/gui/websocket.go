@@ -243,7 +243,7 @@ func (a *App) declareWebSockets(c ui.C) {
 }
 
 func (a *App) websocketConnect(t *Tab, s *websocketTab) {
-	r := vars.Apply(t.Request, a.Vars())
+	r := vars.Apply(t.Request, a.VarsFor(t))
 	headers := make(http.Header)
 	for _, row := range r.Headers {
 		if !row.Disabled && strings.TrimSpace(row.Key) != "" {

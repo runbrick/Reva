@@ -276,6 +276,7 @@ func TestAuthPassedTabVariablesScriptPrecedenceAndCopyNoMutation(t *testing.T) {
 	settings := h.Svc.Settings.Get()
 	settings.ActiveEnvID = env.ID
 	authMust(t, h.Svc.Settings.Save(settings))
+	col.EnvironmentScope = &model.CollectionEnvironmentScope{ActiveID: env.ID}
 	tab.Request.PreScript = `pm.variables.set("shared", "script-token"); pm.request.headers.upsert({key:"X-Script",value:"yes"});`
 	other, err := h.Svc.Collections.Create("Other active collection")
 	authMust(t, err)
@@ -305,8 +306,7 @@ func TestAuthPassedTabVariablesScriptPrecedenceAndCopyNoMutation(t *testing.T) {
 		t.Fatalf("passed-tab/script precedence: %#v", got)
 	}
 	// Without an environment override, the passed collection supplies the token.
-	settings.ActiveEnvID = ""
-	authMust(t, h.Svc.Settings.Save(settings))
+	h.App.selectEnvironment(col.ID, "")
 	command, err = h.App.requestCURLFor(tab)
 	if err != nil || !strings.Contains(command, "Bearer collection-token") {
 		t.Fatalf("passed-tab collection scope lost: %s %v", command, err)

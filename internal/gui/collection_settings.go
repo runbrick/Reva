@@ -16,6 +16,7 @@ const (
 	collectionSettingsGeneral collectionSettingsSection = iota
 	collectionSettingsAuthentication
 	collectionSettingsVariables
+	collectionSettingsEnvironments
 )
 
 // Each open target owns an independent draft. The baseline contains only fields
@@ -25,6 +26,7 @@ type collectionSettingsDraft struct {
 	name, savedName           string
 	auth, savedAuth           model.Auth
 	variables, savedVariables []model.KV
+	environments              collectionEnvironmentDraft
 	editor                    authEditorState
 	table                     kvTableState
 	missing, saveFailed       bool
@@ -77,6 +79,7 @@ func (a *App) reloadCollectionSettings(t *Tab) {
 	}
 	d.savedName, d.savedAuth = d.name, d.auth
 	d.savedVariables = slices.Clone(d.variables)
+	d.environments = newCollectionEnvironmentDraft(col.EnvironmentScope)
 	d.editor, d.table = authEditorState{}, kvTableState{}
 	d.saveFailed, t.Dirty = false, false
 }
@@ -86,14 +89,15 @@ func (a *App) syncCollectionSettingsDirty(t *Tab) {
 		return
 	}
 	d := a.collections.settings[t.ID]
-	t.Dirty = d.name != d.savedName || d.auth != d.savedAuth || !slices.Equal(d.variables, d.savedVariables)
+	t.Dirty = d.name != d.savedName || d.auth != d.savedAuth || !slices.Equal(d.variables, d.savedVariables) ||
+		(t.TargetID == "" && d.environments.dirty())
 }
 
 func (a *App) saveCollectionSettings(t *Tab) {
 	d := a.collections.settings[t.ID]
 	col, item, ok := a.collectionSettingsTarget(t)
 	d.missing = !ok
-	if !ok || strings.TrimSpace(d.name) == "" {
+	if !ok || !d.valid(t.TargetID == "") {
 		return
 	}
 	a.syncCollectionSettingsDirty(t)
@@ -109,6 +113,9 @@ func (a *App) saveCollectionSettings(t *Tab) {
 		}
 		if !slices.Equal(d.variables, d.savedVariables) {
 			col.Variables = slices.Clone(d.variables)
+		}
+		if d.environments.dirty() {
+			col = a.applyCollectionEnvironmentDraft(col, &d.environments)
 		}
 	} else {
 		col.Items = cloneCollectionItems(col.Items)
@@ -127,6 +134,10 @@ func (a *App) saveCollectionSettings(t *Tab) {
 	a.reloadCollectionSettings(t)
 	a.refreshCollections()
 	a.Toast(a.S.Collections.SettingsSaved, "", ui.ToastSuccess)
+}
+
+func (d *collectionSettingsDraft) valid(collection bool) bool {
+	return strings.TrimSpace(d.name) != "" && (!collection || d.environments.valid())
 }
 
 func (a *App) collectionSettingsName(t *Tab) string {
@@ -156,6 +167,8 @@ func (a *App) collectionSettingsSectionLabel(section collectionSettingsSection) 
 		return a.S.Collections.Authentication
 	case collectionSettingsVariables:
 		return a.S.Collections.Variables
+	case collectionSettingsEnvironments:
+		return a.S.Collections.Environments
 	default:
 		return a.S.Collections.General
 	}
@@ -182,7 +195,7 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 			if ui.Button(c, labels.DiscardReload).Small().Ghost().Tooltip(labels.DiscardHelp).Shrink(0).Disabled(d.missing).Clicked() {
 				c.After(func() { a.reloadCollectionSettings(t) })
 			}
-			if ui.Button(c, labels.Save).Small().Icon(icons.Save).Shrink(0).Disabled(d.missing || !t.Dirty || strings.TrimSpace(d.name) == "").Clicked() {
+			if ui.Button(c, labels.Save).Small().Icon(icons.Save).Shrink(0).Disabled(d.missing || !t.Dirty || !d.valid(t.TargetID == "")).Clicked() {
 				c.After(func() { a.saveCollectionSettings(t) })
 			}
 		})
@@ -194,7 +207,7 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 		}
 		sections := []collectionSettingsSection{collectionSettingsGeneral}
 		if t.TargetID == "" {
-			sections = append(sections, collectionSettingsVariables)
+			sections = append(sections, collectionSettingsVariables, collectionSettingsEnvironments)
 		}
 		sections = append(sections, collectionSettingsAuthentication)
 		ui.Row(c).FillWidth().Gap(Space2).FocusGroup(ui.FocusHorizontal).Children(func() {
@@ -231,6 +244,10 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 				case collectionSettingsVariables:
 					if t.TargetID == "" {
 						a.kvTable(c, &d.table, &d.variables)
+					}
+				case collectionSettingsEnvironments:
+					if t.TargetID == "" && !d.missing {
+						a.collectionEnvironments(c, &d.environments)
 					}
 				}
 			})

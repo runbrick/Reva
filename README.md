@@ -28,6 +28,22 @@ not move existing user data. Backups now use `.revabak` and the
 `reva-backup-v1` envelope; backups from earlier builds must be re-exported from
 their local data with this build.
 
+## Collection environments
+
+Open **Collection settings > Collection environments** to choose which
+environments appear in that collection's picker and runner. Create shared
+environments on the main **Environments** page and reuse them in any collection.
+Collection-only environments are edited in collection settings and included in
+native collection exports, including their variable values. Shared environments
+are referenced by ID; their values are not included in collection exports.
+
+Each collection remembers its own selection in the top bar, including **No
+environment**. Saving a list that hides the active environment clears that
+selection. Requests outside a collection keep a separate shared selection.
+Existing collections keep their previous global selection until their list or
+active environment is first changed. New collections start with no active
+environment and show all shared environments until the list is customized.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:
@@ -47,10 +63,11 @@ without reading data or selecting a language from saved settings.
 native stored IDs, not display names or input file paths. `--data-dir` overrides
 `REVA_HOME`, then the normal user config directory/Reva location. The directory
 must already exist. Only `settings.json`, the selected collection, and an
-explicitly selected `environments/<ID>.json` are read. **No environment is used
-by default**, even when GUI settings have an active environment. Explicit
-environment rows override collection variables; disabled rows fall back to
-enabled collection values.
+explicitly selected shared `environments/<ID>.json` are read. `--environment`
+looks first for that ID in the collection's own environments, then in the shared
+directory. **No environment is used by default**, regardless of the GUI's
+picker settings. Explicit environment rows override collection variables;
+disabled rows fall back to enabled collection values.
 
 The CLI creates no data directories and saves no settings, collection,
 environment, or history files, on success, error, or cancellation. An absent
@@ -247,7 +264,8 @@ stays offline. Native scripts may execute later through the normal explicit send
 Choose **Existing collection** to append imported requests in a separate folder,
 preserving existing items and the imported auth scope. Imported variables are
 shared with the destination; conflicting variable values block append and can
-instead be imported as a new project.
+instead be imported as a new project. Import native collections that contain
+collection-only environments as a new project to preserve those environments.
 
 ## Checks
 

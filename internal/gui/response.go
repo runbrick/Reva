@@ -31,6 +31,7 @@ const (
 	responseCookies
 	responseTimeline
 	responseTests
+	responseEvents
 )
 
 type responseMode int
@@ -176,11 +177,7 @@ func responseDisplayText(value string) (string, bool) {
 	return strings.Clone(value[:end]), true
 }
 
-// responsePane declares the response of t: status, duration, size, headers
-// and body (pretty / raw).
-func (a *App) responsePane(c ui.C, t *Tab) {
-	// Also prune while the active tab has no response (for example, after
-	// closing a large response and returning to a new request).
+func (a *App) pruneResponseViews() {
 	for id := range a.response.views {
 		open := false
 		for _, tab := range a.tabs {
@@ -193,8 +190,19 @@ func (a *App) responsePane(c ui.C, t *Tab) {
 			delete(a.response.views, id)
 		}
 	}
+}
+
+// responsePane declares the response of t: status, duration, size, headers
+// and body (pretty / raw).
+func (a *App) responsePane(c ui.C, t *Tab) {
 	ui.Column(c).Fill().Pad(Space4).Gap(Space2).Background(a.palette.Surface).Children(func() {
 		switch {
+		case t.sse != nil && t.sse.status != 0:
+			if t.Response != nil {
+				a.responseResult(c, t)
+			} else {
+				a.responseSSE(c, t)
+			}
 		case t.Sending:
 			ui.Row(c).Gap(Space2).Items(ui.Center).Children(func() {
 				ui.Spinner(c)
@@ -228,6 +236,15 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 		v = &responseView{}
 		a.response.views[t.ID] = v
 	}
+	sections := []responseSection{responseBody, responseHeaders, responseCookies, responseTimeline, responseTests}
+	if t.sse != nil && t.sse.status != 0 {
+		sections = append([]responseSection{responseEvents}, sections...)
+		if v.source != t.Response {
+			v.section = responseEvents
+		}
+	} else if v.section == responseEvents {
+		v.section = responseBody
+	}
 	v.prepare(t.Response)
 	if v.phaseTimePattern != a.S.Response.PhaseDuration {
 		v.phaseTimePattern = a.S.Response.PhaseDuration
@@ -242,8 +259,10 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 	theme := c.Theme()
 	statusColor := a.palette.StatusColor(theme, t.Response.StatusCode)
 	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
-		ui.Tabs(c, &v.section, []responseSection{responseBody, responseHeaders, responseCookies, responseTimeline, responseTests}, func(section responseSection) string {
+		ui.Tabs(c, &v.section, sections, func(section responseSection) string {
 			switch section {
+			case responseEvents:
+				return a.S.Response.SSEEvents
 			case responseHeaders:
 				return a.S.Response.Headers
 			case responseCookies:
@@ -271,6 +290,8 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 		ui.Paragraph(c, a.S.Response.Truncated, 0).Color(a.palette.Warning)
 	}
 	switch v.section {
+	case responseEvents:
+		a.responseSSE(c, t)
 	case responseHeaders:
 		a.responseHeaderTable(c, t.Response)
 	case responseCookies:

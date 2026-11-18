@@ -54,9 +54,25 @@ type Response struct {
 	PhaseDuration      string
 	PreviewUnavailable string
 	EmptyPreview       string
+	SSEEvents          string
+	SSEConnected       string
+	SSEDisconnect      string
+	SSEDisconnected    string
+	SSEEnded           string
+	SSETimedOut        string
+	SSEFailed          string
+	SSEOverflow        string
+	SSEEmpty           string
+	SSEEventNumber     string
+	SSEEventType       string
+	SSEEventID         string
 }
 
 var responseZh = Response{
+	SSEEvents: "SSE 事件", SSEConnected: "流已连接", SSEDisconnect: "断开连接", SSEDisconnected: "已断开连接",
+	SSEEnded: "流已结束", SSETimedOut: "流已超时", SSEFailed: "读取事件流失败",
+	SSEOverflow: "部分事件超出查看上限，无法显示。", SSEEmpty: "暂无完整事件。",
+	SSEEventNumber: "事件 %d", SSEEventType: "类型：%s", SSEEventID: "ID：%s",
 	Title: "响应", EmptyHint: "点击发送或按 Ctrl+Enter 查看响应。",
 	Sending: "正在发送请求…", ErrorTitle: "请求失败",
 	Duration: "耗时", Size: "大小", Truncated: "响应内容已被截断。",
@@ -74,6 +90,10 @@ var responseZh = Response{
 }
 
 var responseEn = Response{
+	SSEEvents: "SSE events", SSEConnected: "Stream connected", SSEDisconnect: "Disconnect", SSEDisconnected: "Disconnected",
+	SSEEnded: "Stream ended", SSETimedOut: "Stream timed out", SSEFailed: "Could not read the event stream",
+	SSEOverflow: "Some events exceeded the inspection limits and could not be shown.", SSEEmpty: "No complete events yet.",
+	SSEEventNumber: "Event %d", SSEEventType: "Type: %s", SSEEventID: "ID: %s",
 	Title: "Response", EmptyHint: "Press Send or Ctrl+Enter to view a response.",
 	Sending: "Sending request…", ErrorTitle: "Request failed",
 	Duration: "Time", Size: "Size", Truncated: "The response body was truncated.",

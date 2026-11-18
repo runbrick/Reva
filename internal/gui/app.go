@@ -359,6 +359,11 @@ func (a *App) Page(c ui.C) {
 	}
 	a.declareSends(c)
 	a.declareWebSockets(c)
+	a.declareCollectionRunner(c)
+	if a.collections.runner.open {
+		a.collectionRunnerPage(c)
+		return
+	}
 	// Preview hides raw background data without moving asynchronous work
 	// into a different declaration scope or changing independent UI state.
 	previewing := a.requestPreviewOpen()

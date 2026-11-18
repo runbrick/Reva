@@ -293,6 +293,9 @@ func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, it
 	ui.Column(c).FillWidth().Gap(Space2).PadBottom(Space4).Children(func() {
 		ui.Text(c, s.APISection).Muted().FontSize(theme.Metrics.FontSizeS)
 		ui.Divider(c)
+		if t.TargetID == "" && ui.Button(c, s.RunCollection).Small().Outline().Icon(icons.Play).Self(ui.Start).Disabled(!exists).Clicked() {
+			c.After(func() { a.openCollectionRunner(t.CollectionID) })
+		}
 		for i, count := range []int{http, ws} {
 			ui.Row(c.KeyInt(i)).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
 				icon, protocol, action := icons.Send, "HTTP", s.NewRequest

@@ -14,10 +14,7 @@ func (a *App) onboardingEntry(c ui.C) {
 	}
 	ui.Text(c, s.GettingStarted).Muted().FontSize(c.Theme().Metrics.FontSizeS)
 	if ui.Button(c, label).XSmall().Outline().Tooltip(s.GettingStartedDescription).Clicked() {
-		c.After(func() {
-			a.settings.guideOpen = true
-			a.settings.guideError = ""
-		})
+		c.After(a.openOnboardingGuide)
 	}
 }
 

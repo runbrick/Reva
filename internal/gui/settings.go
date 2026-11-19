@@ -41,6 +41,7 @@ type settingsState struct {
 	restartFailed              bool
 	sync                       syncState
 	guideOpen                  bool
+	guideOpenedThisSession     bool
 	guideError                 string
 }
 

@@ -228,6 +228,9 @@ func (a *App) responsePane(c ui.C, t *Tab) {
 				ui.Row(c).Size(Space6*2, Space6*2).Radius(theme.Metrics.RadiusSurface).Background(theme.Muted).
 					Center().Children(func() { ui.Icon(c, icons.Send).Size(Space6, Space6).Color(theme.MutedForeground) })
 				ui.Paragraph(c, a.S.Response.EmptyHint, 0).Muted()
+				if a.showOnboardingEntry(t) && ui.Button(c, a.S.Settings.GuideWorkbenchOpen).Small().Outline().Clicked() {
+					c.After(a.openOnboardingGuide)
+				}
 			})
 		}
 	})

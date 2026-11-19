@@ -16,6 +16,7 @@ func (a *App) studioRail(c ui.C) {
 		a.studioRailButton(c.Key("requests"), a.S.Shell.APIs, icons.Send, a.Main == PageWorkbench && a.Section == SectionAPIs, func() { a.SelectSection(SectionAPIs) })
 		a.studioRailButton(c.Key("environments"), a.S.Shell.Environments, icons.Layers, a.Main == PageWorkbench && a.Section == SectionEnvironments, a.openEnvironments)
 		a.studioRailButton(c.Key("history"), a.S.Shell.History, icons.History, a.Main == PageHistory, func() { a.Main = PageHistory })
+		a.studioRailButton(c.Key("toolbox"), a.S.Toolbox.Title, icons.Package, a.Main == PageToolbox, func() { a.Main = PageToolbox })
 		a.studioRailButton(c.Key("settings"), a.S.Settings.Title, icons.Settings, a.Main == PageSettings, a.openSettings)
 		if ui.Shortcut(c, ui.Primary, ",") {
 			c.After(a.openSettings)

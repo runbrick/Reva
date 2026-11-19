@@ -157,6 +157,21 @@ details on wider windows. The theme applies immediately and is saved without
 closing open tabs. Settings saved with an older layout use the current workbench
 and keep their light, dark, or system preference.
 
+## Toolbox
+
+Open **Toolbox** from the left rail. The collapsible groups contain Base64,
+URL, JWT, JSON string escaping, Unicode escapes, hashes, HMAC, AES-GCM, JSON,
+XML, Hex, image preview, colors, timestamps, UUIDs, and regular expressions.
+Each tool retains its own draft while Reva is open. Input, keys, and results
+are processed locally and are not saved. Click **Copy result** to put text on
+the clipboard, or **Clear** to remove the current draft and result.
+
+JWT inspection does not verify signatures. AES-GCM uses a hex key and emits
+Base64 containing the random nonce, ciphertext, and authentication tag. Regex
+uses Go's RE2 syntax and reports UTF-8 byte offsets. XML validates and displays
+the original text without loading external resources. Image preview accepts
+local PNG, JPEG and GIF files, Base64, and image data URLs; it never fetches URLs.
+
 ## HTTP authentication
 
 Collections and folders can store shared Bearer, Basic, or API-key credentials.

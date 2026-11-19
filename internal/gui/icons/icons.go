@@ -41,6 +41,44 @@ var Activity = gfx.Icon{
 	},
 }
 
+// binary is a compiled vector icon.
+var Binary = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(16.0, 14.0),
+		gfx.CubicTo(17.1046, 14.0, 18.0, 14.8954, 18.0, 16.0),
+		gfx.LineTo(18.0, 18.0),
+		gfx.CubicTo(18.0, 19.1046, 17.1046, 20.0, 16.0, 20.0),
+		gfx.LineTo(16.0, 20.0),
+		gfx.CubicTo(14.8954, 20.0, 14.0, 19.1046, 14.0, 18.0),
+		gfx.LineTo(14.0, 16.0),
+		gfx.CubicTo(14.0, 14.8954, 14.8954, 14.0, 16.0, 14.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(8.0, 4.0),
+		gfx.CubicTo(9.10457, 4.0, 10.0, 4.89543, 10.0, 6.0),
+		gfx.LineTo(10.0, 8.0),
+		gfx.CubicTo(10.0, 9.10457, 9.10457, 10.0, 8.0, 10.0),
+		gfx.LineTo(8.0, 10.0),
+		gfx.CubicTo(6.89543, 10.0, 6.0, 9.10457, 6.0, 8.0),
+		gfx.LineTo(6.0, 6.0),
+		gfx.CubicTo(6.0, 4.89543, 6.89543, 4.0, 8.0, 4.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(6.0, 20.0),
+		gfx.LineTo(10.0, 20.0),
+		gfx.MoveTo(14.0, 10.0),
+		gfx.LineTo(18.0, 10.0),
+		gfx.MoveTo(6.0, 14.0),
+		gfx.LineTo(8.0, 14.0),
+		gfx.LineTo(8.0, 20.0),
+		gfx.MoveTo(14.0, 4.0),
+		gfx.LineTo(16.0, 4.0),
+		gfx.LineTo(16.0, 10.0),
+	},
+}
+
 // book-open is a compiled vector icon.
 var BookOpen = gfx.Icon{
 	ViewBox: 24.0,
@@ -397,6 +435,39 @@ var FilePlus = gfx.Icon{
 	},
 }
 
+// fingerprint is a compiled vector icon.
+var Fingerprint = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(12.0, 10.0),
+		gfx.CubicTo(10.8954, 10.0, 10.0, 10.8954, 10.0, 12.0),
+		gfx.CubicTo(10.0, 13.02, 9.9, 14.51, 9.74, 16.0),
+		gfx.MoveTo(14.0, 13.12),
+		gfx.CubicTo(14.0, 15.5, 14.0, 19.5, 13.0, 22.0),
+		gfx.MoveTo(17.29, 21.02),
+		gfx.CubicTo(17.41, 20.42, 17.72, 18.72, 17.79, 18.0),
+		gfx.MoveTo(2.0, 12.0),
+		gfx.CubicTo(2.0, 7.6957, 4.7543, 3.87431, 8.83772, 2.51317),
+		gfx.CubicTo(12.9211, 1.15203, 17.4174, 2.55656, 20.0, 6.0),
+		gfx.MoveTo(2.0, 16.0),
+		gfx.LineTo(2.01, 16.0),
+		gfx.MoveTo(21.8, 16.0),
+		gfx.CubicTo(22.0, 14.0, 21.931, 10.646, 21.8, 10.0),
+		gfx.MoveTo(5.0, 19.5),
+		gfx.CubicTo(5.5, 18.0, 6.0, 15.0, 6.0, 12.0),
+		gfx.CubicTo(5.99899, 11.3189, 6.11397, 10.6425, 6.34, 10.0),
+		gfx.MoveTo(8.65, 22.0),
+		gfx.CubicTo(8.86, 21.34, 9.1, 20.68, 9.22, 20.0),
+		gfx.MoveTo(9.0, 6.8),
+		gfx.CubicTo(10.857, 5.72786, 13.145, 5.72823, 15.0017, 6.80096),
+		gfx.CubicTo(16.8583, 7.8737, 18.0014, 9.85572, 18.0, 12.0),
+		gfx.LineTo(18.0, 14.0),
+	},
+}
+
 // folder is a compiled vector icon.
 var Folder = gfx.Icon{
 	ViewBox: 24.0,
@@ -498,6 +569,24 @@ var HardDrive = gfx.Icon{
 	},
 }
 
+// hash is a compiled vector icon.
+var Hash = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(4.0, 9.0),
+		gfx.LineTo(20.0, 9.0),
+		gfx.MoveTo(4.0, 15.0),
+		gfx.LineTo(20.0, 15.0),
+		gfx.MoveTo(10.0, 3.0),
+		gfx.LineTo(8.0, 21.0),
+		gfx.MoveTo(16.0, 3.0),
+		gfx.LineTo(14.0, 21.0),
+	},
+}
+
 // history is a compiled vector icon.
 var History = gfx.Icon{
 	ViewBox: 24.0,
@@ -544,6 +633,35 @@ var House = gfx.Icon{
 		gfx.LineTo(5.0, 21.0),
 		gfx.CubicTo(3.89543, 21.0, 3.0, 20.1046, 3.0, 19.0),
 		gfx.ClosePath(),
+	},
+}
+
+// image is a compiled vector icon.
+var Image = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(19.0, 3.0),
+		gfx.CubicTo(20.1046, 3.0, 21.0, 3.89543, 21.0, 5.0),
+		gfx.LineTo(21.0, 19.0),
+		gfx.CubicTo(21.0, 20.1046, 20.1046, 21.0, 19.0, 21.0),
+		gfx.LineTo(5.0, 21.0),
+		gfx.CubicTo(3.89543, 21.0, 3.0, 20.1046, 3.0, 19.0),
+		gfx.LineTo(3.0, 5.0),
+		gfx.CubicTo(3.0, 3.89543, 3.89543, 3.0, 5.0, 3.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(11.0, 9.0),
+		gfx.CubicTo(11.0, 10.1046, 10.1046, 11.0, 9.0, 11.0),
+		gfx.CubicTo(7.89543, 11.0, 7.0, 10.1046, 7.0, 9.0),
+		gfx.CubicTo(7.0, 7.89543, 7.89543, 7.0, 9.0, 7.0),
+		gfx.CubicTo(10.1046, 7.0, 11.0, 7.89543, 11.0, 9.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(21.0, 15.0),
+		gfx.LineTo(17.914, 11.914),
+		gfx.CubicTo(17.133, 11.1332, 15.867, 11.1332, 15.086, 11.914),
+		gfx.LineTo(6.0, 21.0),
 	},
 }
 
@@ -596,6 +714,30 @@ var Layers = gfx.Icon{
 	},
 }
 
+// link is a compiled vector icon.
+var Link = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(10.0, 13.0),
+		gfx.CubicTo(10.869, 14.1617, 12.1996, 14.8887, 13.6467, 14.9923),
+		gfx.CubicTo(15.0937, 15.096, 16.5144, 14.566, 17.54, 13.54),
+		gfx.LineTo(20.54, 10.54),
+		gfx.CubicTo(22.4349, 8.57811, 22.4078, 5.45958, 20.4791, 3.53091),
+		gfx.CubicTo(18.5504, 1.60224, 15.4319, 1.57514, 13.47, 3.47),
+		gfx.LineTo(11.75, 5.18),
+		gfx.MoveTo(14.0, 11.0),
+		gfx.CubicTo(13.131, 9.83831, 11.8004, 9.1113, 10.3533, 9.00767),
+		gfx.CubicTo(8.90633, 8.90403, 7.48563, 9.43399, 6.46, 10.46),
+		gfx.LineTo(3.46, 13.46),
+		gfx.CubicTo(1.56514, 15.4219, 1.59224, 18.5404, 3.52091, 20.4691),
+		gfx.CubicTo(5.44958, 22.3978, 8.56811, 22.4249, 10.53, 20.53),
+		gfx.LineTo(12.24, 18.82),
+	},
+}
+
 // list-filter is a compiled vector icon.
 var ListFilter = gfx.Icon{
 	ViewBox: 24.0,
@@ -609,6 +751,36 @@ var ListFilter = gfx.Icon{
 		gfx.LineTo(17.0, 12.0),
 		gfx.MoveTo(10.0, 18.0),
 		gfx.LineTo(14.0, 18.0),
+	},
+}
+
+// lock-keyhole is a compiled vector icon.
+var LockKeyhole = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(13.0, 16.0),
+		gfx.CubicTo(13.0, 16.5523, 12.5523, 17.0, 12.0, 17.0),
+		gfx.CubicTo(11.4477, 17.0, 11.0, 16.5523, 11.0, 16.0),
+		gfx.CubicTo(11.0, 15.4477, 11.4477, 15.0, 12.0, 15.0),
+		gfx.CubicTo(12.5523, 15.0, 13.0, 15.4477, 13.0, 16.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(19.0, 10.0),
+		gfx.CubicTo(20.1046, 10.0, 21.0, 10.8954, 21.0, 12.0),
+		gfx.LineTo(21.0, 20.0),
+		gfx.CubicTo(21.0, 21.1046, 20.1046, 22.0, 19.0, 22.0),
+		gfx.LineTo(5.0, 22.0),
+		gfx.CubicTo(3.89543, 22.0, 3.0, 21.1046, 3.0, 20.0),
+		gfx.LineTo(3.0, 12.0),
+		gfx.CubicTo(3.0, 10.8954, 3.89543, 10.0, 5.0, 10.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(7.0, 10.0),
+		gfx.LineTo(7.0, 7.0),
+		gfx.CubicTo(7.0, 4.23858, 9.23858, 2.0, 12.0, 2.0),
+		gfx.CubicTo(14.7614, 2.0, 17.0, 4.23858, 17.0, 7.0),
+		gfx.LineTo(17.0, 10.0),
 	},
 }
 
@@ -657,6 +829,52 @@ var Package = gfx.Icon{
 		gfx.LineTo(20.7, 7.0),
 		gfx.MoveTo(7.5, 4.27),
 		gfx.LineTo(16.5, 9.42),
+	},
+}
+
+// palette is a compiled vector icon.
+var Palette = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(14.0, 6.5),
+		gfx.CubicTo(14.0, 6.77614, 13.7761, 7.0, 13.5, 7.0),
+		gfx.CubicTo(13.2239, 7.0, 13.0, 6.77614, 13.0, 6.5),
+		gfx.CubicTo(13.0, 6.22386, 13.2239, 6.0, 13.5, 6.0),
+		gfx.CubicTo(13.7761, 6.0, 14.0, 6.22386, 14.0, 6.5),
+		gfx.ClosePath(),
+		gfx.MoveTo(18.0, 10.5),
+		gfx.CubicTo(18.0, 10.7761, 17.7761, 11.0, 17.5, 11.0),
+		gfx.CubicTo(17.2239, 11.0, 17.0, 10.7761, 17.0, 10.5),
+		gfx.CubicTo(17.0, 10.2239, 17.2239, 10.0, 17.5, 10.0),
+		gfx.CubicTo(17.7761, 10.0, 18.0, 10.2239, 18.0, 10.5),
+		gfx.ClosePath(),
+		gfx.MoveTo(9.0, 7.5),
+		gfx.CubicTo(9.0, 7.77614, 8.77614, 8.0, 8.5, 8.0),
+		gfx.CubicTo(8.22386, 8.0, 8.0, 7.77614, 8.0, 7.5),
+		gfx.CubicTo(8.0, 7.22386, 8.22386, 7.0, 8.5, 7.0),
+		gfx.CubicTo(8.77614, 7.0, 9.0, 7.22386, 9.0, 7.5),
+		gfx.ClosePath(),
+		gfx.MoveTo(7.0, 12.5),
+		gfx.CubicTo(7.0, 12.7761, 6.77614, 13.0, 6.5, 13.0),
+		gfx.CubicTo(6.22386, 13.0, 6.0, 12.7761, 6.0, 12.5),
+		gfx.CubicTo(6.0, 12.2239, 6.22386, 12.0, 6.5, 12.0),
+		gfx.CubicTo(6.77614, 12.0, 7.0, 12.2239, 7.0, 12.5),
+		gfx.ClosePath(),
+		gfx.MoveTo(12.0, 2.0),
+		gfx.CubicTo(6.5, 2.0, 2.0, 6.5, 2.0, 12.0),
+		gfx.CubicTo(2.0, 17.5, 6.5, 22.0, 12.0, 22.0),
+		gfx.CubicTo(12.926, 22.0, 13.648, 21.254, 13.648, 20.312),
+		gfx.CubicTo(13.648, 19.875, 13.468, 19.477, 13.211, 19.187),
+		gfx.CubicTo(12.921, 18.898, 12.773, 18.535, 12.773, 18.062),
+		gfx.CubicTo(12.7653, 17.6173, 12.9386, 17.1886, 13.2531, 16.8741),
+		gfx.CubicTo(13.5676, 16.5596, 13.9963, 16.3863, 14.441, 16.394),
+		gfx.LineTo(16.437, 16.394),
+		gfx.CubicTo(19.488, 16.394, 21.992, 13.891, 21.992, 10.84),
+		gfx.CubicTo(21.965, 6.012, 17.461, 2.0, 12.0, 2.0),
+		gfx.ClosePath(),
 	},
 }
 
@@ -733,6 +951,32 @@ var RefreshCw = gfx.Icon{
 		gfx.MoveTo(8.0, 16.0),
 		gfx.LineTo(3.0, 16.0),
 		gfx.LineTo(3.0, 21.0),
+	},
+}
+
+// regex is a compiled vector icon.
+var Regex = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(17.0, 3.0),
+		gfx.LineTo(17.0, 13.0),
+		gfx.MoveTo(12.67, 5.5),
+		gfx.LineTo(21.33, 10.5),
+		gfx.MoveTo(12.67, 10.5),
+		gfx.LineTo(21.33, 5.5),
+		gfx.MoveTo(9.0, 17.0),
+		gfx.CubicTo(9.0, 15.8954, 8.10457, 15.0, 7.0, 15.0),
+		gfx.LineTo(5.0, 15.0),
+		gfx.CubicTo(3.89543, 15.0, 3.0, 15.8954, 3.0, 17.0),
+		gfx.LineTo(3.0, 19.0),
+		gfx.CubicTo(3.0, 20.1046, 3.89543, 21.0, 5.0, 21.0),
+		gfx.LineTo(7.0, 21.0),
+		gfx.CubicTo(8.10457, 21.0, 9.0, 20.1046, 9.0, 19.0),
+		gfx.LineTo(9.0, 17.0),
+		gfx.ClosePath(),
 	},
 }
 

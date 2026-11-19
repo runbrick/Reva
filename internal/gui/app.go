@@ -104,10 +104,11 @@ const (
 	PageWorkbench MainPage = iota // sidebar + request tabs + editor + response
 	PageHistory                   // full-width history
 	PageSettings                  // full-width settings
+	PageToolbox                   // local developer tools
 )
 
 // Pages lists the titlebar navigation items in display order.
-var Pages = []MainPage{PageWorkbench, PageHistory, PageSettings}
+var Pages = []MainPage{PageWorkbench, PageHistory, PageSettings, PageToolbox}
 
 // App is the whole application's UI state.
 type App struct {
@@ -147,6 +148,7 @@ type App struct {
 	titlebar    titlebarState
 	search      searchState
 	websocket   websocketState
+	toolbox     toolboxState
 }
 
 // New builds the App around svc, applying the stored settings.
@@ -352,6 +354,7 @@ func (a *App) Page(c ui.C) {
 	a.declareSends(c)
 	a.declareWebSockets(c)
 	a.declareCollectionRunner(c)
+	a.declareToolbox(c)
 	if a.collections.runner.open {
 		a.collectionRunnerPage(c)
 		return
@@ -369,6 +372,8 @@ func (a *App) Page(c ui.C) {
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.historyPage(c) })
 			case PageSettings:
 				ui.Column(c).Grow(1).FillHeight().Children(func() { a.settingsPage(c) })
+			case PageToolbox:
+				a.toolboxPage(c)
 			default:
 				ui.Column(c).Width(a.sideSplit.Pos).FillHeight().Background(a.palette.Sidebar).Children(func() {
 					if !previewing {

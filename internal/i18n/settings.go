@@ -25,6 +25,7 @@ type Settings struct {
 	S3, GitHub, Gitee, Endpoint, Region, Bucket, ObjectKey              string
 	AccessKey, SecretKey, SnippetID, SnippetFile, APIAddress, PathStyle string
 	GettingStarted, GettingStartedDescription, OpenGuide, ReplayGuide   string
+	GuideWorkbenchOpen                                                  string
 	GuideTitle, GuideIntro, GuideRequestTitle, GuideRequestDescription  string
 	GuidePractice, GuidePracticeName, GuideImport                       string
 	GuideVariablesTitle, GuideVariablesDescription                      string
@@ -62,9 +63,10 @@ var settingsZh = Settings{
 	S3: "S3", GitHub: "GitHub Gist", Gitee: "Gitee", Endpoint: "端点", Region: "区域", Bucket: "存储桶", ObjectKey: "对象路径",
 	AccessKey: "访问密钥 ID", SecretKey: "访问密钥", SnippetID: "代码片段 ID", SnippetFile: "代码片段文件", APIAddress: "API 地址", PathStyle: "路径式存储桶",
 	GettingStarted: "开始使用", GettingStartedDescription: "了解请求、环境变量和数据管理，随时打开或重新查看指南。",
-	OpenGuide: "打开指南", ReplayGuide: "重新查看指南", GuideTitle: "欢迎使用 Reva",
+	GuideWorkbenchOpen: "开始使用",
+	OpenGuide:          "打开指南", ReplayGuide: "重新查看指南", GuideTitle: "欢迎使用 Reva",
 	GuideIntro:        "可随时关闭指南并开始使用。点击“完成”会标记为已完成；点击“暂时跳过”只关闭指南，不标记完成。之后可在设置中重新查看。",
-	GuideRequestTitle: "发送第一个请求", GuideRequestDescription: "输入 URL，选择 HTTP 方法，再手动点击“发送”发出请求。也可导入 curl 命令或 Postman 集合。",
+	GuideRequestTitle: "发送第一个请求", GuideRequestDescription: "可离线预览示例。输入 URL，选择 HTTP 方法，再手动点击“发送”发出真实请求。先查看 curl 命令或 Postman 集合的导入预览，再确认导入。",
 	GuidePractice: "离线预览示例", GuidePracticeName: "示例请求", GuideImport: "导入已有请求",
 	GuideVariablesTitle: "使用环境变量", GuideVariablesDescription: "在环境中配置变量，用 {{name}} 在请求中引用。请在自己的配置中填写令牌、密码等凭据。",
 	GuideDataTitle: "管理本机数据", GuideDataDescription: "数据保存在本机，无需账号。可按需配置加密备份或同步。",
@@ -101,9 +103,10 @@ var settingsEn = Settings{
 	S3: "S3", GitHub: "GitHub Gist", Gitee: "Gitee", Endpoint: "Endpoint", Region: "Region", Bucket: "Bucket", ObjectKey: "Object key",
 	AccessKey: "Access key ID", SecretKey: "Secret key", SnippetID: "Snippet ID", SnippetFile: "Snippet file", APIAddress: "API address", PathStyle: "Path-style bucket",
 	GettingStarted: "Getting started", GettingStartedDescription: "Learn about requests, environment variables and data management. Open or replay the guide anytime.",
-	OpenGuide: "Open guide", ReplayGuide: "Replay guide", GuideTitle: "Welcome to Reva",
+	GuideWorkbenchOpen: "Getting started",
+	OpenGuide:          "Open guide", ReplayGuide: "Replay guide", GuideTitle: "Welcome to Reva",
 	GuideIntro:        "Close this guide anytime and start using the app. Done marks it complete; Skip for now closes it without marking it complete. Replay it anytime from Settings.",
-	GuideRequestTitle: "Send your first request", GuideRequestDescription: "Enter a URL, choose an HTTP method, then click Send manually to send the request. You can also import a curl command or a Postman collection.",
+	GuideRequestTitle: "Send your first request", GuideRequestDescription: "Preview a sample offline. Enter a URL, choose an HTTP method, and click Send manually to send a real request. Review a curl command or Postman collection before confirming import.",
 	GuidePractice: "Preview sample offline", GuidePracticeName: "Sample request", GuideImport: "Import existing requests",
 	GuideVariablesTitle: "Use environment variables", GuideVariablesDescription: "Define variables in an environment and reference them in requests with {{name}}. Enter credentials such as tokens and passwords in your own configuration.",
 	GuideDataTitle: "Manage local data", GuideDataDescription: "Your data stays on this device, with no account required. Encrypted backup and sync are optional and can be configured when you need them.",

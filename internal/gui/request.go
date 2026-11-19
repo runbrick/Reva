@@ -46,6 +46,7 @@ type requestTabState struct {
 	auth                           authEditorState
 	section                        requestSection
 	params, headers, encoded, form kvTableState
+	jsonBody                       requestJSONEditor
 	url                            string
 	requestID                      string
 	menu                           bool
@@ -222,23 +223,24 @@ func (a *App) requestBodySection(c ui.C, t *Tab, s *requestTabState) {
 		}
 	})
 	switch b.Mode {
-	case model.BodyJSON, model.BodyRaw:
-		if b.Mode == model.BodyJSON && b.ContentType == graphQLBodyTag && a.graphQLBodySection(c, t, s) {
+	case model.BodyJSON:
+		if b.ContentType == graphQLBodyTag && a.graphQLBodySection(c, t, s) {
 			return
 		}
-		if b.Mode == model.BodyJSON {
-			if ui.Button(c, a.S.Request.Format).Icon(icons.Braces).Ghost().Small().Clicked() {
-				var out bytes.Buffer
-				if err := json.Indent(&out, []byte(b.Text), "", "  "); err != nil {
-					a.Toast(a.S.Request.InvalidJSON, err.Error(), ui.ToastError)
-				} else if text := out.String(); text != b.Text {
-					b.Text, t.Dirty = text, true
-				}
+		if ui.Button(c, a.S.Request.Format).Icon(icons.Braces).Ghost().Small().Clicked() {
+			var out bytes.Buffer
+			if err := json.Indent(&out, []byte(b.Text), "", "  "); err != nil {
+				a.Toast(a.S.Request.InvalidJSON, err.Error(), ui.ToastError)
+			} else if text := out.String(); text != b.Text {
+				b.Text, t.Dirty = text, true
 			}
-		} else {
-			if ui.TextField(c, &b.ContentType, a.S.Request.ContentType, "text/plain").FillWidth().Changed() {
-				t.Dirty = true
-			}
+		}
+		if s.jsonBody.declare(c, &b.Text, a.S.Request.BodyText, a.palette) {
+			t.Dirty = true
+		}
+	case model.BodyRaw:
+		if ui.TextField(c, &b.ContentType, a.S.Request.ContentType, "text/plain").FillWidth().Changed() {
+			t.Dirty = true
 		}
 		if ui.TextArea(c, &b.Text, a.S.Request.BodyText, "").Mono().FillWidth().Height(Space6 * 6).Changed() {
 			t.Dirty = true

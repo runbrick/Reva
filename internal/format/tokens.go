@@ -27,11 +27,19 @@ type Token struct {
 // Invalid or incomplete JSON is deliberately plain, with no misleading colors.
 // Call once when installing a response, never from a painter.
 func TokenizeJSON(value string) [][]Token {
+	return tokenizeJSON(value, json.Valid([]byte(value)))
+}
+
+// TokenizeJSONDraft highlights recognizable tokens even while a JSON document is incomplete.
+func TokenizeJSONDraft(value string) [][]Token {
+	return tokenizeJSON(value, true)
+}
+
+func tokenizeJSON(value string, highlight bool) [][]Token {
 	lines := strings.Split(value, "\n")
 	out := make([][]Token, len(lines))
-	valid := json.Valid([]byte(value))
 	for n, line := range lines {
-		if !valid {
+		if !highlight {
 			out[n] = []Token{{End: len(line), Kind: Plain}}
 			continue
 		}
@@ -46,14 +54,20 @@ func TokenizeJSON(value string) [][]Token {
 			case '"':
 				kind = String
 				i++
+				closed := false
 				for i < len(line) {
 					b := line[i]
 					i++
-					if b == '\\' {
+					if b == '\\' && i < len(line) {
 						i++
 					} else if b == '"' {
+						closed = true
 						break
 					}
+				}
+				if !closed {
+					out[n] = append(out[n], Token{Start: start, End: i, Kind: kind})
+					continue
 				}
 				j := i
 				for j < len(line) && (line[j] == ' ' || line[j] == '\t' || line[j] == '\r') {
@@ -77,12 +91,16 @@ func TokenizeJSON(value string) [][]Token {
 				kind = Punctuation
 				i++
 			default:
-				kind = Literal
-				if line[i] == '-' || line[i] >= '0' && line[i] <= '9' {
+				if line[start] == '-' || line[start] >= '0' && line[start] <= '9' {
 					kind = Number
 				}
-				for i < len(line) && !strings.ContainsRune(" \t\r{}[]:,", rune(line[i])) {
+				i++
+				for i < len(line) && !strings.ContainsRune(" \t\r{}[]:,\"", rune(line[i])) {
 					i++
+				}
+				switch line[start:i] {
+				case "true", "false", "null":
+					kind = Literal
 				}
 			}
 			out[n] = append(out[n], Token{Start: start, End: i, Kind: kind})

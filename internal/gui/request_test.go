@@ -164,6 +164,79 @@ func TestRequestJSONBodyReachesServiceAndFormats(t *testing.T) {
 	}
 }
 
+func TestRequestJSONDraftHighlightsInBothThemes(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	h.click("Body")
+	h.click("JSON")
+	draft := "{\n  \"名称\": \"测试\",\n  \"limit\": 2,\n  \"enabled\": true,"
+	h.typeInto(h.App.S.Request.BodyText, draft)
+	for _, mode := range []string{"light", "dark"} {
+		h.App.ApplySettings(model.Settings{Language: "en", Theme: mode})
+		requestRepaint(h)
+		if got := h.App.Active().Request.Body.Text; got != draft {
+			t.Fatalf("%s JSON draft = %q, want %q", mode, got, draft)
+		}
+		palette := h.App.palette
+		want := map[gfx.Color]bool{palette.CodeKey: true, palette.CodeString: true, palette.CodeNumber: true, palette.CodeLiteral: true, palette.CodePunct: true}
+		lineNumber := false
+		for _, label := range h.D.Snapshot().Labels {
+			lineNumber = lineNumber || (label.Value == "2" && label.Color == palette.CodeLineNo)
+			for _, run := range label.Runs {
+				delete(want, run.Color)
+			}
+		}
+		if len(want) != 0 || !lineNumber {
+			t.Errorf("%s draft missing syntax colors %v or line numbers (%t)", mode, want, lineNumber)
+		}
+	}
+}
+
+func TestRequestJSONBodyMultilineClipboardAndIME(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	h.click("Body")
+	h.click("JSON")
+	h.click(h.App.S.Request.BodyText)
+	draft := "{\n  \"key\": \""
+	h.D.SetClipboard(draft)
+	if _, err := h.D.ShortcutChord(ui.Primary, 'v'); err != nil {
+		t.Fatal(err)
+	}
+	tab := h.App.Active()
+	tab.Dirty = false
+	if tab.Request.Body.Text != draft {
+		t.Fatalf("pasted body = %q, want %q", tab.Request.Body.Text, draft)
+	}
+	if err := h.D.Compose("ceshi"); err != nil {
+		t.Fatal(err)
+	}
+	if tab.Request.Body.Text != draft || tab.Dirty {
+		t.Fatalf("uncommitted IME composition leaked into request: %q", tab.Request.Body.Text)
+	}
+	if err := h.D.Type(`测试"`); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Key(gfx.KeyEnter, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.D.Type("}"); err != nil {
+		t.Fatal(err)
+	}
+	want := draft + "测试\"\n}"
+	if tab.Request.Body.Text != want || !tab.Dirty {
+		t.Fatalf("multiline body = %q, want %q", tab.Request.Body.Text, want)
+	}
+	for _, chord := range []rune{'a', 'c'} {
+		if _, err := h.D.ShortcutChord(ui.Primary, chord); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got := h.D.Clipboard(); got != want {
+		t.Fatalf("copied body = %q, want %q", got, want)
+	}
+}
+
 func TestRequestAuthFieldsReachService(t *testing.T) {
 	for _, kind := range []model.AuthType{model.AuthBearer, model.AuthBasic, model.AuthAPIKey} {
 		t.Run(string(kind), func(t *testing.T) {
@@ -781,6 +854,25 @@ func BenchmarkRequestPanePaint(b *testing.B) {
 	b.ResetTimer()
 	for b.Loop() {
 		if err := d.Resize(1280, 800); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkRequestJSONBodyPaint(b *testing.B) {
+	a := New(fake.New())
+	tab := a.Active()
+	tab.Request.Body = model.Body{Mode: model.BodyJSON, Text: "{\n  \"platform\": \"test\",\n  \"项目\": \"测试\",\n  \"limit\": 2,\n  \"enabled\": true\n}"}
+	a.requestTab(tab).section = requestBody
+	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
+	driver, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer driver.Close()
+	b.ReportAllocs()
+	for b.Loop() {
+		if err := driver.Resize(1280, 800); err != nil {
 			b.Fatal(err)
 		}
 	}

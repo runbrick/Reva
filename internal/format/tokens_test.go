@@ -52,6 +52,38 @@ func TestTokenizeJSONKeyColonOnNextLine(t *testing.T) {
 	}
 }
 
+func TestTokenizeJSONDraftPreservesIncompleteTokens(t *testing.T) {
+	source := "{\n  \"名称\": \"带转义的值\\\n  \"enabled\": true, \"limit\": -2, \"unknown\": truth"
+	want := map[string]TokenKind{
+		"{": Punctuation, `"名称"`: Key, `"带转义的值\`: String,
+		`"enabled"`: Key, "true": Literal, "-2": Number, "truth": Plain,
+	}
+	lines := strings.Split(source, "\n")
+	for index, tokens := range TokenizeJSONDraft(source) {
+		line := lines[index]
+		end := 0
+		for _, token := range tokens {
+			if token.Start != end || token.End > len(line) || token.End <= end {
+				t.Fatalf("token %+v does not match source line %q", token, line)
+			}
+			value := line[token.Start:token.End]
+			if kind, ok := want[value]; ok {
+				if token.Kind != kind {
+					t.Errorf("%q token = %v, want %v", value, token.Kind, kind)
+				}
+				delete(want, value)
+			}
+			end = token.End
+		}
+		if end != len(line) {
+			t.Fatalf("tokens omitted bytes in line %q", line)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing tokens: %v", want)
+	}
+}
+
 func TestHTMLTextRemovesTagsAndHiddenCode(t *testing.T) {
 	source := `<h1 title="a > b">Hello &amp; welcome</h1><p>World <b>today</b>.</p><!-- hidden --><script>alert("bad")</script><style>p{color:red}</style>`
 	got := HTMLText(source)

@@ -137,7 +137,13 @@ func (s *Service) send(ctx context.Context, req model.Request, variables []model
 	// Copy only the client value to attach this send's tracing wrapper. The
 	// cached underlying transport and its connection pool are always reused.
 	client := *s.client(req.Options)
-	protectRedirects(&client, req.Auth)
+	_, explicitCookie := httpReq.Header["Cookie"]
+	_, explicitHost := httpReq.Header["Host"]
+	session, cookieSessionEnabled := ctx.Value(cookieSessionKey{}).(*CookieSession)
+	if cookieSessionEnabled && !explicitCookie && !explicitHost {
+		client.Jar = session.jarFor(httpReq.URL)
+	}
+	protectRedirects(&client, req.Auth, cookieSessionEnabled)
 	start := time.Now()
 	trace := &sendTrace{base: client.Transport, start: start}
 	client.Transport = trace
@@ -214,7 +220,7 @@ func setDefaultHeader(headers http.Header, key, value string) {
 // protectRedirects wraps policy on a per-send client copy. net/http copies
 // initial headers on every hop, so stripping only the first cross-origin hop
 // would leak credentials when a later redirect returns to the initial origin.
-func protectRedirects(client *http.Client, cfg model.Auth) {
+func protectRedirects(client *http.Client, cfg model.Auth, cookieSessionEnabled bool) {
 	previous := client.CheckRedirect
 	crossedOrigin := false
 	strip := func(req *http.Request) {
@@ -235,6 +241,10 @@ func protectRedirects(client *http.Client, cfg model.Auth) {
 			}
 			if crossedOrigin {
 				strip(req)
+				if cookieSessionEnabled {
+					client.Jar = nil
+					delete(req.Header, "Cookie")
+				}
 			}
 		}
 		checkOrigin()
@@ -252,16 +262,7 @@ func protectRedirects(client *http.Client, cfg model.Auth) {
 }
 
 func sameOrigin(a, b *url.URL) bool {
-	port := func(u *url.URL) string {
-		if p := u.Port(); p != "" {
-			return p
-		}
-		if strings.EqualFold(u.Scheme, "https") {
-			return "443"
-		}
-		return "80"
-	}
-	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Hostname(), b.Hostname()) && port(a) == port(b)
+	return originOf(a) == originOf(b)
 }
 
 func responseHeaders(headers http.Header) []model.KV {

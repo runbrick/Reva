@@ -44,6 +44,21 @@ Existing collections keep their previous global selection until their list or
 active environment is first changed. New collections start with no active
 environment and show all shared environments until the list is customized.
 
+## Cookie sessions
+
+In request settings, enable **Use temporary cookie sessions** to carry server
+cookies between manual sends in the same collection and environment. Use
+**Clear manual cookie sessions** to empty them; disabling the option also
+clears them. Manual sessions
+stay in memory and are separate from collection runs.
+
+In the desktop **Run collection** dialog, check **Use cookie session for this
+run** to carry cookies between requests in that run. This option starts off for
+each new dialog. Every run gets a fresh, private session, discarded after the
+run finishes or is cancelled. Cookies from one run never reach another run or
+the manual request editor. Explicit Cookie headers on a request take precedence
+over automatic cookies. The headless CLI does not enable cookie sessions.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:

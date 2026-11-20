@@ -10,19 +10,20 @@ import (
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/runner"
 	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/service/request"
 	"github.com/vivaui/viva/ui"
 )
 
 type collectionRunnerState struct {
-	open, stopOnFailure, cancelling bool
-	collectionID, environmentID     string
-	environmentIDs                  []string
-	environmentNames                map[string]string
-	problem                         collectionRunProblem
-	job                             *collectionRunJob
-	effect                          *ui.EffectState[runner.Report, *collectionRunJob]
-	report                          runner.Report
-	list                            ui.ListState
+	open, stopOnFailure, useCookieSession, cancelling bool
+	collectionID, environmentID                       string
+	environmentIDs                                    []string
+	environmentNames                                  map[string]string
+	problem                                           collectionRunProblem
+	job                                               *collectionRunJob
+	effect                                            *ui.EffectState[runner.Report, *collectionRunJob]
+	report                                            runner.Report
+	list                                              ui.ListState
 }
 
 type collectionRunProblem uint8
@@ -34,8 +35,9 @@ const (
 )
 
 type collectionRunJob struct {
-	input   runner.Snapshot
-	options runner.Options
+	input            runner.Snapshot
+	options          runner.Options
+	useCookieSession bool
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
@@ -62,6 +64,9 @@ func (job *collectionRunJob) run(parent context.Context, sender service.RequestS
 	input := job.input
 	job.input = runner.Snapshot{}
 	job.mu.Unlock()
+	if job.useCookieSession {
+		ctx = request.WithCookieSession(ctx, request.NewCookieSession())
+	}
 	return input.RunReport(ctx, sender, job.options)
 }
 
@@ -112,8 +117,9 @@ func (a *App) startCollectionRun() {
 		values = environment.Variables
 	}
 	state.job = &collectionRunJob{
-		input:   runner.NewSnapshot(collection, a.Svc.Settings.Get(), values),
-		options: runner.Options{StopOnFailure: state.stopOnFailure},
+		input:            runner.NewSnapshot(collection, a.Svc.Settings.Get(), values),
+		options:          runner.Options{StopOnFailure: state.stopOnFailure},
+		useCookieSession: state.useCookieSession,
 	}
 	sender := a.Svc.Requests
 	state.effect = ui.NewEffectKeyed(func(ctx context.Context, job *collectionRunJob) (runner.Report, error) {
@@ -176,6 +182,7 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 					return state.environmentNames[id]
 				}).FillWidth().Label(text.RunEnvironment)
 				ui.Checkbox(c, &state.stopOnFailure, text.RunStopOnFailure)
+				ui.Checkbox(c, &state.useCookieSession, text.RunUseCookieSession)
 				switch state.problem {
 				case collectionRunMissingCollection:
 					ui.Wrap(c, text.RunMissingCollection).Color(theme.Danger)

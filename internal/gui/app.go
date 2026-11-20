@@ -27,6 +27,7 @@ import (
 	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/service/request"
 	"github.com/runbrick/reva/internal/storage"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
@@ -70,9 +71,10 @@ type TestResult struct {
 }
 
 type sendJob struct {
-	req  model.Request
-	vars []model.KV
-	plan *execution.Plan
+	req           model.Request
+	vars          []model.KV
+	plan          *execution.Plan
+	cookieSession *request.CookieSession
 }
 
 type sendKey struct {
@@ -257,7 +259,7 @@ func (a *App) Send(t *Tab) {
 		}
 		t.sse = nil
 	}
-	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan}
+	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan, cookieSession: a.manualCookieSessionFor(t)}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
 	a.resetScripts(t)
 }
@@ -280,6 +282,7 @@ func (a *App) Toast(title, description string, kind ui.ToastKind) {
 }
 
 func (a *App) run(ctx context.Context, key sendKey) (sendResult, error) {
+	ctx = request.WithCookieSession(ctx, key.job.cookieSession)
 	if key.stream != nil {
 		if sender, ok := a.Svc.Requests.(sseSender); ok {
 			adapter := &ssePlanSender{sender: sender, stream: key.stream}
@@ -323,6 +326,9 @@ func (a *App) declareSends(c ui.C) {
 				a.authFailure(t, false)
 			}
 			entry.Error = t.Err
+			if res.job.cookieSession != nil && r.TransportStarted {
+				entry.Error = a.S.Request.CookieSessionHistoryError
+			}
 		} else if r.Pre.Err != nil {
 			t.Err = a.S.Scripts.PreScriptError
 		}

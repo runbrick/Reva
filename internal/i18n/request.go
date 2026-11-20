@@ -21,6 +21,7 @@ type Request struct {
 	APIKeyName, APIKeyValue, APIKeyLocation, InHeader, InQuery                            string
 	URL, SendMenu, SendDownload, CopyCURL, DownloadName                                   string
 	Settings, Timeout, FollowRedirects, VerifyTLS                                         string
+	CookieSessionEnabled, CookieSessionClear, CookieSessionHistoryError                   string
 	Inherit, On, Off, TimeoutHelp                                                         string
 	ParamName, ParamValue, HeaderName, HeaderValue                                        string
 	Description, AddParam, AddHeader, BulkEdit, TableEdit                                 string
@@ -30,6 +31,7 @@ type Request struct {
 }
 
 var requestZh = Request{
+	CookieSessionEnabled: "使用临时 Cookie 会话", CookieSessionClear: "清空手动 Cookie 会话", CookieSessionHistoryError: "请求失败（未保存错误详情）",
 	Details: "接口信息", QueryParameters: "查询参数",
 	Preview: "请求预览", PreviewTitle: "发送前只读预览", PreviewClose: "关闭预览",
 	PreviewPhase:    "在前置脚本之前计算；按当前请求草稿、已保存的集合和活动环境实时刷新。",
@@ -63,6 +65,7 @@ var requestZh = Request{
 }
 
 var requestEn = Request{
+	CookieSessionEnabled: "Use temporary cookie sessions", CookieSessionClear: "Clear manual cookie sessions", CookieSessionHistoryError: "Request failed (details not saved)",
 	Details: "Request details", QueryParameters: "Query parameters",
 	Preview: "Request preview", PreviewTitle: "Read-only pre-send preview", PreviewClose: "Close preview",
 	PreviewPhase:    "Computed BEFORE pre-request scripts; refreshed from the current draft, stored collection and active environment.",

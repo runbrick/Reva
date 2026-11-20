@@ -38,7 +38,8 @@ var requestAPIKeyLocations = []model.APIKeyIn{model.APIKeyInHeader, model.APIKey
 
 // requestState keeps section selection and table identities separately per tab.
 type requestState struct {
-	tabs map[int]*requestTabState
+	tabs    map[int]*requestTabState
+	cookies manualCookieState
 }
 
 type requestTabState struct {
@@ -617,6 +618,7 @@ func (a *App) requestToggleLabel(toggle model.Toggle) string {
 
 func (a *App) requestSettingsSection(c ui.C, t *Tab, s *requestTabState) {
 	labels, options, theme := &a.S.Request, &t.Request.Options, c.Theme()
+	a.requestCookieControls(c)
 	if options.TimeoutMs != s.timeoutValue {
 		s.timeoutValue = options.TimeoutMs
 		s.timeout = ""

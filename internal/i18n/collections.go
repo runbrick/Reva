@@ -27,6 +27,8 @@ type Collections struct {
 	Open, Duplicate, CopyName, Create                            string
 	InlineCollection, CollectionName                             string
 	Add, Actions, Filter, NoMatches                              string
+	WorkspaceDefaultName, WorkspaceFilter                        string
+	WorkspaceEmpty, WorkspaceNoMatches                           string
 	Variables, Export, VariablesSaved, Exported                  string
 }
 
@@ -62,6 +64,8 @@ var collectionsZh = Collections{
 	Open: "打开", Duplicate: "创建副本", CopyName: "%s 副本", Create: "创建",
 	InlineCollection: "创建新集合", CollectionName: "集合名称",
 	Add: "添加集合项", Actions: "%s 的操作", Filter: "筛选集合与请求", NoMatches: "没有匹配的请求",
+	WorkspaceDefaultName: "我的集合", WorkspaceFilter: "筛选当前集合内的请求",
+	WorkspaceEmpty: "当前没有集合。请新建或导入集合。", WorkspaceNoMatches: "当前集合中没有匹配的请求。",
 	Variables: "集合变量", Export: "导出集合",
 	VariablesSaved: "集合变量已保存", Exported: "集合已导出",
 }
@@ -98,6 +102,8 @@ var collectionsEn = Collections{
 	Open: "Open", Duplicate: "Duplicate", CopyName: "%s copy", Create: "Create",
 	InlineCollection: "Create a new collection", CollectionName: "Collection name",
 	Add: "Create collection item", Actions: "Actions for %s", Filter: "Filter collections and requests", NoMatches: "No matching requests",
+	WorkspaceDefaultName: "My collection", WorkspaceFilter: "Filter requests in this collection",
+	WorkspaceEmpty: "No collections available. Create or import a collection to get started.", WorkspaceNoMatches: "No matching requests in this collection.",
 	Variables: "Collection variables", Export: "Export collection",
 	VariablesSaved: "Collection variables saved", Exported: "Collection exported",
 }

@@ -18,6 +18,7 @@ type responseBaseline struct {
 type responseToolsState struct {
 	open, inspect, hasSelection, moreFields, moreChanges, invalidIgnore bool
 	source                                                              *model.Response
+	artifact                                                            responseArtifactSource
 	doc                                                                 *responsejson.Document
 	compared                                                            *responseBaseline
 	changes                                                             []responsejson.Change
@@ -30,7 +31,7 @@ func (state *responseToolsState) show(response *model.Response) {
 		return
 	}
 	if state.source != response {
-		*state = responseToolsState{source: response, ignored: state.ignored}
+		*state = responseToolsState{source: response, ignored: state.ignored, artifact: state.artifact}
 		if !response.Truncated {
 			state.doc, _ = responsejson.Parse(response.Body)
 		}

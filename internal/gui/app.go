@@ -334,6 +334,7 @@ func (a *App) declareSends(c ui.C) {
 		}
 		if r.Response != nil && (r.Err == nil || t.sse != nil) {
 			t.Response = r.Response
+			a.captureResponseExampleSource(t, r)
 			entry.StatusCode, entry.Duration = r.Response.StatusCode, r.Response.Duration
 		}
 		if !r.TransportStarted {
@@ -475,6 +476,7 @@ func (a *App) httpWorkbench(c ui.C, t *Tab, previewing bool) {
 		} else {
 			a.responsePane(c.KeyInt(t.ID), t)
 		}
+		a.responseArtifactBar(c, t)
 	})
 }
 

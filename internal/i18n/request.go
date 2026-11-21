@@ -27,6 +27,10 @@ type Request struct {
 	Description, AddParam, AddHeader, BulkEdit, TableEdit                                 string
 	BulkContent, BulkHelp                                                                 string
 	GraphQLQuery, GraphQLVariables, GraphQLRaw, GraphQLEdit                               string
+	GraphQLSchemaLoad, GraphQLSchemaCancel, GraphQLSchemaLoading, GraphQLSchemaCanceled   string
+	GraphQLSchemaFilter, GraphQLSchemaNoMatches, GraphQLSchemaEmpty                       string
+	GraphQLSchemaFailed, GraphQLSchemaEndpoint, GraphQLSchemaTooLarge, GraphQLSchemaHTTP  string
+	GraphQLSchemaInvalid, GraphQLSchemaRejected                                           string
 	Details, QueryParameters                                                              string
 }
 
@@ -49,6 +53,10 @@ var requestZh = Request{
 	AuthError: "认证错误", AuthInvalid: "认证配置无效，请检查认证类型、密钥位置及请求头名称和值。", CURLFailed: "无法生成 cURL，请检查 URL 查询参数。",
 	AuthUnsupported: "不支持的认证类型",
 	GraphQLQuery:    "GraphQL 查询", GraphQLVariables: "GraphQL 变量（JSON）", GraphQLRaw: "编辑 JSON", GraphQLEdit: "编辑 GraphQL",
+	GraphQLSchemaLoad: "加载模式", GraphQLSchemaCancel: "取消加载模式", GraphQLSchemaLoading: "正在加载 GraphQL 模式…", GraphQLSchemaCanceled: "已取消加载模式。",
+	GraphQLSchemaFilter: "筛选根字段", GraphQLSchemaNoMatches: "没有匹配的根字段。", GraphQLSchemaEmpty: "此模式没有可显示的根字段。",
+	GraphQLSchemaFailed: "无法加载 GraphQL 模式，请检查端点与网络连接。", GraphQLSchemaEndpoint: "请输入 GraphQL 端点 URL。", GraphQLSchemaTooLarge: "模式响应超过 512 KiB。",
+	GraphQLSchemaHTTP: "端点返回了非成功 HTTP 状态。", GraphQLSchemaInvalid: "端点未返回有效的 GraphQL 内省结果。", GraphQLSchemaRejected: "GraphQL 端点返回了内省错误，可能已禁用内省。",
 	Title: "请求", Method: "方法", Send: "Send / 发送", SendAccessible: "Send / 发送", Save: "保存", Cancel: "取消",
 	Params: "参数", Headers: "请求头", Body: "请求体", Auth: "认证", Scripts: "脚本",
 	None: "无", Raw: "原始文本", FormData: "表单数据", URLEncoded: "网址编码表单", Binary: "二进制",
@@ -83,6 +91,10 @@ var requestEn = Request{
 	AuthError: "Authentication error", AuthInvalid: "Invalid authentication configuration. Check the scheme, API key placement, and header name and value.", CURLFailed: "Cannot generate cURL. Check the URL query parameters.",
 	AuthUnsupported: "Unsupported authentication",
 	GraphQLQuery:    "GraphQL query", GraphQLVariables: "GraphQL variables (JSON)", GraphQLRaw: "Edit JSON", GraphQLEdit: "Edit GraphQL",
+	GraphQLSchemaLoad: "Load schema", GraphQLSchemaCancel: "Cancel schema load", GraphQLSchemaLoading: "Loading GraphQL schema…", GraphQLSchemaCanceled: "Schema load canceled.",
+	GraphQLSchemaFilter: "Filter root fields", GraphQLSchemaNoMatches: "No matching root fields.", GraphQLSchemaEmpty: "This schema has no root fields to display.",
+	GraphQLSchemaFailed: "Could not load the GraphQL schema. Check the endpoint and connection.", GraphQLSchemaEndpoint: "Enter a GraphQL endpoint URL.", GraphQLSchemaTooLarge: "The schema response exceeds 512 KiB.",
+	GraphQLSchemaHTTP: "The endpoint returned an unsuccessful HTTP status.", GraphQLSchemaInvalid: "The endpoint did not return a valid GraphQL introspection result.", GraphQLSchemaRejected: "The endpoint returned GraphQL introspection errors. Introspection may be disabled.",
 	Title: "Request", Method: "Method", Send: "Send", SendAccessible: "Send", Save: "Save", Cancel: "Cancel",
 	Params: "Params", Headers: "Headers", Body: "Body", Auth: "Authorization", Scripts: "Scripts",
 	None: "None", Raw: "Raw", FormData: "Form data", URLEncoded: "URL encoded", Binary: "Binary",

@@ -68,9 +68,34 @@ type Response struct {
 	SSEEventNumber     string
 	SSEEventType       string
 	SSEEventID         string
+	Tools              ResponseTools
+}
+
+type ResponseTools struct {
+	Title, Compare, Fields, SetBaseline, ClearBaseline, RunComparison              string
+	NoBaseline, BaselineReady, Baseline, Current, Ignored, IgnoreHint, IgnoreError string
+	JSONUnavailable, NoChanges, MoreChanges, Status, Root, Missing                 string
+	Added, Removed, TypeChanged, ValueChanged, InspectCurrent                      string
+	Object, Array, String, Number, Boolean, Null                                   string
+	Filter, FilterHint, NoFields, MoreFields, SelectField, Selected                string
+	Exists, Equals, Capture, Variable, VariableHint, CaptureHelp, EqualityHelp     string
+	ExistsTest, EqualsTest, CaptureTest, ScriptAdded                               string
 }
 
 var responseZh = Response{
+	Tools: ResponseTools{
+		Title: "响应工具", Compare: "响应对比", Fields: "JSON 字段", SetBaseline: "设为基准", ClearBaseline: "清除基准", RunComparison: "与基准对比",
+		NoBaseline: "先将一份响应设为基准，再手动发送请求并回到此处对比。", BaselineReady: "基准已保存到当前会话。",
+		Baseline: "基准响应", Current: "当前响应", Ignored: "忽略的路径", IgnoreHint: "每行一个 JSON Pointer，例如 /timestamp", IgnoreError: "请输入有效的 JSON Pointer，每行一个。",
+		JSONUnavailable: "JSON 字段操作需要完整、无重复键的 JSON 正文（最大 512 KiB）。", NoChanges: "JSON 字段无差异。", MoreChanges: "这里只显示前 100 项差异。", Status: "HTTP 状态码", Root: "JSON 根值", Missing: "缺失",
+		Added: "新增", Removed: "删除", TypeChanged: "类型变化", ValueChanged: "值变化", InspectCurrent: "选用当前字段",
+		Object: "对象", Array: "数组", String: "字符串", Number: "数字", Boolean: "布尔值", Null: "空值",
+		Filter: "筛选字段路径", FilterHint: "例如 /data/items/0", NoFields: "没有匹配的字段。", MoreFields: "这里显示前 64 项，可继续缩小筛选范围。", SelectField: "选择一个字段来生成断言或提取变量。", Selected: "已选字段",
+		Exists: "添加存在断言", Equals: "添加等值断言", Capture: "添加提取规则", Variable: "变量名", VariableHint: "例如 orderId",
+		CaptureHelp:  "保存请求后，集合运行中的后续请求可引用 {{变量名}}。提取值仅在本轮有效。",
+		EqualityHelp: "等值断言会把当前字段值写入测试脚本。", ExistsTest: "字段存在 %s", EqualsTest: "字段值相等 %s", CaptureTest: "提取变量 %s",
+		ScriptAdded: "已添加到请求的测试脚本",
+	},
 	SSEEvents: "SSE 事件", SSEConnected: "流已连接", SSEDisconnect: "断开连接", SSEDisconnected: "已断开连接",
 	SSEEnded: "流已结束", SSETimedOut: "流已超时", SSEFailed: "读取事件流失败",
 	SSEOverflow: "部分事件超出查看上限，无法显示。", SSEEmpty: "暂无完整事件。",
@@ -92,6 +117,19 @@ var responseZh = Response{
 }
 
 var responseEn = Response{
+	Tools: ResponseTools{
+		Title: "Response tools", Compare: "Compare responses", Fields: "JSON fields", SetBaseline: "Set as baseline", ClearBaseline: "Clear baseline", RunComparison: "Compare with baseline",
+		NoBaseline: "Set a baseline, send another request manually, then return here to compare.", BaselineReady: "The baseline is available for this session.",
+		Baseline: "Baseline response", Current: "Current response", Ignored: "Ignored paths", IgnoreHint: "One JSON Pointer per line, e.g. /timestamp", IgnoreError: "Enter one valid JSON Pointer per line.",
+		JSONUnavailable: "JSON field actions require a complete JSON body without duplicate keys (up to 512 KiB).", NoChanges: "No JSON field differences.", MoreChanges: "Showing the first 100 differences.", Status: "HTTP status", Root: "JSON root", Missing: "Missing",
+		Added: "Added", Removed: "Removed", TypeChanged: "Type changed", ValueChanged: "Value changed", InspectCurrent: "Use current field",
+		Object: "Object", Array: "Array", String: "String", Number: "Number", Boolean: "Boolean", Null: "Null",
+		Filter: "Filter field paths", FilterHint: "e.g. /data/items/0", NoFields: "No matching fields.", MoreFields: "Showing the first 64 matches. Narrow the filter to find more.", SelectField: "Select a field to generate an assertion or capture a variable.", Selected: "Selected field",
+		Exists: "Add existence check", Equals: "Add equality check", Capture: "Add capture rule", Variable: "Variable name", VariableHint: "e.g. orderId",
+		CaptureHelp:  "Save the request to use {{variableName}} in later requests in a collection run. Captured values last for that run.",
+		EqualityHelp: "An equality check writes the current field value into the test script.", ExistsTest: "JSON field exists %s", EqualsTest: "JSON field equals %s", CaptureTest: "Capture variable %s",
+		ScriptAdded: "Added to the request test script",
+	},
 	SSEEvents: "SSE events", SSEConnected: "Stream connected", SSEDisconnect: "Disconnect", SSEDisconnected: "Disconnected",
 	SSEEnded: "Stream ended", SSETimedOut: "Stream timed out", SSEFailed: "Could not read the event stream",
 	SSEOverflow: "Some events exceeded the inspection limits and could not be shown.", SSEEmpty: "No complete events yet.",

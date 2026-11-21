@@ -4,6 +4,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -90,7 +91,8 @@ func NewSnapshot(collection model.Collection, settings model.Settings, environme
 // Run snapshots the entire collection, settings and environment before any send,
 // then runs requests in original depth-first order through execution.Plan.
 // Environment rows follow collection rows (last enabled value wins). Script
-// variables are request-local; no response capture or mutation crosses requests.
+// edits are request-local. Explicit response captures from successful requests
+// override saved values within this run.
 // HTTP 4xx/5xx alone are successful. An empty collection succeeds unless ctx is
 // cancelled. Callers must not mutate inputs concurrently with snapshot creation.
 // sender must be non-nil; its transport state (such as a caller-owned Cookie jar)
@@ -113,6 +115,8 @@ func (s Snapshot) run(ctx context.Context, sender service.RequestService, option
 	outcome := Passed
 	ordinal := 0
 	stopped := false
+	variables := s.values
+	var captured []model.KV
 	var walk func([]model.Item)
 	walk = func(items []model.Item) {
 		for _, item := range items {
@@ -125,7 +129,21 @@ func (s Snapshot) run(ctx context.Context, sender service.RequestService, option
 				case stopped:
 					request.Outcome, request.Code = Skipped, CodeSkippedFailure
 				default:
-					request = s.execute(ctx, sender, item, request)
+					request = s.execute(ctx, sender, item, request, variables)
+					if changes := request.Execution; changes != nil && len(changes.Captures) != 0 {
+						if request.Outcome == Passed {
+							next, ok := mergeCaptures(captured, changes.Captures)
+							if ok {
+								captured = next
+								variables = append(slices.Clone(s.values), captured...)
+							} else {
+								changes.Tests.Err = errCaptureLimit
+								changes.Stage = execution.StageTests
+								request.Outcome, request.Code, request.Stage = Failed, CodeTestScript, execution.StageTests
+							}
+						}
+						changes.Captures = nil
+					}
 					if request.Outcome == Failed {
 						outcome = Failed
 						stopped = options.StopOnFailure
@@ -140,10 +158,27 @@ func (s Snapshot) run(ctx context.Context, sender service.RequestService, option
 	return outcome
 }
 
-func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item model.Item, request RequestResult) RequestResult {
+func mergeCaptures(existing, incoming []model.KV) ([]model.KV, bool) {
+	const maxRunCaptures = 128
+	next := slices.Clone(existing)
+	for _, capture := range incoming {
+		index := slices.IndexFunc(next, func(row model.KV) bool { return row.Key == capture.Key })
+		if index >= 0 {
+			next[index] = capture
+		} else {
+			if len(next) == maxRunCaptures {
+				return nil, false
+			}
+			next = append(next, capture)
+		}
+	}
+	return next, true
+}
+
+func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item model.Item, request RequestResult, variables []model.KV) RequestResult {
 	req := *item.Request
 	req.ID = item.ID
-	plan, err := execution.New(execution.Input{Request: req, Collection: s.collection, Settings: s.settings, Variables: s.values})
+	plan, err := execution.New(execution.Input{Request: req, Collection: s.collection, Settings: s.settings, Variables: variables})
 	if ctx.Err() != nil {
 		request.Outcome, request.Code = Skipped, CodeSkippedCancellation
 		return request
@@ -188,6 +223,7 @@ func classify(ctx context.Context, r execution.Result) (Outcome, Code) {
 var (
 	errUnsupportedMethod   = errors.New("unsupported request method")
 	errUnsupportedProtocol = errors.New("unsupported request protocol")
+	errCaptureLimit        = errors.New("response capture limit reached")
 )
 
 // checkedSender sees the once-expanded post-pre-script request. It prevents

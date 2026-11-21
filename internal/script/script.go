@@ -5,10 +5,12 @@ import (
 	_ "embed"
 	"errors"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/robertkrimen/otto"
 	"github.com/runbrick/reva/internal/model"
+	"github.com/runbrick/reva/internal/responsejson"
 	"github.com/runbrick/reva/internal/vars"
 )
 
@@ -41,10 +43,11 @@ var apiProgram = func() *otto.Script {
 type timeoutSignal struct{}
 
 type runner struct {
-	vm      *otto.Otto
-	vars    []model.KV
-	logs    []string
-	results []Result
+	vm       *otto.Otto
+	vars     []model.KV
+	logs     []string
+	results  []Result
+	captures []model.KV
 }
 
 // RunPre executes src and writes request mutations back immediately. Variables
@@ -61,10 +64,15 @@ func RunPre(src string, req *model.Request, values []model.KV, timeout time.Dura
 // RunTests executes src against a request snapshot and response. Failed tests
 // are results; syntax errors, uncaught exceptions and timeouts also return err.
 func RunTests(src string, req model.Request, resp model.Response, values []model.KV, timeout time.Duration) (results []Result, logs []string, err error) {
+	results, logs, _, err = RunTestsWithCaptures(src, req, resp, values, timeout)
+	return results, logs, err
+}
+
+func RunTestsWithCaptures(src string, req model.Request, resp model.Response, values []model.KV, timeout time.Duration) (results []Result, logs []string, captures []model.KV, err error) {
 	req = req.Clone()
 	r := newRunner(&req, &resp, values)
 	err = r.run(src, timeout)
-	return r.results, r.logs, err
+	return r.results, r.logs, r.captures, err
 }
 
 func newRunner(req *model.Request, resp *model.Response, values []model.KV) *runner {
@@ -130,6 +138,30 @@ func newRunner(req *model.Request, resp *model.Response, values []model.KV) *run
 			"responseTime": float64(resp.Duration) / float64(time.Millisecond),
 		}
 		host["text"] = func() string { return string(resp.Body) }
+		document := sync.OnceValue(func() *responsejson.Document {
+			mediaType, _, _ := strings.Cut(resp.Header("Content-Type"), ";")
+			if resp.Truncated || strings.EqualFold(strings.TrimSpace(mediaType), "text/event-stream") {
+				return nil
+			}
+			parsed, _ := responsejson.Parse(resp.Body)
+			return parsed
+		})
+		host["hasJSONField"] = func(pointer string) bool { return document().Lookup(pointer) != nil }
+		host["jsonFieldEquals"] = func(pointer, expected string) bool {
+			value := document().Lookup(pointer)
+			return value != nil && value.EqualsJSONScalar(expected)
+		}
+		host["captureJSON"] = func(pointer, name string) bool {
+			if !responsejson.ValidVariable(name) {
+				return false
+			}
+			value := document().Lookup(pointer)
+			if value == nil {
+				return false
+			}
+			text, ok := value.Scalar()
+			return ok && r.capture(name, text)
+		}
 		host["header"] = func(name string) otto.Value {
 			for _, h := range resp.Headers {
 				if !h.Disabled && strings.EqualFold(h.Key, name) {
@@ -144,6 +176,20 @@ func newRunner(req *model.Request, resp *model.Response, values []model.KV) *run
 		panic(err)
 	}
 	return r
+}
+
+func (r *runner) capture(name, value string) bool {
+	for index, row := range r.captures {
+		if row.Key == name {
+			r.captures[index].Value = value
+			return true
+		}
+	}
+	if len(r.captures) >= responsejson.MaxCaptures {
+		return false
+	}
+	r.captures = append(r.captures, model.KV{Key: name, Value: value})
+	return true
 }
 
 func stringValue(s string) otto.Value {

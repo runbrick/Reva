@@ -59,6 +59,29 @@ run finishes or is cancelled. Cookies from one run never reach another run or
 the manual request editor. Explicit Cookie headers on a request take precedence
 over automatic cookies. The headless CLI does not enable cookie sessions.
 
+## Response tools
+
+Open **Response tools** after a manual HTTP send. Choose **Set as baseline**,
+then send another request and select **Compare with baseline**. The baseline
+stays in memory for the current app session and works across request tabs.
+The comparison shows the two HTTP status codes and JSON changes by field path.
+Object key order is ignored and arrays are compared by position. To skip a field
+and its descendants, enter one JSON Pointer per line, such as `/timestamp` or
+`/data/requestId`.
+
+In **JSON fields**, select a field to add an existence check, an equality check
+for a scalar value, or a capture rule. Reva adds editable code to the request's
+response test script. Equality checks store the selected value in the script.
+These field actions use complete JSON responses up to 512 KiB.
+
+Save the request with the capture rule and reference its variable, for example
+`{{orderId}}`, in a later request in the same collection. The desktop runner and
+`reva-run` make captures from successful steps available for the rest of that
+run, with precedence over environment and collection values. A missing capture
+fails its generated test. Enable **Stop on failure** if later requests depend on
+the value. The collection retains the rule and the captured value stays in run
+memory.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:
@@ -101,8 +124,9 @@ inherited collection/folder auth, request options over saved settings, pre-reque
 scripts, one variable expansion, HTTP, then response tests. Default behavior
 continues after failures; `--stop-on-failure` marks subsequent requests skipped.
 HTTP 4xx/5xx alone do not fail a run; assert the desired status in a response
-test. Script variable edits are local to one request and do not carry into the
-next request. Pre-script failure prevents sending. The existing bounded ES5
+test. Ordinary script variable edits are local to one request. Explicit response
+capture rules can pass values to later requests. Pre-script failure prevents
+sending. The existing bounded ES5
 script sandbox is used; a running script may take up to its two-second limit
 to observe cancellation. Enabled binary/multipart upload references can read
 local files and send them, as in the GUI. This command runs trusted native
@@ -139,8 +163,7 @@ in the report. A per-request timeout is a run failure (`1`); it does not cancel
 the parent run. If stdout cannot be written, the report may be incomplete and
 the exit code is `1` with `reva-run: output_failed` on stderr. No new dependencies,
 GUI packages, parallel execution, iterations, implicit active-environment
-selection, response capture between requests, cookie jar, or full Postman runtime
-are introduced.
+selection, cookie jar, or full Postman runtime are introduced.
 
 ## Layout
 

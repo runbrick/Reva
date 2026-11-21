@@ -102,11 +102,11 @@ func collectionsCreate(h *harness, name string) model.Collection {
 
 func TestCollectionsCreateCollectionAndNestedFolder(t *testing.T) {
 	h := newHarness(t)
-	if !h.shows(h.App.S.Collections.Empty) {
+	if !workspaceSidebarShows(h, h.App.S.Collections.WorkspaceEmpty) {
 		t.Fatal("missing empty state")
 	}
 	col := collectionsCreate(h, "Payments")
-	if !h.shows("Payments") || h.shows(h.App.S.Collections.Empty) {
+	if !h.shows("Payments") || workspaceSidebarShows(h, h.App.S.Collections.WorkspaceEmpty) {
 		t.Fatal("tree did not replace empty state")
 	}
 	collectionsContext(h, "Payments", h.App.S.Collections.NewFolder)
@@ -269,7 +269,7 @@ func TestCollectionsRenameAndDeleteTreeNodes(t *testing.T) {
 	collectionsContext(h, "Billing", h.App.S.Collections.Delete)
 	h.click(h.App.S.Collections.Delete)
 	h.pump()
-	if len(h.Svc.Collections.List()) != 0 || !h.shows(h.App.S.Collections.Empty) {
+	if len(h.Svc.Collections.List()) != 0 || !workspaceSidebarShows(h, h.App.S.Collections.WorkspaceEmpty) {
 		t.Fatal("deleted collection still shown")
 	}
 }
@@ -469,12 +469,11 @@ func TestCollectionsActiveRowAndEllipsisRename(t *testing.T) {
 	}
 }
 
-func TestCollectionsDragRequestBetweenFoldersAndCollections(t *testing.T) {
+func TestCollectionsDragRequestBetweenFolders(t *testing.T) {
 	svc := fake.New()
 	col, _ := svc.Collections.Create("Payments")
 	first, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
 	second, _ := svc.Collections.AddFolder(col.ID, "", "Receipts")
-	other, _ := svc.Collections.Create("Archive")
 	r := model.NewRequest("invoice")
 	r.Name = "List invoices"
 	_, _ = svc.Collections.SaveRequest(col.ID, first.ID, r)
@@ -485,14 +484,32 @@ func TestCollectionsDragRequestBetweenFoldersAndCollections(t *testing.T) {
 	if len(model.FindItem(stored.Items, first.ID).Items) != 0 || model.FindItem(model.FindItem(stored.Items, second.ID).Items, r.ID) == nil {
 		t.Fatal("drag did not move request between folders")
 	}
-	collectionsDrag(h, r.Name, "Archive")
-	stored, _ = svc.Collections.Get(col.ID)
-	destination, _ := svc.Collections.Get(other.ID)
-	if model.FindItem(stored.Items, r.ID) != nil || model.FindItem(destination.Items, r.ID) == nil {
-		t.Fatal("drag did not move request between collections")
+	if h.App.Active().CollectionID != col.ID || h.App.Active().Request.ID != r.ID {
+		t.Fatal("drag changed the open editor's request or collection")
 	}
-	if h.App.Active().CollectionID != other.ID {
-		t.Fatal("moving request left open editor in original collection")
+}
+
+func TestCollectionsMoveRequestBetweenCollections(t *testing.T) {
+	svc := fake.New()
+	source, err := svc.Collections.Create("Archive")
+	authMust(t, err)
+	target, err := svc.Collections.Create("Payments")
+	authMust(t, err)
+	request := model.NewRequest("archive-entry")
+	request.Name = "Get archive entry"
+	request, err = svc.Collections.SaveRequest(source.ID, "", request)
+	authMust(t, err)
+	h := newHarness(t, svc)
+	h.click(request.Name)
+	open := h.App.Active()
+	h.App.moveCollectionItem(collectionNode{collectionID: source.ID, id: request.ID}, collectionNode{collectionID: target.ID})
+	source, _ = svc.Collections.Get(source.ID)
+	target, _ = svc.Collections.Get(target.ID)
+	if model.FindItem(source.Items, request.ID) != nil || model.FindItem(target.Items, request.ID) == nil {
+		t.Fatal("move did not transfer the request between collections")
+	}
+	if h.App.Active() != open || open.CollectionID != target.ID {
+		t.Fatal("moving request left the open editor in its original collection")
 	}
 }
 
@@ -549,19 +566,26 @@ func TestCollectionsFilterKeepsMatchingParents(t *testing.T) {
 	r.Name = "List invoices"
 	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
 	_, _ = svc.Collections.AddFolder(col.ID, "", "Unrelated")
+	other, err := svc.Collections.Create("Z Archive")
+	authMust(t, err)
+	otherRequest := model.NewRequest("archived-invoice")
+	otherRequest.Name = "List archived invoices"
+	_, err = svc.Collections.SaveRequest(other.ID, "", otherRequest)
+	authMust(t, err)
 	h := newHarness(t, svc)
 	collectionsDrag(h, "Invoices", "Invoices")
-	h.typeInto(h.App.S.Collections.Filter, "LIST")
+	h.typeInto(h.App.S.Collections.WorkspaceFilter, "LIST")
 	h.pump()
-	if !h.shows("Payments") || !h.shows("Invoices") || !h.shows(r.Name) || h.shows("Unrelated") {
+	if !workspaceHasSidebarHit(h, "Payments") || !workspaceHasSidebarHit(h, "Invoices") ||
+		!workspaceHasSidebarHit(h, r.Name) || workspaceHasSidebarHit(h, "Unrelated") || workspaceHasSidebarHit(h, otherRequest.Name) {
 		t.Fatalf("filter failed to preserve matching request ancestry: %+v", h.App.collections.visible)
 	}
-	collectionsReplace(h, h.App.S.Collections.Filter, "missing")
+	collectionsReplace(h, h.App.S.Collections.WorkspaceFilter, "archived")
 	h.pump()
-	if !h.shows(h.App.S.Collections.NoMatches) {
-		t.Fatal("missing no matches feedback")
+	if !workspaceSidebarShows(h, h.App.S.Collections.WorkspaceNoMatches) || workspaceHasSidebarHit(h, otherRequest.Name) {
+		t.Fatal("a match in another collection hid the current collection's no-matches feedback")
 	}
-	collectionsReplace(h, h.App.S.Collections.Filter, "")
+	collectionsReplace(h, h.App.S.Collections.WorkspaceFilter, "")
 	h.pump()
 	if !h.shows("Unrelated") {
 		t.Fatal("clearing filter did not restore tree")
@@ -662,7 +686,7 @@ func TestCollectionsAddMenuUsesSelectedFolder(t *testing.T) {
 	}
 }
 
-func TestCollectionsDragFolderPreservesChildrenAndOpenTab(t *testing.T) {
+func TestCollectionsMoveFolderPreservesChildrenAndOpenTab(t *testing.T) {
 	svc := fake.New()
 	col, _ := svc.Collections.Create("Payments")
 	folder, _ := svc.Collections.AddFolder(col.ID, "", "Invoices")
@@ -671,8 +695,9 @@ func TestCollectionsDragFolderPreservesChildrenAndOpenTab(t *testing.T) {
 	r.Name = "List invoices"
 	_, _ = svc.Collections.SaveRequest(col.ID, folder.ID, r)
 	h := newHarness(t, svc)
+	workspacePick(h, col.Name)
 	h.click(r.Name)
-	collectionsDrag(h, "Invoices", "Archive")
+	h.App.moveCollectionItem(collectionNode{collectionID: col.ID, id: folder.ID}, collectionNode{collectionID: other.ID})
 	source, _ := svc.Collections.Get(col.ID)
 	target, _ := svc.Collections.Get(other.ID)
 	if model.FindItem(source.Items, folder.ID) != nil || model.FindItem(target.Items, r.ID) == nil || h.App.Active().CollectionID != other.ID {
@@ -701,8 +726,10 @@ func TestCollectionsFailedCrossCollectionMoveKeepsOriginal(t *testing.T) {
 	_, _ = svc.Collections.SaveRequest(col.ID, "", r)
 	svc.Collections = &collectionsFailingMove{CollectionService: svc.Collections, sourceID: col.ID}
 	h := newHarness(t, svc)
+	workspacePick(h, col.Name)
 	h.click(r.Name)
-	collectionsDrag(h, r.Name, "Archive")
+	h.App.moveCollectionItem(collectionNode{collectionID: col.ID, id: r.ID}, collectionNode{collectionID: other.ID})
+	collectionsPaint(h)
 	source, _ := svc.Collections.Get(col.ID)
 	target, _ := svc.Collections.Get(other.ID)
 	if model.FindItem(source.Items, r.ID) == nil || model.FindItem(target.Items, r.ID) != nil || h.App.Active().CollectionID != col.ID {

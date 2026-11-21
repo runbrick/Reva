@@ -11,11 +11,13 @@ import (
 	"github.com/runbrick/reva/internal/execution"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service"
+	"github.com/runbrick/reva/internal/service/request"
 )
 
-// Options configures failure handling. The zero value continues after failures.
+// Options configures execution. The zero value continues after failures without a cookie jar.
 type Options struct {
-	StopOnFailure bool
+	StopOnFailure    bool
+	UseCookieSession bool
 }
 
 // Outcome is the disposition of a run or request, independent of HTTP status.
@@ -50,6 +52,7 @@ const (
 // value with fmt or serialize Execution directly: both can expose secrets.
 type RequestResult struct {
 	Ordinal   int               `json:"-"`
+	Iteration int               `json:"-"`
 	ItemID    string            `json:"-"`
 	Outcome   Outcome           `json:"-"`
 	Code      Code              `json:"-"`
@@ -74,6 +77,7 @@ type Result struct {
 // when the caller needs to fix the inputs on its own thread.
 type Snapshot struct {
 	collection model.Collection
+	requests   []*model.Item
 	settings   model.Settings
 	values     []model.KV
 }
@@ -83,9 +87,43 @@ func NewSnapshot(collection model.Collection, settings model.Settings, environme
 	collection = cloneCollection(collection)
 	return Snapshot{
 		collection: collection,
+		requests:   requestItems(collection.Items),
 		settings:   settings,
 		values:     append(append([]model.KV(nil), collection.Variables...), environment...),
 	}
+}
+
+// WithFolder restricts execution to a saved folder ID. An empty ID selects the
+// whole collection. The full tree remains available for inherited auth.
+func (s Snapshot) WithFolder(folderID string) (Snapshot, error) {
+	if folderID == "" {
+		s.requests = requestItems(s.collection.Items)
+		return s, nil
+	}
+	folder := model.FindItem(s.collection.Items, folderID)
+	if folder == nil || folder.Type != model.ItemFolder {
+		return Snapshot{}, ErrInvalidFolder
+	}
+	s.requests = requestItems(folder.Items)
+	return s, nil
+}
+
+var ErrInvalidFolder = errors.New("invalid run folder")
+
+func requestItems(items []model.Item) []*model.Item {
+	var requests []*model.Item
+	var walk func([]model.Item)
+	walk = func(nodes []model.Item) {
+		for index := range nodes {
+			item := &nodes[index]
+			if item.Type == model.ItemRequest && item.Request != nil {
+				requests = append(requests, item)
+			}
+			walk(item.Items)
+		}
+	}
+	walk(items)
+	return requests
 }
 
 // Run snapshots the entire collection, settings and environment before any send,
@@ -95,13 +133,13 @@ func NewSnapshot(collection model.Collection, settings model.Settings, environme
 // override saved values within this run.
 // HTTP 4xx/5xx alone are successful. An empty collection succeeds unless ctx is
 // cancelled. Callers must not mutate inputs concurrently with snapshot creation.
-// sender must be non-nil; its transport state (such as a caller-owned Cookie jar)
-// is outside the runner's isolation boundary.
+// sender must be non-nil. An opted-in runner cookie session belongs to a single
+// iteration. Transport state supplied by the caller remains caller-owned.
 func Run(ctx context.Context, sender service.RequestService, collection model.Collection, settings model.Settings, environment []model.KV, options Options) Result {
 	start := time.Now()
 	snapshot := NewSnapshot(collection, settings, environment)
 	details := make([]RequestResult, 0)
-	outcome := snapshot.run(ctx, sender, options, func(request RequestResult) {
+	outcome := snapshot.run(ctx, sender, options, IterationData{}, func(request RequestResult) {
 		details = append(details, request)
 	})
 	err := ctx.Err()
@@ -111,50 +149,55 @@ func Run(ctx context.Context, sender service.RequestService, collection model.Co
 	return Result{Outcome: outcome, Err: err, Duration: time.Since(start), Requests: details}
 }
 
-func (s Snapshot) run(ctx context.Context, sender service.RequestService, options Options, record func(RequestResult)) Outcome {
+func (s Snapshot) run(ctx context.Context, sender service.RequestService, options Options, data IterationData, record func(RequestResult)) Outcome {
 	outcome := Passed
 	ordinal := 0
 	stopped := false
-	variables := s.values
-	var captured []model.KV
-	var walk func([]model.Item)
-	walk = func(items []model.Item) {
-		for _, item := range items {
-			if item.Type == model.ItemRequest && item.Request != nil {
-				ordinal++
-				request := RequestResult{Ordinal: ordinal, ItemID: item.ID, Stage: "pending"}
-				switch {
-				case ctx.Err() != nil:
-					request.Outcome, request.Code = Skipped, CodeSkippedCancellation
-				case stopped:
-					request.Outcome, request.Code = Skipped, CodeSkippedFailure
-				default:
-					request = s.execute(ctx, sender, item, request, variables)
-					if changes := request.Execution; changes != nil && len(changes.Captures) != 0 {
-						if request.Outcome == Passed {
-							next, ok := mergeCaptures(captured, changes.Captures)
-							if ok {
-								captured = next
-								variables = append(slices.Clone(s.values), captured...)
-							} else {
-								changes.Tests.Err = errCaptureLimit
-								changes.Stage = execution.StageTests
-								request.Outcome, request.Code, request.Stage = Failed, CodeTestScript, execution.StageTests
-							}
-						}
-						changes.Captures = nil
-					}
-					if request.Outcome == Failed {
-						outcome = Failed
-						stopped = options.StopOnFailure
-					}
-				}
-				record(request)
+	for index := range max(1, len(data.rows)) {
+		iteration, base, iterationCtx := 0, s.values, ctx
+		if len(data.rows) != 0 {
+			iteration = index + 1
+			if !stopped && ctx.Err() == nil && len(s.requests) != 0 {
+				base = append(slices.Clone(base), data.rows[index]...)
 			}
-			walk(item.Items)
+		}
+		if options.UseCookieSession && !stopped && ctx.Err() == nil && len(s.requests) != 0 {
+			iterationCtx = request.WithCookieSession(ctx, request.NewCookieSession())
+		}
+		variables := base
+		var captured []model.KV
+		for _, item := range s.requests {
+			ordinal++
+			result := RequestResult{Ordinal: ordinal, Iteration: iteration, ItemID: item.ID, Stage: "pending"}
+			switch {
+			case ctx.Err() != nil:
+				result.Outcome, result.Code = Skipped, CodeSkippedCancellation
+			case stopped:
+				result.Outcome, result.Code = Skipped, CodeSkippedFailure
+			default:
+				result = s.execute(iterationCtx, sender, item, result, variables)
+				if changes := result.Execution; changes != nil && len(changes.Captures) != 0 {
+					if result.Outcome == Passed {
+						next, ok := mergeCaptures(captured, changes.Captures)
+						if ok {
+							captured = next
+							variables = append(slices.Clone(base), captured...)
+						} else {
+							changes.Tests.Err = errCaptureLimit
+							changes.Stage = execution.StageTests
+							result.Outcome, result.Code, result.Stage = Failed, CodeTestScript, execution.StageTests
+						}
+					}
+					changes.Captures = nil
+				}
+				if result.Outcome == Failed {
+					outcome = Failed
+					stopped = options.StopOnFailure
+				}
+			}
+			record(result)
 		}
 	}
-	walk(s.collection.Items)
 	return outcome
 }
 
@@ -175,7 +218,7 @@ func mergeCaptures(existing, incoming []model.KV) ([]model.KV, bool) {
 	return next, true
 }
 
-func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item model.Item, request RequestResult, variables []model.KV) RequestResult {
+func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item *model.Item, request RequestResult, variables []model.KV) RequestResult {
 	req := *item.Request
 	req.ID = item.ID
 	plan, err := execution.New(execution.Input{Request: req, Collection: s.collection, Settings: s.settings, Variables: variables})

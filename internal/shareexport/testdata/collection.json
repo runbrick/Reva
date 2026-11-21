@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "id": "SECRET_COLLECTION_ID",
+  "name": "Payments 示例",
+  "auth": {"type":"bearer", "token":"{{localToken}}"},
+  "variables": [
+    {"key":"localToken", "value":"SECRET_LOCAL_TOKEN", "description":"SECRET_VARIABLE_NOTE"},
+    {"key":"{{dynamicKey}}", "value":"SECRET_DYNAMIC_KEY"}
+  ],
+  "environmentScope": {
+    "activeId":"SECRET_ENV_ID",
+    "visibleIds":["SECRET_ENV_ID", "SECRET_SHARED_ID"],
+    "local":[{"id":"SECRET_ENV_ID", "version":1, "name":"Local", "variables":[{"key":"localToken", "value":"SECRET_ENV_TOKEN"}]}]
+  },
+  "items": [
+    {"type":"request", "id":"SECRET_ITEM_1", "name":"Listing", "request":{
+      "id":"SECRET_ITEM_1", "name":"Listing", "method":"GET", "auth":{"type":"inherit"}, "body":{"mode":"none"},
+      "url":"https://SECRET_USER:{{localPassword}}@example.invalid/SECRET_PATH?tag=SECRET_QUERY&tag=&SECRET_BARE#SECRET_FRAGMENT",
+      "params":[{"key":"tag", "value":"SECRET_QUERY"}, {"key":"tag", "value":""}, {"key":"cursor", "value":"SECRET_CURSOR", "disabled":true}],
+      "headers":[{"key":"Authorization", "value":"SECRET_HEADER"}, {"key":"X-Trace", "value":"SECRET_TRACE"}, {"key":"X-Trace", "value":""}, {"key":"Cookie", "value":"SECRET_COOKIE", "disabled":true}]
+    }},
+    {"type":"folder", "id":"SECRET_FOLDER_ID", "name":"Public", "auth":{"type":"none", "password":"SECRET_INACTIVE_PASSWORD"}, "items":[
+      {"type":"folder", "id":"empty", "name":"Empty"},
+      {"type":"request", "id":"head", "name":"Health", "request":{
+        "name":"Health", "method":"HEAD", "url":"{{host}}/SECRET_HEALTH", "auth":{"type":"inherit"}, "body":{"mode":"none"},
+        "params":[{"key":"tag", "value":"SECRET_UNICODE_中文\n\""}, {"key":"tag", "value":""}]
+      }},
+      {"type":"request", "id":"post", "name":"Update", "request":{
+        "name":"Update", "method":"POST", "url":"{{savedPrivateURL}}", "body":{"mode":"json", "text":"{\"secret\":\"SECRET_BODY\"}"},
+        "auth":{"type":"basic", "username":"SECRET_BASIC_USER", "password":"SECRET_BASIC_PASS"}
+      }}
+    ]},
+    {"type":"request", "id":"upload", "name":"Upload", "request":{
+      "name":"Upload", "method":"POST", "url":"{{host}}/SECRET_UPLOAD", "auth":{"type":""},
+      "body":{"mode":"form-data", "form":[{"key":"file", "value":"C:/SECRET_FILE", "file":true}, {"key":"note", "value":"SECRET_FORM"}]}
+    }},
+    {"type":"request", "id":"script", "name":"Scripted", "request":{
+      "name":"Scripted", "method":"GET", "url":"{{host}}/SECRET_SCRIPT_ROUTE", "auth":{"type":"inherit"},
+      "body":{"mode":"none"}, "preScript":"SECRET_PRE", "testScript":"SECRET_TEST", "options":{"verifyTls":"off"}
+    }},
+    {"type":"request", "id":"ws", "name":"Socket", "request":{
+      "name":"Socket", "method":"WS", "url":"wss://SECRET_WS", "auth":{"type":"none"}, "body":{"mode":"none"}
+    }}
+  ]
+}

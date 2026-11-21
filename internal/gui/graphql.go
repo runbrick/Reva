@@ -47,6 +47,19 @@ func graphQLFields(body string) (map[string]json.RawMessage, string, string, boo
 
 func (a *App) graphQLBodySection(c ui.C, t *Tab, s *requestTabState) bool {
 	fields, query, variables, ok := graphQLFields(t.Request.Body.Text)
+	ui.Row(c).FillWidth().Gap(Space2).Items(ui.Center).Children(func() {
+		if ok {
+			label := a.S.Request.GraphQLRaw
+			if s.graphQLRaw {
+				label = a.S.Request.GraphQLEdit
+			}
+			if ui.Button(c, label).Ghost().Small().Clicked() {
+				s.graphQLRaw = !s.graphQLRaw
+			}
+		}
+		a.graphQLSchemaAction(c, t, &s.graphQLSchema)
+	})
+	a.graphQLSchemaResults(c, &s.graphQLSchema)
 	if !ok {
 		s.graphQLError = false
 		return false
@@ -54,13 +67,6 @@ func (a *App) graphQLBodySection(c ui.C, t *Tab, s *requestTabState) bool {
 	if s.graphQLBody != t.Request.Body.Text {
 		s.graphQLBody, s.graphQLQuery, s.graphQLVariables = t.Request.Body.Text, query, variables
 		s.graphQLError = false
-	}
-	label := a.S.Request.GraphQLRaw
-	if s.graphQLRaw {
-		label = a.S.Request.GraphQLEdit
-	}
-	if ui.Button(c, label).Ghost().Small().Clicked() {
-		s.graphQLRaw = !s.graphQLRaw
 	}
 	if s.graphQLRaw {
 		s.graphQLError = false

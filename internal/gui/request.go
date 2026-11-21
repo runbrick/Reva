@@ -60,6 +60,7 @@ type requestTabState struct {
 	graphQLBody, graphQLQuery      string
 	graphQLVariables               string
 	graphQLRaw, graphQLError       bool
+	graphQLSchema                  graphQLSchemaState
 	captions                       [requestSettings + 1]requestSectionCaption
 }
 

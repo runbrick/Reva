@@ -53,11 +53,10 @@ clears them. Manual sessions
 stay in memory and are separate from collection runs.
 
 In the desktop **Run collection** dialog, check **Use cookie session for this
-run** to carry cookies between requests in that run. This option starts off for
-each new dialog. Every run gets a fresh, private session, discarded after the
-run finishes or is cancelled. Cookies from one run never reach another run or
-the manual request editor. Explicit Cookie headers on a request take precedence
-over automatic cookies. The headless CLI does not enable cookie sessions.
+run** to carry cookies between requests. In the CLI, use `--cookie-session`.
+The option defaults to off. With cookies enabled, each run gets a fresh,
+private session, or a fresh session per data row. Reva discards each session
+after use. Explicit `Cookie` headers take precedence over automatic cookies.
 
 ## Response tools
 
@@ -105,7 +104,11 @@ explicitly selected shared `environments/<ID>.json` are read. `--environment`
 looks first for that ID in the collection's own environments, then in the shared
 directory. **No environment is used by default**, regardless of the GUI's
 picker settings. Explicit environment rows override collection variables;
-disabled rows fall back to enabled collection values.
+disabled rows fall back to enabled collection values. Use `--folder ID` to run
+one folder in saved order and `--data-file PATH` to repeat the selected scope
+for each CSV or JSON row. The desktop runner also supports both options. See
+[Native runner workflows](docs/research/runner-workflows.md) for limits and
+variable precedence.
 
 The CLI creates no data directories and saves no settings, collection,
 environment, or history files, on success, error, or cancellation. An absent
@@ -132,11 +135,11 @@ to observe cancellation. Enabled binary/multipart upload references can read
 local files and send them, as in the GUI. This command runs trusted native
 collections; it is not an import preview or a filesystem/network sandbox.
 
-After any run, stdout contains exactly one compact JSON report plus a newline,
-including failures and partial cancellation. Input/load errors produce no
-report; help prints usage text. Stderr contains only fixed diagnostic codes,
-never raw filesystem, HTTP, or script errors. Example for an empty collection
-(the measured `durationNs` varies):
+After a run, stdout contains a report, including failures and partial
+cancellation. The default is one compact JSON object plus a newline. Use
+`--report-format junit` to generate JUnit XML for CI. Input/load errors produce
+no report. Help prints usage text. Stderr uses fixed diagnostic codes. Example
+JSON for an empty collection (the measured `durationNs` varies):
 
 ```json
 {"version":1,"outcome":"passed","durationNs":1200,"counts":{"total":0,"passed":0,"failed":0,"cancelled":0,"skipped":0},"assertions":{"passed":0,"failed":0},"requests":[]}
@@ -145,7 +148,8 @@ never raw filesystem, HTTP, or script errors. Example for an empty collection
 Report version 1 is independent of the native data schema. Reports contain only
 fixed outcome/stage/diagnostic codes, one-based request ordinals, sender-invoked
 flags, optional HTTP status codes, nonnegative nanosecond timings, request counts,
-and assertion pass/fail counts. They omit all entity IDs/names, URLs, methods,
+and assertion pass/fail counts. Data runs also report iteration counts and
+ordinals. Reports omit all entity IDs/names, URLs, methods,
 headers, bodies, credentials, variables, script sources/logs, assertion names,
 and arbitrary error messages. Locate a reported ordinal using the collection's
 depth-first request order. Counts/order, HTTP status, timings, and execution
@@ -161,9 +165,7 @@ outcomes are intentionally visible; there is no raw/debug report flag.
 Cancellation prevents subsequent sends and includes skipped request positions
 in the report. A per-request timeout is a run failure (`1`); it does not cancel
 the parent run. If stdout cannot be written, the report may be incomplete and
-the exit code is `1` with `reva-run: output_failed` on stderr. No new dependencies,
-GUI packages, parallel execution, iterations, implicit active-environment
-selection, cookie jar, or full Postman runtime are introduced.
+the exit code is `1` with `reva-run: output_failed` on stderr.
 
 ## Layout
 

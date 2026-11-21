@@ -81,6 +81,13 @@ fails its generated test. Enable **Stop on failure** if later requests depend on
 the value. The collection retains the rule and the captured value stays in run
 memory.
 
+The response footer also lets you save one response example per saved HTTP
+request, reopen it offline, or delete it. Use **Export WireMock** to review and
+save a static mapping from a current response or saved example. Examples use
+local plaintext files and the response body is opt-in. See
+[Saved response examples and WireMock export](docs/research/response-examples.md)
+for body limits, matching behavior, and manual backup instructions.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:

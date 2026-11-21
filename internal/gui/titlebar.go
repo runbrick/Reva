@@ -68,14 +68,14 @@ func (a *App) titlebarStrip(c ui.C) {
 
 func (a *App) studioCollectionPicker(c ui.C) {
 	theme, labels := c.Theme(), a.S.Collections
-	activeID := a.Active().CollectionID
+	activeID := a.workspaceCollectionID()
 	name := labels.Title
 	if collection, found := a.Svc.Collections.Get(activeID); found {
 		name = collection.Name
 	}
 	trigger := ui.ButtonBase(c, labels.Collection).Width(Space6*7).Height(theme.Metrics.ControlHeight).Shrink(0).
 		Radius(theme.Metrics.RadiusControl).Border(1, theme.Border).Background(theme.Card).
-		PadX(Space2).Gap(Space2).Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
+		PadX(Space2).Gap(Space2).Tooltip(name).Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring)).Children(func() {
 		ui.Icon(c, icons.Folder).Size(Space4, Space4).Color(theme.MutedForeground)
 		ui.Text(c, name).Grow(1).Ellipsis()
 		ui.Icon(c, icons.ChevronDown).Size(Space4, Space4).Color(theme.MutedForeground)
@@ -84,10 +84,17 @@ func (a *App) studioCollectionPicker(c ui.C) {
 		a.titlebar.collectionsOpen = !a.titlebar.collectionsOpen
 	}
 	ui.Menu(c, trigger, &a.titlebar.collectionsOpen, func(menu *ui.MenuItems) {
+		menu.WidthRange(Space6*7, Space6*16)
 		for _, collection := range a.Svc.Collections.List() {
 			if menu.Item(collection.Name).Icon(icons.Folder).Chosen(collection.ID == activeID).Clicked() {
+				c.After(func() { a.focusWorkspaceCollection(collection.ID) })
+			}
+		}
+		if activeID != "" {
+			menu.Separator()
+			if menu.Item(labels.Settings).Icon(icons.Settings).Clicked() {
 				c.After(func() {
-					a.openCollectionSettings(collectionNode{collectionID: collection.ID}, collectionSettingsGeneral)
+					a.openCollectionSettings(collectionNode{collectionID: activeID}, collectionSettingsGeneral)
 				})
 			}
 		}

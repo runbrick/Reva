@@ -29,6 +29,7 @@ type collectionsState struct {
 	collectionNames                 map[string]string
 	actionsFormat                   string
 	filter, appliedFilter           string
+	workspaceID                     string
 	addOpen, rowMenuOpen            bool
 	rowMenuID                       string
 	selected                        collectionNode
@@ -154,6 +155,9 @@ func (s *collectionsState) flattenVisible() {
 	s.appliedFilter = s.filter
 	hiddenBelow := -1
 	for i, n := range s.all {
+		if n.collectionID != s.workspaceID {
+			continue
+		}
 		if query != "" {
 			match := strings.Contains(strings.ToLower(n.name), query)
 			for j := i + 1; !match && j < len(s.all) && s.all[j].depth > n.depth; j++ {
@@ -192,9 +196,6 @@ func (a *App) refreshCollections() {
 	}
 	cols := a.Svc.Collections.List()
 	if s.ready && s.actionsFormat == a.S.Collections.Actions && s.matches(cols) {
-		if s.appliedFilter != s.filter {
-			s.flattenVisible()
-		}
 		return
 	}
 	s.ready = true
@@ -241,6 +242,14 @@ func (a *App) refreshCollections() {
 func (a *App) collectionsPane(c ui.C) {
 	a.refreshCollections()
 	s, text, theme := &a.collections, a.S.Collections, c.Theme()
+	if id := a.workspaceCollectionID(); id != s.workspaceID {
+		s.workspaceID = id
+		s.filter = ""
+		s.selected = collectionNode{}
+		s.rowMenuID, s.rowMenuOpen = "", false
+		s.tree.ScrollTo(0, ui.ListStart)
+		s.flattenVisible()
+	}
 	s.activeCollection, s.activeRequest = a.Active().CollectionID, a.Active().Request.ID
 	s.activeSettings = a.Active().Kind == collectionSettingsTabKind
 	if s.activeSettings {
@@ -301,17 +310,26 @@ func (a *App) collectionsPane(c ui.C) {
 				}
 			})
 		})
-		ui.TextField(c, &s.filter, text.Filter, text.Filter).Icon(icons.Search).FillWidth().Background(theme.Muted).Border(1, theme.Border)
+		if s.workspaceID == "" {
+			ui.Paragraph(c, text.WorkspaceEmpty, 0).FillWidth().Muted().FontSize(theme.Metrics.FontSizeS)
+			if !s.addOpen && !s.dialogOpen && !a.titlebar.collectionsOpen {
+				if ui.Button(c, text.NewCollection).Icon(icons.Plus).Outline().FillWidth().Clicked() {
+					c.After(func() { a.collectionNameDialog(collectionCreate, collectionNode{}) })
+				}
+			}
+			if ui.Button(c, a.S.Import.Title).Icon(icons.Download).Ghost().FillWidth().Clicked() {
+				c.After(a.openImportDialog)
+			}
+			return
+		}
+		ui.TextField(c, &s.filter, text.WorkspaceFilter, text.WorkspaceFilter).Icon(icons.Search).FillWidth().Background(theme.Muted).Border(1, theme.Border)
 		// Read the bound string after declaring the editor, before the Tree reads
 		// its rows. Text input arrives in a regular repaint rather than a click.
 		if s.appliedFilter != s.filter {
 			s.flattenVisible()
 		}
-		if len(s.all) == 0 {
-			ui.Paragraph(c, text.Empty, 0).FillWidth().Muted().FontSize(theme.Metrics.FontSizeS)
-		}
-		if len(s.all) > 0 && len(s.visible) == 0 {
-			ui.Text(c, text.NoMatches).Muted()
+		if len(s.visible) == 0 {
+			ui.Paragraph(c, text.WorkspaceNoMatches, 0).FillWidth().Muted()
 		}
 		ui.Tree(c, &s.tree, len(s.visible), s.label, func(i int) {
 			n := s.visible[i]
@@ -388,6 +406,30 @@ func (a *App) newCollectionTab() {
 func (a *App) newGraphQLTab() {
 	a.newCollectionTab()
 	a.initGraphQLRequest(a.Active())
+}
+
+func (a *App) focusWorkspaceCollection(id string) {
+	a.selectWorkspaceCollection(id)
+	a.SelectSection(SectionAPIs)
+	if a.workspaceCollectionID() == id {
+		return
+	}
+	standalone := -1
+	for index := len(a.tabs) - 1; index >= 0; index-- {
+		tab := a.tabs[index]
+		if tab.CollectionID == id {
+			a.active = index
+			return
+		}
+		if standalone < 0 && tab.CollectionID == "" {
+			standalone = index
+		}
+	}
+	if standalone >= 0 {
+		a.active = standalone
+	} else {
+		a.NewTab()
+	}
 }
 
 // Only an inside drop is accepted; collection roots cannot themselves be moved.
@@ -716,6 +758,7 @@ func (a *App) saveCollectionRequest() {
 		if a.collectionError(err) {
 			return
 		}
+		a.selectWorkspaceCollection(col.ID)
 		s.saveCollection, s.saveFolder, s.inlineCollection = col.ID, "", false
 	}
 	r := s.saveTab.Request.Clone()
@@ -772,7 +815,11 @@ func (a *App) applyCollectionEdit() {
 	var err error
 	switch s.dialog {
 	case collectionCreate:
-		_, err = a.Svc.Collections.Create(name)
+		col, createErr := a.Svc.Collections.Create(name)
+		if createErr == nil {
+			a.focusWorkspaceCollection(col.ID)
+		}
+		err = createErr
 	case collectionFolder:
 		_, err = a.Svc.Collections.AddFolder(n.collectionID, n.id, name)
 		if err == nil {

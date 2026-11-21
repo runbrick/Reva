@@ -206,18 +206,21 @@ func TestCollectionOverviewFolderActionsAndSavedExport(t *testing.T) {
 
 func TestCollectionOverviewDuplicateNamesHaveDistinctGears(t *testing.T) {
 	h, col := collectionLayoutFixture(t)
-	_, err := h.Svc.Collections.Create(col.Name)
+	_, err := h.Svc.Collections.AddFolder(col.ID, "", "Invoices")
 	authMust(t, err)
 	requestRepaint(h)
 	seen := make(map[string]bool)
 	for _, n := range h.App.collections.visible {
-		if n.branch {
+		if n.branch && n.name == "Invoices" {
 			if seen[n.settings] || !strings.Contains(n.settings, n.name) {
 				t.Fatal("gear names are ambiguous or omit the display name")
 			}
 			seen[n.settings] = true
 			collectionLayoutHit(t, h, n.settings)
 		}
+	}
+	if len(seen) != 2 {
+		t.Fatalf("expected two Invoices gear controls, got %v", seen)
 	}
 }
 

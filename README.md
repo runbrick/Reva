@@ -167,6 +167,15 @@ in the report. A per-request timeout is a run failure (`1`); it does not cancel
 the parent run. If stdout cannot be written, the report may be incomplete and
 the exit code is `1` with `reva-run: output_failed` on stderr.
 
+## Collection share templates
+
+Open a collection's **Settings > Overview > Export share template** to
+preview and save a Reva share template, Postman Collection v2.1, Hurl HTTP
+template, or k6 single-flow script. Templates replace stored URLs and values
+with input variables, omit credentials and local file paths, and list skipped
+requests and fields. Review collection and field names before sharing. See
+[Collection share templates](docs/research/share-exports.md) for format limits.
+
 ## Layout
 
 ```

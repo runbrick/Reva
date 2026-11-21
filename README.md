@@ -28,6 +28,17 @@ not move existing user data. Backups now use `.revabak` and the
 `reva-backup-v1` envelope; backups from earlier builds must be re-exported from
 their local data with this build.
 
+## Collection workbench
+
+Use the collection picker in the top bar to focus the **APIs** sidebar on one
+collection. The sidebar filter searches that collection. Global search can
+still open requests in any collection. Opening a saved request brings its
+collection into view. Switching collections keeps open tabs and their drafts.
+
+On first desktop launch with no collections, Reva creates one collection in
+the current app language. If you later delete every collection, the sidebar
+offers **New collection** and **Import**.
+
 ## Collection environments
 
 Open **Collection settings > Collection environments** to choose which
@@ -87,6 +98,13 @@ save a static mapping from a current response or saved example. Examples use
 local plaintext files and the response body is opt-in. See
 [Saved response examples and WireMock export](docs/research/response-examples.md)
 for body limits, matching behavior, and manual backup instructions.
+
+## GraphQL schema
+
+In a GraphQL request's **Body** tab, choose **Load schema** to browse and
+filter Query, Mutation, and Subscription fields and their return types. See
+[Browse GraphQL root fields](docs/research/graphql-schema.md) for how the
+request uses the current endpoint, variables, and authentication.
 
 ## Headless collection CLI
 

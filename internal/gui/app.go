@@ -151,6 +151,8 @@ type App struct {
 	search      searchState
 	websocket   websocketState
 	toolbox     toolboxState
+
+	collectionWorkspace collectionWorkspaceState
 }
 
 // New builds the App around svc, applying the stored settings.

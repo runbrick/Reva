@@ -315,6 +315,9 @@ type Settings struct {
 	// their zero values are the safe ones (follow redirects, verify TLS).
 	NoFollowRedirects bool `json:"noFollowRedirects,omitempty"`
 	InsecureTLS       bool `json:"insecureTls,omitempty"`
+
+	CollectionWorkspaceInitialized bool   `json:"collectionWorkspaceInitialized,omitempty"`
+	WorkspaceCollectionID          string `json:"workspaceCollectionId,omitempty"`
 }
 
 // DefaultSettings returns the settings used before the user changes any.

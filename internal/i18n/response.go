@@ -69,6 +69,7 @@ type Response struct {
 	SSEEventType       string
 	SSEEventID         string
 	Tools              ResponseTools
+	Artifacts          ResponseArtifacts
 }
 
 type ResponseTools struct {
@@ -82,7 +83,30 @@ type ResponseTools struct {
 	ExistsTest, EqualsTest, CaptureTest, ScriptAdded                               string
 }
 
+type ResponseArtifacts struct {
+	Example, Export, ExportExample, Empty, RequiresSaved, ReviewSave, ReviewReplace string
+	Save, Replace, Delete, ConfirmDelete, DeleteHelp, Saved, Deleted, NoSavedBody   string
+	Path, OptionalPath, PathError, SaveHelp, ExportHelp, Back                       string
+	IncludeBody, BodyReview, BodyHelp, BodyUnavailable, TemplateBody                string
+	Preview, JSONPreview, PreviewHelp, ConfirmExport, Exported                      string
+	ReadError, WriteError, DeleteError, MappingError, ExportError                   string
+}
+
 var responseZh = Response{
+	Artifacts: ResponseArtifacts{
+		Example: "响应示例", Export: "导出 WireMock", ExportExample: "导出此示例",
+		Empty: "此请求还没有响应示例。手动发送请求后即可保存示例。", RequiresSaved: "请先将请求保存到集合。",
+		ReviewSave: "查看并保存当前响应", ReviewReplace: "查看并替换为当前响应", Save: "保存示例", Replace: "替换示例",
+		Delete: "删除示例", ConfirmDelete: "确认删除示例", DeleteHelp: "确定要删除此请求的本地响应示例吗？",
+		Saved: "已在本地保存示例", Deleted: "已删除本地示例", NoSavedBody: "此示例未保存正文。",
+		Path: "固定匹配路径", OptionalPath: "固定匹配路径（可选）", PathError: "请输入以 / 开头的固定路径，不含主机、查询参数、片段或变量。",
+		SaveHelp: "示例保存在本机。请移除路径中的密钥或敏感标识，也可以留空。", ExportHelp: "仅匹配此方法和路径。请检查路径并移除密钥或敏感标识。只有允许的 Content-Type 才会导出。",
+		Back: "返回", IncludeBody: "包括响应正文", BodyReview: "响应正文检查", BodyHelp: "正文可能包含密钥或个人信息。继续前请检查完整正文。",
+		BodyUnavailable: "没有可包含的完整 UTF-8 文本正文（上限 256 KiB）。", TemplateBody: "包含模板起始标记的正文不能用于静态映射。",
+		Preview: "预览映射 JSON", JSONPreview: "WireMock 映射 JSON 预览", PreviewHelp: "请核对映射 JSON。确认后选择文件位置并保存。",
+		ConfirmExport: "确认导出 JSON", Exported: "已导出 WireMock 映射", ReadError: "无法读取本地示例。", WriteError: "无法保存本地示例。",
+		DeleteError: "无法删除本地示例。", MappingError: "无法生成映射。请检查路径和正文设置。", ExportError: "无法写入映射 JSON 文件。",
+	},
 	Tools: ResponseTools{
 		Title: "响应工具", Compare: "响应对比", Fields: "JSON 字段", SetBaseline: "设为基准", ClearBaseline: "清除基准", RunComparison: "与基准对比",
 		NoBaseline: "先将一份响应设为基准，再手动发送请求并回到此处对比。", BaselineReady: "基准已保存到当前会话。",
@@ -117,6 +141,22 @@ var responseZh = Response{
 }
 
 var responseEn = Response{
+	Artifacts: ResponseArtifacts{
+		Example: "Response example", Export: "Export WireMock", ExportExample: "Export this example",
+		Empty: "This request has no saved example. Send it manually to capture one.", RequiresSaved: "Save the request to a collection first.",
+		ReviewSave: "Review current response", ReviewReplace: "Review replacement response", Save: "Save example", Replace: "Replace example",
+		Delete: "Delete example", ConfirmDelete: "Confirm example deletion", DeleteHelp: "Delete the local response example for this request?",
+		Saved: "Response example saved locally", Deleted: "Local response example deleted", NoSavedBody: "This example has no saved body.",
+		Path: "Exact match path", OptionalPath: "Exact match path (optional)", PathError: "Enter a fixed path starting with /. Leave out hosts, queries, fragments and variables.",
+		SaveHelp:   "The example stays on this device. Remove secrets or sensitive identifiers from the path, or leave it blank.",
+		ExportHelp: "WireMock matches this method and path. Remove secrets or sensitive identifiers from the path. Only allowlisted Content-Type values are exported.",
+		Back:       "Back", IncludeBody: "Include response body", BodyReview: "Review response body", BodyHelp: "Review the full body for secrets or personal information before continuing.",
+		BodyUnavailable: "There is no complete UTF-8 text body available to include (256 KiB limit).", TemplateBody: "Static mappings omit bodies that contain a template opening delimiter.",
+		Preview: "Preview mapping JSON", JSONPreview: "WireMock mapping JSON preview", PreviewHelp: "Review the exact mapping JSON. Confirm to choose a location and save it.",
+		ConfirmExport: "Confirm JSON export", Exported: "WireMock mapping exported", ReadError: "Could not read the local example.",
+		WriteError: "Could not save the local example.", DeleteError: "Could not delete the local example.",
+		MappingError: "Could not build the mapping. Check the path and body options.", ExportError: "Could not write the mapping JSON file.",
+	},
 	Tools: ResponseTools{
 		Title: "Response tools", Compare: "Compare responses", Fields: "JSON fields", SetBaseline: "Set as baseline", ClearBaseline: "Clear baseline", RunComparison: "Compare with baseline",
 		NoBaseline: "Set a baseline, send another request manually, then return here to compare.", BaselineReady: "The baseline is available for this session.",

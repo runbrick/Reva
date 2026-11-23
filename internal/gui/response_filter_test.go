@@ -158,7 +158,7 @@ func BenchmarkResponseFilterPaint(b *testing.B) {
 			page := ui.NewPage(ui.PageConfig{Theme: &a.theme, View: func(c ui.C) {
 				ui.Column(c).Fill().Children(func() { a.responseResult(c, tab) })
 			}})
-			driver, err := app.NewDriver(page.Config(app.Config{Width: 960, Height: 600}), nil)
+			driver, err := app.NewDriver(ui.Configure(page, app.Config{Width: 960, Height: 600}), nil)
 			if err != nil {
 				b.Fatal(err)
 			}

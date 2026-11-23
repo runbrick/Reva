@@ -373,7 +373,7 @@ gofmt -l . && go vet ./... && go tool viva vet ./... && go test ./... -count=1
 
 ## Packaging
 
-Use Go 1.26 and the project-pinned `go tool viva` (Viva 0.6.0). Application
+Use Go 1.26 and the project-pinned `go tool viva` (Viva 0.6.7). Application
 identity, version, icon, output directory, and minimum macOS version are in
 [`viva.toml`](viva.toml); update `[app] version` for a release. The original
 [`assets/icon.svg`](assets/icon.svg) depicts a request arrow inside a Q; its

@@ -169,7 +169,7 @@ func BenchmarkResponseRedirectTimelineRepaint(b *testing.B) {
 	}
 	view := &responseView{source: response, duration: "1 ms", phaseTimes: []string{"1.00 ms"}, phaseShares: []float32{1}}
 	page := ui.NewPage(ui.PageConfig{View: func(c ui.C) { application.responseTimelineChart(c, view) }, Theme: &application.theme})
-	config := page.Config(app.Config{Width: 900, Height: 500})
+	config := ui.Configure(page, app.Config{Width: 900, Height: 500})
 	driver, err := app.NewDriver(config, nil)
 	if err != nil {
 		b.Fatal(err)

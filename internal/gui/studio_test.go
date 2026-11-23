@@ -196,7 +196,7 @@ func TestStudioHeadlessCapture(t *testing.T) {
 		response := studioResponseFixture()
 		h.App.Active().Response = &response
 		page := ui.NewPage(ui.PageConfig{View: h.App.Page, Theme: &h.App.theme})
-		session, err := headless.Open(page.Config(h.App.windowConfig(app.Config{Width: variant.width, Height: variant.height})), nil, headless.Options{Scale: 1})
+		session, err := headless.Open(ui.Configure(page, h.App.windowConfig(app.Config{Width: variant.width, Height: variant.height})), nil, headless.Options{Scale: 1})
 		authMust(t, err)
 		path := filepath.Join(dir, "studio-"+variant.name+".png")
 		err = session.Screenshot(path)

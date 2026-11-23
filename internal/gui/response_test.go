@@ -378,7 +378,7 @@ func BenchmarkResponseRepaint(b *testing.B) {
 	a := New(fake.New())
 	a.Active().Response = &model.Response{Status: "200 OK", StatusCode: 200, Body: []byte(`{"ok":true}`)}
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	config := page.Config(app.Config{Width: 1280, Height: 800})
+	config := ui.Configure(page, app.Config{Width: 1280, Height: 800})
 	driver, err := app.NewDriver(config, nil)
 	if err != nil {
 		b.Fatal(err)
@@ -411,7 +411,7 @@ func benchmarkResponse5000Lines(b *testing.B, paneOnly bool) {
 		view = func(c ui.C) { a.responsePane(c, a.Active()) }
 	}
 	page := ui.NewPage(ui.PageConfig{View: view, Theme: &a.theme})
-	config := page.Config(app.Config{Width: 1280, Height: 800})
+	config := ui.Configure(page, app.Config{Width: 1280, Height: 800})
 	driver, err := app.NewDriver(config, nil)
 	if err != nil {
 		b.Fatal(err)

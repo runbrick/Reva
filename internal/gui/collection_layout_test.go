@@ -336,7 +336,7 @@ func TestCollectionOverviewHeadlessCapture(t *testing.T) {
 		h.App.ApplySettings(settings)
 		h.App.openCollectionSettings(collectionNode{collectionID: col.ID}, collectionSettingsGeneral)
 		page := ui.NewPage(ui.PageConfig{View: h.App.Page, Theme: &h.App.theme})
-		session, err := headless.Open(page.Config(app.Config{Width: variant.width, Height: variant.height}), nil, headless.Options{Scale: 1})
+		session, err := headless.Open(ui.Configure(page, app.Config{Width: variant.width, Height: variant.height}), nil, headless.Options{Scale: 1})
 		authMust(t, err)
 		path := filepath.Join(dir, fmt.Sprintf("collection-%s-%s-%dx%d.png", variant.lang, variant.theme, variant.width, variant.height))
 		err = session.Screenshot(path)

@@ -199,7 +199,7 @@ func (a *App) syncTheme() {
 // titlebar the app paints itself (titlebar.go), on every platform.
 func (a *App) Config() app.Config {
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	return page.Config(a.windowConfig(app.Config{
+	return ui.Configure(page, a.windowConfig(app.Config{
 		Title: a.S.Common.AppName, Width: 1440, Height: 900, MinWidth: 960, MinHeight: 600,
 	}))
 }

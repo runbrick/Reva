@@ -172,7 +172,7 @@ func BenchmarkImportDialogPaint(b *testing.B) {
 			a := New(fake.New())
 			a.importer.open = open
 			page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-			config := page.Config(app.Config{Width: 1280, Height: 800})
+			config := ui.Configure(page, app.Config{Width: 1280, Height: 800})
 			d, err := app.NewDriver(config, nil)
 			if err != nil {
 				b.Fatal(err)

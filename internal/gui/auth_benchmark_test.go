@@ -70,7 +70,7 @@ func authBenchmarkApp(b *testing.B) (*App, model.Collection) {
 func authBenchmarkPaint(b *testing.B, a *App, view func(ui.C), width, height int) {
 	b.Helper()
 	page := ui.NewPage(ui.PageConfig{View: view, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: width, Height: height}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: width, Height: height}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

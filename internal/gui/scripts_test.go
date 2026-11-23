@@ -558,7 +558,7 @@ func BenchmarkScriptSectionsPaint(b *testing.B) {
 			ui.Column(c).FillWidth().Grow(1).Children(func() { a.testsSection(c, a.Active()) })
 		})
 	}})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

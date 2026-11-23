@@ -99,7 +99,7 @@ func TestToolboxLayoutAtMinimumWindow(t *testing.T) {
 				if dir := os.Getenv("REVA_THEME_CAPTURE_DIR"); dir != "" {
 					h.App.toolbox.selected = toolbox.Base64
 					page := ui.NewPage(ui.PageConfig{View: h.App.Page, Theme: &h.App.theme})
-					session, err := headless.Open(page.Config(app.Config{Width: 1280, Height: 800}), nil, headless.Options{Scale: 1})
+					session, err := headless.Open(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil, headless.Options{Scale: 1})
 					if err != nil {
 						t.Fatal(err)
 					}
@@ -146,7 +146,7 @@ func BenchmarkToolboxPaint(b *testing.B) {
 	a := New(fake.New())
 	a.Main = PageToolbox
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	driver, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	driver, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

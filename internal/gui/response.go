@@ -13,6 +13,7 @@ import (
 
 	"github.com/runbrick/reva/internal/format"
 	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/components"
@@ -66,6 +67,7 @@ type responseView struct {
 	count, countPattern         string
 	countIndex, countTotal      int
 	findKey                     func(gfx.KeyEvent) gfx.EventResult
+	filter                      responseFilterState
 	previewText                 string
 	previewHTML                 bool
 	previewImage                gfx.Bitmap
@@ -88,6 +90,7 @@ func (v *responseView) prepare(r *model.Response) {
 		return
 	}
 	v.source = r
+	v.filter = responseFilterState{query: v.filter.query}
 	v.tools = responseToolsState{ignored: v.tools.ignored}
 	body := r.Body
 	v.rawLimited = len(body) > responseDisplayLimit
@@ -222,8 +225,17 @@ func (a *App) responsePane(c ui.C, t *Tab) {
 				ui.Icon(c, icons.CircleX).Size(Space4, Space4).Color(c.Theme().Danger)
 				ui.Text(c, a.S.Response.ErrorTitle).Bold().Color(c.Theme().Danger)
 			})
-			ui.Scroll(c).FillWidth().Grow(1).Children(func() {
-				ui.Paragraph(c, t.Err, 0).Color(c.Theme().Danger)
+			ui.Scroll(c).FillWidth().Grow(1).Scrollbars().Children(func() {
+				ui.Column(c).FillWidth().Gap(Space3).Children(func() {
+					message := t.Err
+					if t.failedRedirects != nil {
+						message = i18n.ResponseRedirectsFor(a.S.Lang).RequestFailed
+					}
+					ui.Paragraph(c, message, 0).Color(c.Theme().Danger)
+					if t.failedRedirects != nil {
+						a.responseRedirects(c.Key("failed-redirects"), t.failedRedirects)
+					}
+				})
 			})
 		default:
 			ui.Column(c).Fill().Center().Gap(Space3).Children(func() {
@@ -363,6 +375,7 @@ func (a *App) responseWorkbench(c ui.C, t *Tab, v *responseView) {
 		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, t, v) })
 	})
 	a.responseToolsModal(c, t, &v.tools)
+	a.responseFilterModal(c.Key("json-filter"), v)
 }
 
 func (a *App) responseBodyView(c ui.C, t *Tab, v *responseView) {
@@ -407,6 +420,9 @@ func (a *App) responseBodyContent(c ui.C, t *Tab, v *responseView) {
 		ui.Spacer(c)
 		if t.sse == nil && ui.Button(c, a.S.Response.Tools.Title).Small().Outline().Clicked() {
 			c.After(func() { v.tools.show(t.Response) })
+		}
+		if ui.Button(c, i18n.ResponseFilterFor(a.S.Lang).Open).Small().Outline().Clicked() {
+			v.filter.open = true
 		}
 		if ui.Button(c, a.S.Response.Search).Icon(icons.Search).IconOnly().Ghost().Tooltip(a.S.Response.Search).Disabled(v.mode == responsePreview).Clicked() {
 			v.find = !v.find
@@ -607,12 +623,19 @@ func (a *App) responseEmpty(c ui.C, icon gfx.Icon, label string) {
 }
 
 func (a *App) responseTimelineChart(c ui.C, v *responseView) {
-	if len(v.source.Timeline) == 0 {
+	if len(v.source.Timeline) == 0 && len(v.source.Redirects) == 0 {
 		a.responseEmpty(c, icons.Activity, a.S.Response.NoTimeline)
 		return
 	}
 	ui.Scroll(c).FillWidth().Grow(1).Scrollbars().Children(func() {
 		ui.Column(c).FillWidth().Gap(Space3).Pad(Space2).Children(func() {
+			if len(v.source.Redirects) != 0 {
+				a.responseRedirects(c.Key("redirects"), v.source)
+				if len(v.source.Timeline) == 0 {
+					return
+				}
+				ui.Divider(c)
+			}
 			for i, phase := range v.source.Timeline {
 				ui.Row(c.KeyInt(i)).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
 					ui.Text(c, a.responsePhaseLabel(phase.Kind)).Width(Space6 * 6)

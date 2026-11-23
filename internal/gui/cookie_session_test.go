@@ -284,7 +284,7 @@ func TestManualCookieSessionNeverPersists(t *testing.T) {
 	requestRepaint(h)
 	h.waitFor("redirect transport error", func() bool { return !tab.Sending })
 	entries := svc.History.List()
-	if len(entries) == 0 || !strings.Contains(tab.Err, "manual-secret") || entries[0].Error != h.App.S.Request.CookieSessionHistoryError {
+	if len(entries) == 0 || tab.Err != i18n.ResponseRedirectsFor(h.App.S.Lang).RequestFailed || entries[0].Error != h.App.S.Request.CookieSessionHistoryError {
 		t.Fatalf("live error = %q; history = %+v", tab.Err, entries)
 	}
 	command, err := h.App.requestCURLFor(tab)

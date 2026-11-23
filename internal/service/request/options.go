@@ -2,7 +2,6 @@ package request
 
 import (
 	"crypto/tls"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -60,8 +59,8 @@ func (s *Service) client(options model.RequestOptions) *http.Client {
 			if key.noRedirects {
 				return http.ErrUseLastResponse
 			}
-			if len(via) > 10 {
-				return fmt.Errorf("stopped after 10 redirects")
+			if len(via) > redirectLimit {
+				return errRedirectLimit
 			}
 			return nil
 		},

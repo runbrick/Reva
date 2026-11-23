@@ -23,6 +23,7 @@ const (
 )
 
 var ErrInvalid = errors.New("invalid, ambiguous or oversized JSON")
+var errDocumentLimit = errors.New("JSON document limit exceeded")
 
 type Kind string
 
@@ -89,7 +90,18 @@ func Quote(value string) string {
 type Document struct{ root *Value }
 
 func Parse(body []byte) (*Document, error) {
-	if len(body) > maxBody || !utf8.Valid(body) {
+	doc, err := parseDocument(body)
+	if err != nil {
+		return nil, ErrInvalid
+	}
+	return doc, nil
+}
+
+func parseDocument(body []byte) (*Document, error) {
+	if len(body) > maxBody {
+		return nil, errDocumentLimit
+	}
+	if !utf8.Valid(body) {
 		return nil, ErrInvalid
 	}
 	decoder := json.NewDecoder(bytes.NewReader(body))
@@ -97,6 +109,9 @@ func Parse(body []byte) (*Document, error) {
 	remaining := maxNodes
 	root, err := readValue(decoder, 0, 0, &remaining)
 	if err != nil {
+		if err == errDocumentLimit {
+			return nil, err
+		}
 		return nil, ErrInvalid
 	}
 	if _, err := decoder.Token(); err != io.EOF {
@@ -107,7 +122,7 @@ func Parse(body []byte) (*Document, error) {
 
 func readValue(decoder *json.Decoder, depth, pointerBytes int, remaining *int) (*Value, error) {
 	if depth > maxDepth || pointerBytes > maxPointer || *remaining == 0 {
-		return nil, ErrInvalid
+		return nil, errDocumentLimit
 	}
 	*remaining--
 	token, err := decoder.Token()
@@ -149,9 +164,10 @@ func readValue(decoder *json.Decoder, depth, pointerBytes int, remaining *int) (
 	case string:
 		return &Value{kind: String, text: token}, nil
 	case json.Number:
-		if len(token) <= maxNumber {
-			return &Value{kind: Number, text: string(token)}, nil
+		if len(token) > maxNumber {
+			return nil, errDocumentLimit
 		}
+		return &Value{kind: Number, text: string(token)}, nil
 	case bool:
 		return &Value{kind: Boolean, text: strconv.FormatBool(token)}, nil
 	case nil:

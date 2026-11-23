@@ -6,6 +6,12 @@ type Runner struct {
 	BrowseData, ClearData, DataSelected, InvalidData        string
 	IterationLimit, Iterations, Iteration, IterationRows    string
 	EmptyScope                                              string
+	CollectionTarget, TargetChanged, UnavailableChoice      string
+	Preset, CustomPreset, PresetName                        string
+	SavePreset, UpdatePreset, DeletePreset, RetryPresets    string
+	LoadingPresets, WritingPresets, PresetLoadError         string
+	PresetWriteError, EmptyPresetName, DuplicatePresetName  string
+	PresetUnavailable                                       string
 }
 
 // RunnerFor returns runner strings without requiring data access.
@@ -33,19 +39,36 @@ var runnerZh = Runner{
 需要读取退出码时请使用编译后的程序；go run 可能包装非零退出状态。
 使用 -h 或 --help 查看帮助。
 `,
-	Scope:           "运行范围",
-	WholeCollection: "整个集合",
-	MissingFolder:   "所选文件夹已不存在，请重新选择运行范围。",
-	FolderPath:      "%s / %s",
-	BrowseData:      "选择 CSV 或 JSON 数据文件",
-	ClearData:       "清除数据文件",
-	DataSelected:    "已选择数据文件",
-	InvalidData:     "无法读取数据文件，或文件不符合 CSV/JSON 格式和大小限制。",
-	IterationLimit:  "数据行数与请求数的乘积不能超过 10,000。",
-	Iterations:      "数据迭代：%d",
-	Iteration:       "迭代",
-	IterationRows:   "请求结果（按运行顺序）",
-	EmptyScope:      "所选范围内没有已保存的请求。",
+	Scope:               "运行范围",
+	WholeCollection:     "整个集合",
+	MissingFolder:       "所选文件夹已不存在，请重新选择运行范围。",
+	FolderPath:          "%s / %s",
+	BrowseData:          "选择 CSV 或 JSON 数据文件",
+	ClearData:           "清除数据文件",
+	DataSelected:        "已选择数据文件",
+	InvalidData:         "无法读取数据文件，或文件不符合 CSV/JSON 格式和大小限制。",
+	IterationLimit:      "数据行数与请求数的乘积不能超过 10,000。",
+	Iterations:          "数据迭代：%d",
+	Iteration:           "迭代",
+	IterationRows:       "请求结果（按运行顺序）",
+	EmptyScope:          "所选范围内没有已保存的请求。",
+	CollectionTarget:    "集合：%s",
+	TargetChanged:       "运行目标已更改，请核对当前集合、范围和环境后再次开始。",
+	UnavailableChoice:   "已不可用，请重新选择",
+	Preset:              "配置预设",
+	CustomPreset:        "自定义配置",
+	PresetName:          "预设名称",
+	SavePreset:          "保存预设",
+	UpdatePreset:        "更新预设",
+	DeletePreset:        "删除预设",
+	RetryPresets:        "重新加载预设",
+	LoadingPresets:      "正在加载预设…",
+	WritingPresets:      "正在保存预设更改…",
+	PresetLoadError:     "无法读取本机预设。可以重试，或手动设置本次运行。",
+	PresetWriteError:    "无法保存预设更改，请重试。",
+	EmptyPresetName:     "请输入预设名称。",
+	DuplicatePresetName: "此集合中已有同名预设。",
+	PresetUnavailable:   "此预设已不存在，请重新加载预设。",
 }
 
 var runnerEn = Runner{
@@ -64,17 +87,34 @@ Exit codes: 0 passed/help, 1 run/report-write failure, 2 usage/load error, 130 c
 Use a built binary when consuming exit codes; go run may wrap nonzero exit status.
 Use -h or --help to show this help.
 `,
-	Scope:           "Run scope",
-	WholeCollection: "Whole collection",
-	MissingFolder:   "The selected folder no longer exists. Choose a run scope again.",
-	FolderPath:      "%s / %s",
-	BrowseData:      "Choose CSV or JSON data file",
-	ClearData:       "Clear data file",
-	DataSelected:    "Data file selected",
-	InvalidData:     "The data file could not be read or exceeds the CSV/JSON format or size limits.",
-	IterationLimit:  "The number of data rows times the number of requests must be 10,000 or fewer.",
-	Iterations:      "Data iterations: %d",
-	Iteration:       "Iteration",
-	IterationRows:   "Request results in run order",
-	EmptyScope:      "There are no saved requests in the selected scope.",
+	Scope:               "Run scope",
+	WholeCollection:     "Whole collection",
+	MissingFolder:       "The selected folder no longer exists. Choose a run scope again.",
+	FolderPath:          "%s / %s",
+	BrowseData:          "Choose CSV or JSON data file",
+	ClearData:           "Clear data file",
+	DataSelected:        "Data file selected",
+	InvalidData:         "The data file could not be read or exceeds the CSV/JSON format or size limits.",
+	IterationLimit:      "The number of data rows times the number of requests must be 10,000 or fewer.",
+	Iterations:          "Data iterations: %d",
+	Iteration:           "Iteration",
+	IterationRows:       "Request results in run order",
+	EmptyScope:          "There are no saved requests in the selected scope.",
+	CollectionTarget:    "Collection: %s",
+	TargetChanged:       "The run target changed. Review the collection, scope, and environment, then start again.",
+	UnavailableChoice:   "Unavailable. Choose again",
+	Preset:              "Configuration preset",
+	CustomPreset:        "Custom setup",
+	PresetName:          "Preset name",
+	SavePreset:          "Save preset",
+	UpdatePreset:        "Update preset",
+	DeletePreset:        "Delete preset",
+	RetryPresets:        "Reload presets",
+	LoadingPresets:      "Loading presets…",
+	WritingPresets:      "Saving preset changes…",
+	PresetLoadError:     "Could not read local presets. Retry or configure this run manually.",
+	PresetWriteError:    "Could not save preset changes. Try again.",
+	EmptyPresetName:     "Enter a preset name.",
+	DuplicatePresetName: "This collection already has a preset with that name.",
+	PresetUnavailable:   "This preset no longer exists. Reload presets to continue.",
 }

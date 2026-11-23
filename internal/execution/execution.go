@@ -89,7 +89,8 @@ type Result struct {
 	TransportStarted bool
 	Prepared         model.Request
 	Variables        []model.KV
-	Captures         []model.KV `json:"-"`
+	Captures         []model.KV          `json:"-"`
+	FailedRedirects  []model.RedirectHop `json:"-"`
 	HistoryRequest   model.Request
 }
 
@@ -139,6 +140,7 @@ func (p *Plan) Run(ctx context.Context, svc service.RequestService) Result {
 		r.Err = ctx.Err()
 	}
 	if r.Err != nil {
+		r.FailedRedirects = resp.Redirects
 		return r
 	}
 	r.Response = &resp

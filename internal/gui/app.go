@@ -58,9 +58,10 @@ type Tab struct {
 	// Tests are the results of the last test script run (scripts.go).
 	Tests []TestResult
 
-	job  *sendJob
-	send *ui.EffectState[sendResult, sendKey]
-	sse  *sseState
+	job             *sendJob
+	send            *ui.EffectState[sendResult, sendKey]
+	sse             *sseState
+	failedRedirects *model.Response
 }
 
 // TestResult is one assertion reported by a test script.
@@ -263,6 +264,7 @@ func (a *App) Send(t *Tab) {
 	}
 	t.job = &sendJob{req: plan.Request(), vars: plan.Variables(), plan: plan, cookieSession: a.manualCookieSessionFor(t)}
 	t.Sending, t.Err, t.Response, t.Tests = true, "", nil, nil
+	t.failedRedirects = nil
 	a.resetScripts(t)
 }
 
@@ -324,6 +326,10 @@ func (a *App) declareSends(c ui.C) {
 		entry := model.HistoryEntry{At: time.Now(), Request: r.HistoryRequest}
 		if r.Err != nil {
 			t.Err = r.Err.Error()
+			if len(r.FailedRedirects) != 0 {
+				t.failedRedirects = &model.Response{Redirects: r.FailedRedirects}
+				t.Err = i18n.ResponseRedirectsFor(a.S.Lang).RequestFailed
+			}
 			if r.Stage == execution.StageValidation {
 				a.authFailure(t, false)
 			}

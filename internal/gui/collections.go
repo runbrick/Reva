@@ -273,7 +273,7 @@ func (a *App) collectionsPane(c ui.C) {
 					}
 					c.After(func() { a.collectionNameDialog(collectionFolder, n) })
 				}
-				if menu.Item(text.NewRequest).Clicked() {
+				if menu.Item(text.NewRequest).Icon(icons.Send).Clicked() {
 					c.After(func() {
 						if s.selected.collectionID == "" {
 							a.newCollectionTab()
@@ -307,6 +307,17 @@ func (a *App) collectionsPane(c ui.C) {
 							a.newCollectionGraphQLRequest(n)
 						}
 					})
+				}
+				if menu.Item(text.NewSSE).Icon(icons.Radio).Clicked() {
+					n := s.selected
+					if !n.branch {
+						n.id = n.parentID
+					}
+					c.After(func() { a.newSSERequest(n) })
+				}
+				menu.Separator()
+				if menu.Item(a.S.Import.Title).Icon(icons.Download).Clicked() {
+					c.After(a.openImportDialog)
 				}
 			})
 		})
@@ -538,7 +549,7 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		if menu.Item(s.NewFolder).Clicked() {
 			c.After(func() { a.collectionNameDialog(collectionFolder, n) })
 		}
-		if menu.Item(s.NewRequest).Clicked() {
+		if menu.Item(s.NewRequest).Icon(icons.Send).Clicked() {
 			c.After(func() { a.newCollectionRequest(n) })
 		}
 		if menu.Item(s.NewWebSocket).Icon(icons.Activity).Clicked() {
@@ -546,6 +557,9 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		}
 		if menu.Item(s.NewGraphQL).Icon(icons.Braces).Clicked() {
 			c.After(func() { a.newCollectionGraphQLRequest(n) })
+		}
+		if menu.Item(s.NewSSE).Icon(icons.Radio).Clicked() {
+			c.After(func() { a.newSSERequest(n) })
 		}
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {
@@ -596,6 +610,20 @@ func (a *App) newCollectionGraphQLRequest(n collectionNode) {
 	a.createCollectionRequest(n, true)
 }
 
+func (a *App) newSSERequest(n collectionNode) {
+	name := a.S.Collections.NewSSE
+	headers := []model.KV{{Key: "Accept", Value: "text/event-stream"}}
+	if n.collectionID == "" {
+		a.newCollectionTab()
+		tab := a.Active()
+		tab.Request.Name, tab.Request.Headers, tab.Dirty = name, headers, true
+		return
+	}
+	request := model.NewRequest(storage.NewID())
+	request.Name, request.Headers, request.Auth.Type = name, headers, model.AuthInherit
+	a.saveNewCollectionRequest(n, request)
+}
+
 func (a *App) createCollectionRequest(n collectionNode, graphQL bool) {
 	r := model.NewRequest(storage.NewID())
 	r.Auth.Type = model.AuthInherit
@@ -604,17 +632,21 @@ func (a *App) createCollectionRequest(n collectionNode, graphQL bool) {
 		r.Name = a.S.Collections.NewGraphQL
 		initGraphQLBody(&r)
 	}
-	r, err := a.Svc.Collections.SaveRequest(n.collectionID, n.id, r)
+	if a.saveNewCollectionRequest(n, r) && graphQL {
+		a.requestTab(a.Active()).section = requestBody
+	}
+}
+
+func (a *App) saveNewCollectionRequest(n collectionNode, request model.Request) bool {
+	stored, err := a.Svc.Collections.SaveRequest(n.collectionID, n.id, request)
 	if a.collectionError(err) {
-		return
+		return false
 	}
 	a.collections.closed[a.collections.nodeKey(n)] = false
 	a.refreshCollections()
-	a.OpenRequest(r, n.collectionID)
-	if graphQL {
-		a.requestTab(a.Active()).section = requestBody
-	}
+	a.OpenRequest(stored, n.collectionID)
 	a.Main, a.Section = PageWorkbench, SectionAPIs
+	return true
 }
 
 func (a *App) duplicateCollectionRequest(n collectionNode) {

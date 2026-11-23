@@ -23,7 +23,7 @@ func TestImportManualSourcesAndInputModes(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			text := h.App.S.Import
 			for _, label := range []string{text.YAPISource, text.MarkdownSource, text.InsomniaSource, text.APIDocSource, text.ApizzaSource, text.EolinkSource, text.CurrentCollection} {
 				if !importSmokeHit(t, h, label).Disabled {
@@ -65,7 +65,7 @@ func TestImportManualSourceValidation(t *testing.T) {
 	for _, source := range []importSource{importNative, importPostman, importApifox, importApiPost, importCurl, importHAR} {
 		t.Run(fmt.Sprint(source), func(t *testing.T) {
 			h := newHarness(t)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			text := h.App.S.Import
 			labels := map[importSource]string{importNative: text.NativeSource, importPostman: text.PostmanSource, importApifox: text.ApifoxSource, importApiPost: text.ApiPostSource, importCurl: text.CurlSource, importHAR: text.HARSource}
 			h.click(labels[source])
@@ -127,7 +127,7 @@ func TestImportAppendChoosesCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := newHarness(t, svc)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	h.click(h.App.S.Import.CurrentCollection)
 	h.click(h.App.S.Import.SelectCollection)
 	collectionsOption(h, second.Name)
@@ -162,7 +162,7 @@ func TestImportAppendCollectionPreservesScopesAndIdentity(t *testing.T) {
 			}
 			before := importRegressionDisk(t, dir)
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			h.click(h.App.S.Import.CurrentCollection)
 			auth := ""
 			if sharedAuth {
@@ -201,7 +201,7 @@ func TestImportAppendRechecksDestinationBeforeSaving(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			h.click(h.App.S.Import.CurrentCollection)
 			input := `{"info":{"name":"Append"},"variable":[{"key":"host","value":"imported"}],"item":[]}`
 			importTypeInto(h, input)
@@ -253,7 +253,7 @@ func TestImportAppendFailureAndVariableConflict(t *testing.T) {
 			svc.Collections = failedAppendCollections{svc.Collections}
 			before := svc.Collections.List()
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			h.click(h.App.S.Import.CurrentCollection)
 			input := `{"info":{"name":"Append"},"variable":[{"key":"host","value":"imported"}],"item":[]}`
 			importTypeInto(h, input)
@@ -294,7 +294,7 @@ func TestImportAppendCurlAndEnvironment(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			h.click(h.App.S.Import.CurrentCollection)
 			input := "curl https://example.test/saved"
 			if environment {
@@ -333,7 +333,7 @@ func TestImportManualLayout(t *testing.T) {
 					if err := h.D.Resize(size[0], size[1]); err != nil {
 						t.Fatal(err)
 					}
-					h.click(h.App.S.Import.Title)
+					openImportForTest(h)
 					importSmokeLayout(t, h)
 					h.click(h.App.S.Import.Details)
 					importSmokeLayout(t, h)

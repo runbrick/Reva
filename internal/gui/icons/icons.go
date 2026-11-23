@@ -930,6 +930,30 @@ var Plus = gfx.Icon{
 	},
 }
 
+// radio is a compiled vector icon.
+var Radio = gfx.Icon{
+	ViewBox: 24.0,
+	Stroke:  2.0,
+	Cap:     gfx.CapRound,
+	Join:    gfx.JoinRound,
+	Commands: []gfx.PathCommand{
+		gfx.MoveTo(4.9, 19.1),
+		gfx.CubicTo(1.0, 15.2, 1.0, 8.8, 4.9, 4.9),
+		gfx.MoveTo(7.8, 16.2),
+		gfx.CubicTo(5.5, 13.9, 5.5, 10.1, 7.8, 7.7),
+		gfx.MoveTo(14.0, 12.0),
+		gfx.CubicTo(14.0, 13.1046, 13.1046, 14.0, 12.0, 14.0),
+		gfx.CubicTo(10.8954, 14.0, 10.0, 13.1046, 10.0, 12.0),
+		gfx.CubicTo(10.0, 10.8954, 10.8954, 10.0, 12.0, 10.0),
+		gfx.CubicTo(13.1046, 10.0, 14.0, 10.8954, 14.0, 12.0),
+		gfx.ClosePath(),
+		gfx.MoveTo(16.2, 7.8),
+		gfx.CubicTo(18.5, 10.1, 18.5, 13.9, 16.2, 16.3),
+		gfx.MoveTo(19.1, 4.9),
+		gfx.CubicTo(23.0, 8.8, 23.0, 15.1, 19.1, 19.0),
+	},
+}
+
 // refresh-cw is a compiled vector icon.
 var RefreshCw = gfx.Icon{
 	ViewBox: 24.0,

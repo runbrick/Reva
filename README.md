@@ -106,6 +106,13 @@ filter Query, Mutation, and Subscription fields and their return types. See
 [Browse GraphQL root fields](docs/research/graphql-schema.md) for how the
 request uses the current endpoint, variables, and authentication.
 
+## Server-sent events
+
+In the **APIs** sidebar, choose **Add collection item (+) > New SSE request**.
+Reva starts with a `GET` request and an `Accept: text/event-stream` header.
+Enter an endpoint URL and send the request to see incoming events in **SSE
+events**. Use **Disconnect** to end the stream.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:
@@ -265,8 +272,9 @@ headers remain available) are deferred.
 
 ## Import and migration
 
-Paste content or open a `.json`, `.har`, or other text file, then choose **Review
-import**. Review the detected format, destination, request/folder/variable counts,
+In the **APIs** sidebar, open **Add collection item (+) > Import**. Paste content
+or open a `.json`, `.har`, or other text file, then choose **Review import**.
+Review the detected format, destination, request/folder/variable counts,
 and compatibility notices before **Confirm import**. Every notice requires an
 explicit acknowledgement. Nothing is saved or opened during review. Errors keep
 the input available; save failures preserve the review for retry.

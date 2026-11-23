@@ -16,6 +16,34 @@ import (
 	"github.com/vivaui/viva/ui"
 )
 
+func openImportForTest(h *harness) {
+	h.t.Helper()
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, h.App.S.Import.Title)
+}
+
+func TestImportOpensFromAddCollectionMenu(t *testing.T) {
+	svc := fake.New()
+	if _, err := svc.Collections.Create("Workspace"); err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, svc)
+	labels := h.App.S.Import
+	for _, hit := range h.hitLabels() {
+		if hit == labels.Title {
+			t.Fatal("import action is visible before opening the add menu")
+		}
+	}
+	openImportForTest(h)
+	if h.App.collections.addOpen || !h.App.importer.open || !h.shows(labels.ManualTitle) {
+		t.Fatal("choosing Import should close the add menu and show the import dialog")
+	}
+	h.click(labels.Cancel)
+	if h.App.importer.open || h.App.collections.addOpen {
+		t.Fatal("cancel should return to the workspace with the add menu closed")
+	}
+}
+
 func TestImportCurlOpensRequest(t *testing.T) {
 	for _, lang := range []i18n.Lang{i18n.Zh, i18n.En} {
 		t.Run(string(lang), func(t *testing.T) {
@@ -26,7 +54,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 				t.Fatal(err)
 			}
 			h := newHarness(t, svc)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, `curl 'https://example.test/users?q=active' -H 'Authorization: Bearer {{token}}' -d '{"name":"你好"}'`)
 			reviewImportForTest(h)
 			h.click(h.App.S.Import.Submit)
@@ -43,7 +71,7 @@ func TestImportCurlOpensRequest(t *testing.T) {
 
 func TestImportPostmanAddsCollection(t *testing.T) {
 	h := newHarness(t)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	importTypeInto(h, `{"info":{"name":"Imported API"},"item":[{"name":"Ping","request":{"method":"GET","url":"https://example.test/ping"}}]}`)
 	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)
@@ -66,7 +94,7 @@ func TestImportInvalidInputStaysOpen(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, tc.input)
 			reviewImportForTest(h)
 			h.pump()
@@ -94,7 +122,7 @@ func TestImportJSONFile(t *testing.T) {
 	if err := h.D.QueueOpenFiles([]string{path}, nil); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	h.click(h.App.S.Import.LoadFile)
 	h.waitFor("file contents", func() bool { return h.App.importer.input == data })
 	request, ok := h.D.LastOpenFilesRequest()
@@ -120,7 +148,7 @@ func TestImportFileErrorsAndCancellation(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			h := newHarness(t)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, "keep me")
 			if err := h.D.QueueOpenFiles(tc.paths, tc.err); err != nil {
 				t.Fatal(err)
@@ -152,7 +180,7 @@ func TestImportCollectionSaveFailureStaysOpen(t *testing.T) {
 	svc := fake.New()
 	svc.Collections = failedImportCollections{svc.Collections}
 	h := newHarness(t, svc)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	importTypeInto(h, `{"info":{"name":"Fail"},"item":[]}`)
 	reviewImportForTest(h)
 	h.click(h.App.S.Import.Submit)

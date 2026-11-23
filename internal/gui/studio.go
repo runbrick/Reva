@@ -29,15 +29,24 @@ func (a *App) studioRail(c ui.C) {
 
 func (a *App) studioRailButton(c ui.C, label string, icon gfx.Icon, selected bool, action func()) {
 	theme := c.Theme()
-	color := theme.Foreground
+	color := theme.MutedForeground
+	hover := ui.Look{}.Background(theme.Hover)
+	if selected {
+		color = theme.Primary
+		hover = ui.Look{}.Background(theme.Accent).Border(theme.Primary.WithAlpha(0.45))
+	}
 	button := ui.Row(c).Size(Space6*2, Space6*2).Center().Radius(theme.Metrics.RadiusControl).
 		HitWith(ui.ID(c), label, gfx.HitOptions{Role: gfx.RoleButton, Selected: selected}).Tooltip(label).
-		Hover(ui.Look{}.Background(theme.Hover)).Focus(ui.Look{}.Ring(2, theme.Ring))
+		Hover(hover).Focus(ui.Look{}.Ring(2, theme.Ring))
 	if selected {
-		button.Background(a.palette.RailActive)
-		color = theme.AccentForeground
+		button.Background(a.palette.RailActive).Border(1, theme.Primary.WithAlpha(0.24))
 	}
-	button.Children(func() { ui.Icon(c, icon).Size(Space6, Space6).Color(color) })
+	button.Children(func() {
+		glyph := ui.Icon(c, icon).Size(Space6, Space6).Color(color)
+		if !selected {
+			glyph.StateFrom(button).Hover(ui.Look{}.Color(theme.Foreground)).Focus(ui.Look{}.Color(theme.Foreground))
+		}
+	})
 	if button.Clicked() {
 		c.After(action)
 	}

@@ -754,7 +754,7 @@ func BenchmarkTabsPaint(b *testing.B) {
 		a.NewTab()
 	}
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

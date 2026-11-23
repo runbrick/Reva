@@ -394,7 +394,7 @@ func BenchmarkCollectionsPanePaint(b *testing.B) {
 	}
 	a := New(svc)
 	page := ui.NewPage(ui.PageConfig{View: a.collectionsPane, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 260, Height: 700}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 260, Height: 700}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

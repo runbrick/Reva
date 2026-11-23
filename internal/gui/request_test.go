@@ -840,7 +840,7 @@ func BenchmarkRequestPanePaint(b *testing.B) {
 	a.Active().Request.URL = "https://example.test/search"
 	a.Active().Request.Params = []model.KV{{Key: "q", Value: "hello"}, {Key: "limit", Value: "20"}, {Key: "token", Value: "{{token}}"}, {Key: "disabled", Value: "saved", Disabled: true}}
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -865,7 +865,7 @@ func BenchmarkRequestJSONBodyPaint(b *testing.B) {
 	tab.Request.Body = model.Body{Mode: model.BodyJSON, Text: "{\n  \"platform\": \"test\",\n  \"项目\": \"测试\",\n  \"limit\": 2,\n  \"enabled\": true\n}"}
 	a.requestTab(tab).section = requestBody
 	page := ui.NewPage(ui.PageConfig{View: a.Page, Theme: &a.theme})
-	driver, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	driver, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

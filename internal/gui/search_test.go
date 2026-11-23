@@ -435,7 +435,7 @@ func TestSearchArrowsRevealVirtualizedResults(t *testing.T) {
 func BenchmarkSearchClosedPaint(b *testing.B) {
 	a := New(fake.New())
 	page := ui.NewPage(ui.PageConfig{View: func(c ui.C) { a.searchBox(c); a.searchPalette(c) }, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -458,7 +458,7 @@ func BenchmarkSearchOpenPaint(b *testing.B) {
 	a := New(fake.New())
 	a.openSearch()
 	page := ui.NewPage(ui.PageConfig{View: func(c ui.C) { a.searchPalette(c) }, Theme: &a.theme})
-	d, err := app.NewDriver(page.Config(app.Config{Width: 1280, Height: 800}), nil)
+	d, err := app.NewDriver(ui.Configure(page, app.Config{Width: 1280, Height: 800}), nil)
 	if err != nil {
 		b.Fatal(err)
 	}

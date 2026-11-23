@@ -13,6 +13,8 @@ import (
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/service/fake"
 	"github.com/runbrick/reva/internal/service/request"
+	"github.com/runbrick/reva/internal/service/store"
+	"github.com/runbrick/reva/internal/storage"
 )
 
 func newSSEHarness(t *testing.T, handler http.HandlerFunc) (*harness, string) {
@@ -30,6 +32,85 @@ func flushSSE(w http.ResponseWriter, body string) {
 	w.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
 	io.WriteString(w, body)
 	w.(http.Flusher).Flush()
+}
+
+func TestNewSSERequestStreamsAndDisconnects(t *testing.T) {
+	closed := make(chan struct{})
+	h, url := newSSEHarness(t, func(w http.ResponseWriter, r *http.Request) {
+		defer close(closed)
+		if r.Method != http.MethodGet || r.Header.Get("Accept") != "text/event-stream" {
+			t.Errorf("request = %s, Accept = %q", r.Method, r.Header.Get("Accept"))
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		flushSSE(w, "data: subscribed from menu\n\n")
+		<-r.Context().Done()
+	})
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, h.App.S.Collections.NewSSE)
+	tab := h.App.Active()
+	if len(h.App.Tabs()) != 2 || tab.Request.Name != h.App.S.Collections.NewSSE || tab.CollectionID != "" || !tab.Dirty {
+		t.Fatalf("SSE draft = %+v", tab)
+	}
+	h.typeInto(h.App.S.Request.URL, url)
+	h.click(h.App.S.Request.Send)
+	h.waitFor("live SSE event", func() bool { return tab.Sending && h.shows("subscribed from menu") })
+	h.click(h.App.S.Response.SSEDisconnect)
+	h.waitFor("stream disconnected", func() bool { return !tab.Sending && h.shows(h.App.S.Response.SSEDisconnected) })
+	assertSSEClosed(t, closed)
+}
+
+func TestNewSSERequestInFolderSavesAndReopens(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv(storage.EnvHome, dir)
+	disk, err := store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc := fake.New()
+	svc.Collections = disk.Collections()
+	collection, err := svc.Collections.Create("API")
+	if err != nil {
+		t.Fatal(err)
+	}
+	folder, err := svc.Collections.AddFolder(collection.ID, "", "Streams")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := newHarness(t, svc)
+	label := h.App.S.Collections.NewSSE
+	collectionsContext(h, folder.Name, label)
+	first := h.App.Active()
+	if first.CollectionID != collection.ID || first.Request.Auth.Type != model.AuthInherit {
+		t.Fatalf("collection SSE request = %+v", first)
+	}
+	const url = "https://example.test/events"
+	h.typeInto(h.App.S.Request.URL, url)
+	h.click(h.App.S.Request.Save)
+	h.click(label)
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, label)
+	second := h.App.Active()
+	if second.Request.ID == first.Request.ID {
+		t.Fatal("creating an SSE request with a sibling selected reused the sibling")
+	}
+	h.D.Close()
+	disk, err = store.Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	svc.Collections = disk.Collections()
+	stored, ok := svc.Collections.Get(collection.ID)
+	parent := model.FindItem(stored.Items, folder.ID)
+	if !ok || parent == nil || len(parent.Items) != 2 {
+		t.Fatalf("saved folder = %+v", parent)
+	}
+	h = newHarness(t, svc)
+	h.click(label)
+	reopened := h.App.Active().Request
+	if reopened.ID != first.Request.ID || reopened.URL != url || reopened.Method != model.MethodGet || len(reopened.Headers) != 1 || reopened.Headers[0] != (model.KV{Key: "Accept", Value: "text/event-stream"}) {
+		t.Fatalf("reopened SSE request = %+v", reopened)
+	}
 }
 
 func TestResponseSSEEarlyThenFinalThroughExecution(t *testing.T) {

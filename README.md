@@ -106,6 +106,13 @@ filter Query, Mutation, and Subscription fields and their return types. See
 [Browse GraphQL root fields](docs/research/graphql-schema.md) for how the
 request uses the current endpoint, variables, and authentication.
 
+## Server-sent events
+
+In the **APIs** sidebar, choose **Add collection item (+) > New SSE request**.
+Reva starts with a `GET` request and an `Accept: text/event-stream` header.
+Enter an endpoint URL and send the request to see incoming events in **SSE
+events**. Use **Disconnect** to end the stream.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:

@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/robertkrimen/otto v0.5.1
-	github.com/vivaui/viva v0.6.0
+	github.com/vivaui/viva v0.6.1
 )
 
 require (

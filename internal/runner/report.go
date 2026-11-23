@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/runbrick/reva/internal/execution"
@@ -37,6 +38,7 @@ type Report struct {
 	Version    int             `json:"version"`
 	Outcome    Outcome         `json:"outcome"`
 	DurationNS int64           `json:"durationNs"`
+	Iterations int             `json:"iterations,omitempty"`
 	Counts     Counts          `json:"counts"`
 	Assertions Assertions      `json:"assertions"`
 	Requests   []RequestReport `json:"requests"`
@@ -46,6 +48,7 @@ type Report struct {
 // response fields, variables, scripts, logs, and arbitrary error strings.
 type RequestReport struct {
 	Ordinal    int             `json:"ordinal"`
+	Iteration  int             `json:"iteration,omitempty"`
 	Outcome    Outcome         `json:"outcome"`
 	Code       Code            `json:"code"`
 	Stage      execution.Stage `json:"stage"`
@@ -68,9 +71,27 @@ func (r Result) Report() Report {
 // RunReport uses Run's execution loop and v1 projection, discarding each raw
 // execution result before the next request. Its duration starts after snapshotting.
 func (s Snapshot) RunReport(ctx context.Context, sender service.RequestService, options Options) Report {
+	return s.runReport(ctx, sender, options, IterationData{})
+}
+
+var ErrIterationLimit = errors.New("iteration request limit exceeded")
+
+// RunDataReport runs the selected requests once per row, in file order. The
+// projected aggregate includes skipped positions after failure or cancellation.
+func (s Snapshot) RunDataReport(ctx context.Context, sender service.RequestService, options Options, data IterationData) (Report, error) {
+	if len(data.rows) == 0 {
+		return Report{}, ErrInvalidDataFile
+	}
+	if len(s.requests) > maxIterationRequests/len(data.rows) {
+		return Report{}, ErrIterationLimit
+	}
+	return s.runReport(ctx, sender, options, data), nil
+}
+
+func (s Snapshot) runReport(ctx context.Context, sender service.RequestService, options Options, data IterationData) Report {
 	start := time.Now()
-	report := Report{Version: ReportVersion, Requests: make([]RequestReport, 0)}
-	report.Outcome = s.run(ctx, sender, options, report.record)
+	report := Report{Version: ReportVersion, Iterations: len(data.rows), Requests: make([]RequestReport, 0)}
+	report.Outcome = s.run(ctx, sender, options, data, report.record)
 	if ctx.Err() != nil {
 		report.Outcome = Cancelled
 	}
@@ -106,7 +127,7 @@ func (r RequestResult) MarshalJSON() ([]byte, error) {
 }
 
 func (r RequestResult) report(ordinal int) RequestReport {
-	entry := RequestReport{Ordinal: ordinal, Outcome: safeOutcome(r.Outcome), Code: safeCode(r.Code), Stage: safeStage(r.Stage), Sent: r.Sent, DurationNS: elapsed(r.Duration)}
+	entry := RequestReport{Ordinal: ordinal, Iteration: max(0, r.Iteration), Outcome: safeOutcome(r.Outcome), Code: safeCode(r.Code), Stage: safeStage(r.Stage), Sent: r.Sent, DurationNS: elapsed(r.Duration)}
 	if r.Execution != nil {
 		if response := r.Execution.Response; response != nil && response.StatusCode >= 100 && response.StatusCode <= 599 {
 			entry.StatusCode = response.StatusCode

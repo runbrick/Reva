@@ -94,7 +94,10 @@
             code: host.response.code, status: host.response.status, responseTime: host.response.responseTime,
             headers: {get: function (name) { return host.header(String(name)); }},
             text: function () { return host.text(); },
-            json: function () { return JSON.parse(host.text()); }
+            json: function () { return JSON.parse(host.text()); },
+            hasJSONField: function (pointer) { return host.hasJSONField(String(pointer)); },
+            jsonFieldEquals: function (pointer, expected) { return host.jsonFieldEquals(String(pointer), String(expected)); },
+            captureJSON: function (pointer, name) { return host.captureJSON(String(pointer), String(name)); }
         };
         pm.response.to = expect(pm.response);
     }

@@ -28,6 +28,17 @@ not move existing user data. Backups now use `.revabak` and the
 `reva-backup-v1` envelope; backups from earlier builds must be re-exported from
 their local data with this build.
 
+## Collection workbench
+
+Use the collection picker in the top bar to focus the **APIs** sidebar on one
+collection. The sidebar filter searches that collection. Global search can
+still open requests in any collection. Opening a saved request brings its
+collection into view. Switching collections keeps open tabs and their drafts.
+
+On first desktop launch with no collections, Reva creates one collection in
+the current app language. If you later delete every collection, the sidebar
+offers **New collection** and **Import**.
+
 ## Collection environments
 
 Open **Collection settings > Collection environments** to choose which
@@ -53,11 +64,47 @@ clears them. Manual sessions
 stay in memory and are separate from collection runs.
 
 In the desktop **Run collection** dialog, check **Use cookie session for this
-run** to carry cookies between requests in that run. This option starts off for
-each new dialog. Every run gets a fresh, private session, discarded after the
-run finishes or is cancelled. Cookies from one run never reach another run or
-the manual request editor. Explicit Cookie headers on a request take precedence
-over automatic cookies. The headless CLI does not enable cookie sessions.
+run** to carry cookies between requests. In the CLI, use `--cookie-session`.
+The option defaults to off. With cookies enabled, each run gets a fresh,
+private session, or a fresh session per data row. Reva discards each session
+after use. Explicit `Cookie` headers take precedence over automatic cookies.
+
+## Response tools
+
+Open **Response tools** after a manual HTTP send. Choose **Set as baseline**,
+then send another request and select **Compare with baseline**. The baseline
+stays in memory for the current app session and works across request tabs.
+The comparison shows the two HTTP status codes and JSON changes by field path.
+Object key order is ignored and arrays are compared by position. To skip a field
+and its descendants, enter one JSON Pointer per line, such as `/timestamp` or
+`/data/requestId`.
+
+In **JSON fields**, select a field to add an existence check, an equality check
+for a scalar value, or a capture rule. Reva adds editable code to the request's
+response test script. Equality checks store the selected value in the script.
+These field actions use complete JSON responses up to 512 KiB.
+
+Save the request with the capture rule and reference its variable, for example
+`{{orderId}}`, in a later request in the same collection. The desktop runner and
+`reva-run` make captures from successful steps available for the rest of that
+run, with precedence over environment and collection values. A missing capture
+fails its generated test. Enable **Stop on failure** if later requests depend on
+the value. The collection retains the rule and the captured value stays in run
+memory.
+
+The response footer also lets you save one response example per saved HTTP
+request, reopen it offline, or delete it. Use **Export WireMock** to review and
+save a static mapping from a current response or saved example. Examples use
+local plaintext files and the response body is opt-in. See
+[Saved response examples and WireMock export](docs/research/response-examples.md)
+for body limits, matching behavior, and manual backup instructions.
+
+## GraphQL schema
+
+In a GraphQL request's **Body** tab, choose **Load schema** to browse and
+filter Query, Mutation, and Subscription fields and their return types. See
+[Browse GraphQL root fields](docs/research/graphql-schema.md) for how the
+request uses the current endpoint, variables, and authentication.
 
 ## Headless collection CLI
 
@@ -82,7 +129,11 @@ explicitly selected shared `environments/<ID>.json` are read. `--environment`
 looks first for that ID in the collection's own environments, then in the shared
 directory. **No environment is used by default**, regardless of the GUI's
 picker settings. Explicit environment rows override collection variables;
-disabled rows fall back to enabled collection values.
+disabled rows fall back to enabled collection values. Use `--folder ID` to run
+one folder in saved order and `--data-file PATH` to repeat the selected scope
+for each CSV or JSON row. The desktop runner also supports both options. See
+[Native runner workflows](docs/research/runner-workflows.md) for limits and
+variable precedence.
 
 The CLI creates no data directories and saves no settings, collection,
 environment, or history files, on success, error, or cancellation. An absent
@@ -101,18 +152,19 @@ inherited collection/folder auth, request options over saved settings, pre-reque
 scripts, one variable expansion, HTTP, then response tests. Default behavior
 continues after failures; `--stop-on-failure` marks subsequent requests skipped.
 HTTP 4xx/5xx alone do not fail a run; assert the desired status in a response
-test. Script variable edits are local to one request and do not carry into the
-next request. Pre-script failure prevents sending. The existing bounded ES5
+test. Ordinary script variable edits are local to one request. Explicit response
+capture rules can pass values to later requests. Pre-script failure prevents
+sending. The existing bounded ES5
 script sandbox is used; a running script may take up to its two-second limit
 to observe cancellation. Enabled binary/multipart upload references can read
 local files and send them, as in the GUI. This command runs trusted native
 collections; it is not an import preview or a filesystem/network sandbox.
 
-After any run, stdout contains exactly one compact JSON report plus a newline,
-including failures and partial cancellation. Input/load errors produce no
-report; help prints usage text. Stderr contains only fixed diagnostic codes,
-never raw filesystem, HTTP, or script errors. Example for an empty collection
-(the measured `durationNs` varies):
+After a run, stdout contains a report, including failures and partial
+cancellation. The default is one compact JSON object plus a newline. Use
+`--report-format junit` to generate JUnit XML for CI. Input/load errors produce
+no report. Help prints usage text. Stderr uses fixed diagnostic codes. Example
+JSON for an empty collection (the measured `durationNs` varies):
 
 ```json
 {"version":1,"outcome":"passed","durationNs":1200,"counts":{"total":0,"passed":0,"failed":0,"cancelled":0,"skipped":0},"assertions":{"passed":0,"failed":0},"requests":[]}
@@ -121,7 +173,8 @@ never raw filesystem, HTTP, or script errors. Example for an empty collection
 Report version 1 is independent of the native data schema. Reports contain only
 fixed outcome/stage/diagnostic codes, one-based request ordinals, sender-invoked
 flags, optional HTTP status codes, nonnegative nanosecond timings, request counts,
-and assertion pass/fail counts. They omit all entity IDs/names, URLs, methods,
+and assertion pass/fail counts. Data runs also report iteration counts and
+ordinals. Reports omit all entity IDs/names, URLs, methods,
 headers, bodies, credentials, variables, script sources/logs, assertion names,
 and arbitrary error messages. Locate a reported ordinal using the collection's
 depth-first request order. Counts/order, HTTP status, timings, and execution
@@ -137,10 +190,16 @@ outcomes are intentionally visible; there is no raw/debug report flag.
 Cancellation prevents subsequent sends and includes skipped request positions
 in the report. A per-request timeout is a run failure (`1`); it does not cancel
 the parent run. If stdout cannot be written, the report may be incomplete and
-the exit code is `1` with `reva-run: output_failed` on stderr. No new dependencies,
-GUI packages, parallel execution, iterations, implicit active-environment
-selection, response capture between requests, cookie jar, or full Postman runtime
-are introduced.
+the exit code is `1` with `reva-run: output_failed` on stderr.
+
+## Collection share templates
+
+Open a collection's **Settings > Overview > Export share template** to
+preview and save a Reva share template, Postman Collection v2.1, Hurl HTTP
+template, or k6 single-flow script. Templates replace stored URLs and values
+with input variables, omit credentials and local file paths, and list skipped
+requests and fields. Review collection and field names before sharing. See
+[Collection share templates](docs/research/share-exports.md) for format limits.
 
 ## Layout
 

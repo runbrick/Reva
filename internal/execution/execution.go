@@ -89,6 +89,7 @@ type Result struct {
 	TransportStarted bool
 	Prepared         model.Request
 	Variables        []model.KV
+	Captures         []model.KV `json:"-"`
 	HistoryRequest   model.Request
 }
 
@@ -143,7 +144,7 @@ func (p *Plan) Run(ctx context.Context, svc service.RequestService) Result {
 	r.Response = &resp
 	r.Stage = StageTests
 	if strings.TrimSpace(r.Prepared.TestScript) != "" {
-		r.Tests.Assertions, r.Tests.Logs, r.Tests.Err = script.RunTests(r.Prepared.TestScript, expanded, resp, r.Variables, 0)
+		r.Tests.Assertions, r.Tests.Logs, r.Captures, r.Tests.Err = script.RunTestsWithCaptures(r.Prepared.TestScript, expanded, resp, r.Variables, 0)
 	}
 	if r.Err = ctx.Err(); r.Err != nil || r.Tests.Err != nil {
 		return r

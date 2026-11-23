@@ -73,11 +73,13 @@ type responseView struct {
 	phaseTimes                  []string
 	phaseTimePattern            string
 	phaseShares                 []float32
+	tools                       responseToolsState
 }
 
 // responseState is the response viewer's UI state. Owned by the response PR.
 type responseState struct {
-	views map[int]*responseView
+	views    map[int]*responseView
+	baseline *responseBaseline
 }
 
 // prepare runs only when the shell installs a new response pointer.
@@ -86,6 +88,7 @@ func (v *responseView) prepare(r *model.Response) {
 		return
 	}
 	v.source = r
+	v.tools = responseToolsState{ignored: v.tools.ignored}
 	body := r.Body
 	v.rawLimited = len(body) > responseDisplayLimit
 	if v.rawLimited {
@@ -286,7 +289,7 @@ func (a *App) responseResult(c ui.C, t *Tab) {
 		ui.Paragraph(c, labels.Truncated, 0).Pad(Space2).Color(a.palette.Warning)
 	}
 	if v.section == responseBody {
-		a.responseWorkbench(c, v)
+		a.responseWorkbench(c, t, v)
 		return
 	}
 	ui.Column(c).FillWidth().Grow(1).Pad(Space4).Gap(Space2).Children(func() {
@@ -355,13 +358,14 @@ func (a *App) responseCopyButton(c ui.C, r *model.Response) {
 	}
 }
 
-func (a *App) responseWorkbench(c ui.C, v *responseView) {
+func (a *App) responseWorkbench(c ui.C, t *Tab, v *responseView) {
 	ui.Row(c).FillWidth().Grow(1).Children(func() {
-		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, v) })
+		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, t, v) })
 	})
+	a.responseToolsModal(c, t, &v.tools)
 }
 
-func (a *App) responseBodyView(c ui.C, v *responseView) {
+func (a *App) responseBodyView(c ui.C, t *Tab, v *responseView) {
 	pane := ui.Column(c).FillWidth().Grow(1)
 	if pane.Shortcut(ui.Primary, "f") && v.mode != responsePreview {
 		v.find = true
@@ -374,7 +378,7 @@ func (a *App) responseBodyView(c ui.C, v *responseView) {
 			a.responseCopy(c, selected)
 		}
 	}
-	pane.Children(func() { a.responseBodyContent(c, v) })
+	pane.Children(func() { a.responseBodyContent(c, t, v) })
 }
 
 func (a *App) responseModeLabel(mode responseMode) string {
@@ -388,7 +392,7 @@ func (a *App) responseModeLabel(mode responseMode) string {
 	}
 }
 
-func (a *App) responseBodyContent(c ui.C, v *responseView) {
+func (a *App) responseBodyContent(c ui.C, t *Tab, v *responseView) {
 	theme := c.Theme()
 	ui.Row(c).FillWidth().Height(TabBarHeight).Shrink(0).PadX(Space4).Gap(Space2).Items(ui.Center).
 		Background(theme.Card).Children(func() {
@@ -401,6 +405,9 @@ func (a *App) responseBodyContent(c ui.C, v *responseView) {
 			v.wrap = !v.wrap
 		}
 		ui.Spacer(c)
+		if t.sse == nil && ui.Button(c, a.S.Response.Tools.Title).Small().Outline().Clicked() {
+			c.After(func() { v.tools.show(t.Response) })
+		}
 		if ui.Button(c, a.S.Response.Search).Icon(icons.Search).IconOnly().Ghost().Tooltip(a.S.Response.Search).Disabled(v.mode == responsePreview).Clicked() {
 			v.find = !v.find
 		}

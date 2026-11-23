@@ -250,6 +250,9 @@ func (s *searchCountingCollections) List() []model.Collection {
 
 func TestSearchCachesIndexUntilQueryChanges(t *testing.T) {
 	svc := searchFixture(t)
+	settings := svc.Settings.Get()
+	settings.WorkspaceCollectionID = svc.Collections.List()[0].ID
+	authMust(t, svc.Settings.Save(settings))
 	collections := &searchCountingCollections{CollectionService: svc.Collections}
 	svc.Collections = collections
 	h := newHarness(t, svc)

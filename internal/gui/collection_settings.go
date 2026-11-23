@@ -29,6 +29,7 @@ type collectionSettingsDraft struct {
 	environments              collectionEnvironmentDraft
 	editor                    authEditorState
 	table                     kvTableState
+	shareExport               collectionShareExportState
 	missing, saveFailed       bool
 }
 
@@ -254,6 +255,7 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 		})
 	})
 	a.syncCollectionSettingsDirty(t)
+	a.collectionShareExportDialog(c, t, d)
 	if ui.Shortcut(c, ui.Primary, "s") {
 		c.After(func() { a.saveCollectionSettings(t) })
 	}
@@ -345,7 +347,7 @@ func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, it
 			}
 		})
 		if t.TargetID == "" {
-			ui.Text(c, s.ExportSection).Muted().FontSize(theme.Metrics.FontSizeS).PadTop(Space4)
+			a.collectionShareExportEntry(c, t, exists)
 			ui.Divider(c)
 			ui.Row(c).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
 				ui.Icon(c, icons.Download).Size(Space6, Space6).Color(theme.MutedForeground)

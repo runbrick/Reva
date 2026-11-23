@@ -2,23 +2,28 @@ package gui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"sync"
 
 	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/runbrick/reva/internal/runner"
 	"github.com/runbrick/reva/internal/service"
-	"github.com/runbrick/reva/internal/service/request"
+	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/ui"
 )
 
 type collectionRunnerState struct {
 	open, stopOnFailure, useCookieSession, cancelling bool
-	collectionID, environmentID                       string
+	scopedEmpty                                       bool
+	collectionID, environmentID, folderID, dataFile   string
 	environmentIDs                                    []string
 	environmentNames                                  map[string]string
+	folderIDs                                         []string
+	folderNames                                       map[string]string
 	problem                                           collectionRunProblem
 	job                                               *collectionRunJob
 	effect                                            *ui.EffectState[runner.Report, *collectionRunJob]
@@ -32,12 +37,15 @@ const (
 	collectionRunReady collectionRunProblem = iota
 	collectionRunMissingCollection
 	collectionRunMissingEnvironment
+	collectionRunMissingFolder
+	collectionRunInvalidData
+	collectionRunIterationLimit
 )
 
 type collectionRunJob struct {
-	input            runner.Snapshot
-	options          runner.Options
-	useCookieSession bool
+	input    runner.Snapshot
+	options  runner.Options
+	dataFile string
 
 	mu        sync.Mutex
 	cancel    context.CancelFunc
@@ -53,7 +61,7 @@ func (job *collectionRunJob) stop() {
 	}
 }
 
-func (job *collectionRunJob) run(parent context.Context, sender service.RequestService) runner.Report {
+func (job *collectionRunJob) run(parent context.Context, sender service.RequestService) (runner.Report, error) {
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	job.mu.Lock()
@@ -64,10 +72,14 @@ func (job *collectionRunJob) run(parent context.Context, sender service.RequestS
 	input := job.input
 	job.input = runner.Snapshot{}
 	job.mu.Unlock()
-	if job.useCookieSession {
-		ctx = request.WithCookieSession(ctx, request.NewCookieSession())
+	if job.dataFile == "" {
+		return input.RunReport(ctx, sender, job.options), nil
 	}
-	return input.RunReport(ctx, sender, job.options)
+	data, err := runner.ReadDataFile(job.dataFile)
+	if err != nil {
+		return runner.Report{}, err
+	}
+	return input.RunDataReport(ctx, sender, job.options, data)
 }
 
 func (a *App) openCollectionRunner(collectionID string) {
@@ -76,13 +88,15 @@ func (a *App) openCollectionRunner(collectionID string) {
 		return
 	}
 	state.open, state.collectionID = true, collectionID
-	a.collectionRunnerEnvironments()
+	a.collectionRunnerChoices()
 }
 
-func (a *App) collectionRunnerEnvironments() {
+func (a *App) collectionRunnerChoices() {
 	state := &a.collections.runner
 	state.environmentIDs = []string{""}
 	state.environmentNames = make(map[string]string)
+	state.folderIDs = []string{""}
+	state.folderNames = make(map[string]string)
 	collection, ok := a.Svc.Collections.Get(state.collectionID)
 	if !ok {
 		return
@@ -93,6 +107,41 @@ func (a *App) collectionRunnerEnvironments() {
 			state.environmentNames[environment.ID] = environment.Name
 		}
 	}
+	text := i18n.RunnerFor(a.S.Lang)
+	var walk func([]model.Item, string)
+	walk = func(items []model.Item, parent string) {
+		for _, item := range items {
+			if item.Type != model.ItemFolder || item.ID == "" {
+				continue
+			}
+			name := item.Name
+			if parent != "" {
+				name = fmt.Sprintf(text.FolderPath, parent, name)
+			}
+			state.folderIDs = append(state.folderIDs, item.ID)
+			state.folderNames[item.ID] = name
+			walk(item.Items, name)
+		}
+	}
+	walk(collection.Items, "")
+}
+
+func (a *App) chooseCollectionRunData() {
+	state, text := &a.collections.runner, i18n.RunnerFor(a.S.Lang)
+	if !state.open || state.job != nil || state.report.Version != 0 {
+		return
+	}
+	paths, err := app.OpenFiles(app.OpenFileOptions{Title: text.BrowseData, Filters: []app.FileFilter{
+		{Name: "CSV", Pattern: "*.csv"}, {Name: "JSON", Pattern: "*.json"},
+	}})
+	if errors.Is(err, app.ErrCanceled) {
+		return
+	}
+	if err != nil || len(paths) != 1 || paths[0] == "" {
+		state.problem = collectionRunInvalidData
+		return
+	}
+	state.dataFile, state.problem = paths[0], collectionRunReady
 }
 
 func (a *App) startCollectionRun() {
@@ -111,22 +160,29 @@ func (a *App) startCollectionRun() {
 		if !ok {
 			state.problem = collectionRunMissingEnvironment
 			state.environmentID = ""
-			a.collectionRunnerEnvironments()
+			a.collectionRunnerChoices()
 			return
 		}
 		values = environment.Variables
 	}
+	input := runner.NewSnapshot(collection, a.Svc.Settings.Get(), values)
+	if state.folderID != "" {
+		var err error
+		input, err = input.WithFolder(state.folderID)
+		if err != nil {
+			state.problem = collectionRunMissingFolder
+			a.collectionRunnerChoices()
+			return
+		}
+	}
 	state.job = &collectionRunJob{
-		input:            runner.NewSnapshot(collection, a.Svc.Settings.Get(), values),
-		options:          runner.Options{StopOnFailure: state.stopOnFailure},
-		useCookieSession: state.useCookieSession,
+		input: input, dataFile: state.dataFile,
+		options: runner.Options{StopOnFailure: state.stopOnFailure, UseCookieSession: state.useCookieSession},
 	}
 	sender := a.Svc.Requests
 	state.effect = ui.NewEffectKeyed(func(ctx context.Context, job *collectionRunJob) (runner.Report, error) {
-		return job.run(ctx, sender), nil
+		return job.run(ctx, sender)
 	})
-	state.collectionID, state.environmentID = "", ""
-	state.environmentIDs, state.environmentNames = nil, nil
 	state.problem = collectionRunReady
 }
 
@@ -136,8 +192,16 @@ func (a *App) declareCollectionRunner(c ui.C) {
 		return
 	}
 	ui.Effect(c, state.effect, state.job)
-	if report, _, ok := state.effect.Take(); ok {
-		state.job, state.effect, state.cancelling, state.report = nil, nil, false, report
+	if report, err, ok := state.effect.Take(); ok {
+		state.job, state.effect, state.cancelling = nil, nil, false
+		switch {
+		case errors.Is(err, runner.ErrIterationLimit):
+			state.problem = collectionRunIterationLimit
+		case err != nil:
+			state.problem = collectionRunInvalidData
+		default:
+			*state = collectionRunnerState{open: true, report: report, scopedEmpty: state.folderID != ""}
+		}
 	}
 }
 
@@ -160,6 +224,7 @@ func (a *App) collectionRunnerPage(c ui.C) {
 
 func (a *App) collectionRunnerDialog(c ui.C) {
 	state, text, theme := &a.collections.runner, a.S.Collections, c.Theme()
+	labels := i18n.RunnerFor(a.S.Lang)
 	spec := ui.ModalSpec{Width: 27 * Space6, Height: 17 * Space6, NoClose: state.job != nil}
 	dismissed := ui.ModalWith(c, &state.open, text.RunCollection, spec, func() {
 		ui.Column(c).Fill().Gap(Space3).Children(func() {
@@ -174,13 +239,37 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 				ui.Text(c, status).Bold().Color(theme.Primary)
 			default:
 				ui.Wrap(c, text.RunSetup).Muted()
-				ui.Text(c, text.RunEnvironment).Bold()
-				ui.Select(c, &state.environmentID, state.environmentIDs, func(id string) string {
-					if id == "" {
-						return text.RunNoEnvironment
+				ui.Row(c).FillWidth().Gap(Space3).Children(func() {
+					ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
+						ui.Text(c, labels.Scope).Bold()
+						ui.Select(c, &state.folderID, state.folderIDs, func(id string) string {
+							if id == "" {
+								return labels.WholeCollection
+							}
+							return state.folderNames[id]
+						}).FillWidth().Label(labels.Scope)
+					})
+					ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
+						ui.Text(c, text.RunEnvironment).Bold()
+						ui.Select(c, &state.environmentID, state.environmentIDs, func(id string) string {
+							if id == "" {
+								return text.RunNoEnvironment
+							}
+							return state.environmentNames[id]
+						}).FillWidth().Label(text.RunEnvironment)
+					})
+				})
+				ui.Row(c).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
+					if ui.Button(c, labels.BrowseData).Outline().Clicked() {
+						c.After(a.chooseCollectionRunData)
 					}
-					return state.environmentNames[id]
-				}).FillWidth().Label(text.RunEnvironment)
+					if state.dataFile != "" {
+						ui.Text(c, labels.DataSelected).Muted().Grow(1)
+						if ui.Button(c, labels.ClearData).Outline().Clicked() {
+							state.dataFile, state.problem = "", collectionRunReady
+						}
+					}
+				})
 				ui.Checkbox(c, &state.stopOnFailure, text.RunStopOnFailure)
 				ui.Checkbox(c, &state.useCookieSession, text.RunUseCookieSession)
 				switch state.problem {
@@ -188,6 +277,12 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 					ui.Wrap(c, text.RunMissingCollection).Color(theme.Danger)
 				case collectionRunMissingEnvironment:
 					ui.Wrap(c, text.RunMissingEnvironment).Color(theme.Danger)
+				case collectionRunMissingFolder:
+					ui.Wrap(c, labels.MissingFolder).Color(theme.Danger)
+				case collectionRunInvalidData:
+					ui.Wrap(c, labels.InvalidData).Color(theme.Danger)
+				case collectionRunIterationLimit:
+					ui.Wrap(c, labels.IterationLimit).Color(theme.Danger)
 				}
 			}
 		})
@@ -212,22 +307,41 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 
 func (a *App) collectionRunnerSummary(c ui.C, state *collectionRunnerState) {
 	text, theme, report := a.S.Collections, c.Theme(), state.report
+	labels := i18n.RunnerFor(a.S.Lang)
 	label, color := a.collectionRunOutcome(c, report.Outcome)
 	ui.Text(c, label).Bold().Color(color)
 	counts := report.Counts
 	ui.Wrap(c, fmt.Sprintf(text.RunCounts, counts.Total, counts.Passed, counts.Failed, counts.Cancelled, counts.Skipped))
 	ui.Wrap(c, fmt.Sprintf(text.RunAssertions, report.Assertions.Passed, report.Assertions.Failed)).Muted()
+	if report.Iterations > 0 {
+		ui.Text(c, fmt.Sprintf(labels.Iterations, report.Iterations)).Muted()
+	}
 	if len(report.Requests) == 0 {
-		ui.Wrap(c, text.RunEmpty).Muted()
+		empty := text.RunEmpty
+		if state.scopedEmpty {
+			empty = labels.EmptyScope
+		}
+		ui.Wrap(c, empty).Muted()
 		return
+	}
+	rowsLabel := text.RunRows
+	if report.Iterations > 0 {
+		rowsLabel = labels.IterationRows
 	}
 	state.list.Name = func(index int) string {
 		entry := report.Requests[index]
 		label, status := a.collectionRunOutcomeLabel(entry.Outcome), a.collectionRunStatus(entry)
-		return fmt.Sprintf("%d · %s · %s · %s", entry.Ordinal, status, label, fmt.Sprintf(text.RunAssertions, entry.Assertions.Passed, entry.Assertions.Failed))
+		name := fmt.Sprintf("%d · %s · %s · %s", entry.Ordinal, status, label, fmt.Sprintf(text.RunAssertions, entry.Assertions.Passed, entry.Assertions.Failed))
+		if entry.Iteration > 0 {
+			name = fmt.Sprintf("%s %d · %s", labels.Iteration, entry.Iteration, name)
+		}
+		return name
 	}
 	ui.Row(c).FillWidth().Shrink(0).Height(theme.Metrics.ControlHeight).PadX(Space2).Gap(Space3).Items(ui.Center).
 		Background(a.palette.TableHeader).Children(func() {
+		if report.Iterations > 0 {
+			ui.Text(c, labels.Iteration).Width(3 * Space6).Muted()
+		}
 		ui.Text(c, text.RunOrdinal).Width(4 * Space6).Muted()
 		ui.Text(c, text.RunStatus).Width(5 * Space6).Muted()
 		ui.Text(c, text.RunOutcome).Width(5 * Space6).Muted()
@@ -243,12 +357,15 @@ func (a *App) collectionRunnerSummary(c ui.C, state *collectionRunnerState) {
 		}
 		row.Element.Height(theme.Metrics.ControlHeight).PadX(Space2).Gap(Space3).Items(ui.Center).
 			Focus(ui.Look{}.Ring(1, theme.Ring)).Children(func() {
+			if report.Iterations > 0 {
+				ui.Text(row.C, strconv.Itoa(entry.Iteration)).Width(3 * Space6)
+			}
 			ui.Text(row.C, strconv.Itoa(entry.Ordinal)).Width(4 * Space6)
 			ui.Text(row.C, status).Width(5 * Space6).Color(statusColor)
 			ui.Text(row.C, label).Width(5 * Space6).Color(outcomeColor)
 			ui.Text(row.C, fmt.Sprintf(text.RunAssertions, entry.Assertions.Passed, entry.Assertions.Failed)).Ellipsis().Grow(1).MinWidth(0)
 		})
-	}).FillWidth().Grow(1).MinHeight(0).Label(text.RunRows).Scrollbars()
+	}).FillWidth().Grow(1).MinHeight(0).Label(rowsLabel).Scrollbars()
 }
 
 func (a *App) collectionRunStatus(entry runner.RequestReport) string {

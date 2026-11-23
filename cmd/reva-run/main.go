@@ -4,6 +4,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,9 +39,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	flags.SetOutput(io.Discard)
 	flags.Usage = func() {}
 	collectionID := flags.String("collection", "", "")
+	folderID := flags.String("folder", "", "")
 	environmentID := flags.String("environment", "", "")
 	dataDir := flags.String("data-dir", "", "")
+	dataFile := flags.String("data-file", "", "")
+	reportFormat := flags.String("report-format", "json", "")
 	stopOnFailure := flags.Bool("stop-on-failure", false, "")
+	cookieSession := flags.Bool("cookie-session", false, "")
 	help := flags.Bool("help", false, "")
 	shortHelp := flags.Bool("h", false, "")
 	if err := flags.Parse(args); err != nil {
@@ -55,16 +60,20 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if flags.NArg() != 0 || !validID(*collectionID) {
 		return diagnostic(stderr, "collection_required_or_invalid", exitInput)
 	}
-	var environmentSet, dataDirSet bool
+	var invalidSelection bool
 	flags.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "environment":
-			environmentSet = true
+			invalidSelection = invalidSelection || !validID(*environmentID)
+		case "folder":
+			invalidSelection = invalidSelection || !validID(*folderID)
 		case "data-dir":
-			dataDirSet = true
+			invalidSelection = invalidSelection || *dataDir == ""
+		case "data-file":
+			invalidSelection = invalidSelection || *dataFile == ""
 		}
 	})
-	if (environmentSet && !validID(*environmentID)) || (dataDirSet && *dataDir == "") {
+	if invalidSelection || (*reportFormat != "json" && *reportFormat != "junit") {
 		return diagnostic(stderr, "invalid_arguments", exitInput)
 	}
 	dir, err := readOnlyDir(*dataDir)
@@ -75,12 +84,40 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	if code != "" {
 		return diagnostic(stderr, code, exitInput)
 	}
-	result := runner.Run(ctx, request.New(), input.collection, input.settings, input.environment,
-		runner.Options{StopOnFailure: *stopOnFailure})
-	if err := json.NewEncoder(stdout).Encode(result.Report()); err != nil {
+	selected := runner.NewSnapshot(input.collection, input.settings, input.environment)
+	if *folderID != "" {
+		selected, err = selected.WithFolder(*folderID)
+		if err != nil {
+			return diagnostic(stderr, "folder_invalid", exitInput)
+		}
+	}
+	sender := request.New()
+	options := runner.Options{StopOnFailure: *stopOnFailure, UseCookieSession: *cookieSession}
+	var report runner.Report
+	if *dataFile == "" {
+		report = selected.RunReport(ctx, sender, options)
+	} else {
+		data, err := runner.ReadDataFile(*dataFile)
+		if err != nil {
+			return diagnostic(stderr, "data_file_invalid_or_unreadable", exitInput)
+		}
+		report, err = selected.RunDataReport(ctx, sender, options, data)
+		if errors.Is(err, runner.ErrIterationLimit) {
+			return diagnostic(stderr, "iteration_limit_exceeded", exitInput)
+		}
+		if err != nil {
+			return diagnostic(stderr, "data_file_invalid_or_unreadable", exitInput)
+		}
+	}
+	if *reportFormat == "junit" {
+		err = runner.WriteJUnit(stdout, report)
+	} else {
+		err = json.NewEncoder(stdout).Encode(report)
+	}
+	if err != nil {
 		return diagnostic(stderr, "output_failed", exitFailed)
 	}
-	switch result.Outcome {
+	switch report.Outcome {
 	case runner.Cancelled:
 		return exitCancelled
 	case runner.Passed:

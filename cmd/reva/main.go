@@ -10,6 +10,7 @@ import (
 	"github.com/runbrick/reva/internal/update"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/gfx"
+	"github.com/vivaui/viva/ui"
 )
 
 func main() {
@@ -29,14 +30,21 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	newApp := func() *gui.App {
+		a := gui.New(svc)
+		if err := a.InitializeCollectionWorkspace(a.S.Collections.WorkspaceDefaultName); err != nil {
+			a.Toast(a.S.Common.Error, err.Error(), ui.ToastError)
+		}
+		return a
+	}
 	if runtime.GOOS != "windows" && runtime.GOOS != "darwin" {
-		if err := app.RunCanvas(gui.New(svc).Config(), &gfx.Canvas{}); err != nil {
+		if err := app.RunCanvas(newApp().Config(), &gfx.Canvas{}); err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
 	if err := app.RunApplication(func(application *app.Application) error {
-		a := gui.New(svc)
+		a := newApp()
 		a.ConfigureUpdates(application.Quit, updateFailed)
 		_, err := application.OpenWindow(a.Config(), &gfx.Canvas{})
 		return err

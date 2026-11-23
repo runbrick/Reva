@@ -1,0 +1,196 @@
+{
+  "info": {
+    "name": "Reva 本地接口测试",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [{"key": "baseUrl", "value": "http://127.0.0.1:8787"}],
+  "item": [
+    {"name": "健康检查", "request": {"method": "GET", "url": "{{baseUrl}}/health"}},
+    {
+      "name": "登录与鉴权",
+      "item": [
+        {
+          "name": "错误密码",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "options": {"raw": {"language": "json"}},
+              "raw": "{\"username\":\"demo\",\"password\":\"wrong\"}"
+            }
+          }
+        },
+        {"name": "尚未登录", "request": {"method": "GET", "url": "{{baseUrl}}/auth/cookie"}},
+        {
+          "name": "登录",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "options": {"raw": {"language": "json"}},
+              "raw": "{\"username\":\"demo\",\"password\":\"reva123\"}"
+            }
+          }
+        },
+        {
+          "name": "Bearer 鉴权",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/bearer",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "reva-demo-token", "type": "string"}]}
+          }
+        },
+        {"name": "Cookie 会话", "request": {"method": "GET", "url": "{{baseUrl}}/auth/cookie"}},
+        {
+          "name": "Basic 鉴权",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/basic",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {"key": "username", "value": "demo", "type": "string"},
+                {"key": "password", "value": "reva123", "type": "string"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "API Key 请求头",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/key",
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {"key": "key", "value": "X-API-Key", "type": "string"},
+                {"key": "value", "value": "reva-demo-key", "type": "string"},
+                {"key": "in", "value": "header", "type": "string"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "API Key 查询参数",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/key",
+            "auth": {
+              "type": "apikey",
+              "apikey": [
+                {"key": "key", "value": "api_key", "type": "string"},
+                {"key": "value", "value": "reva-demo-key", "type": "string"},
+                {"key": "in", "value": "query", "type": "string"}
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "方法与传参",
+      "item": [
+        {
+          "name": "路径、查询和请求头",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/echo/%E8%AE%A2%E5%8D%95%2042?tag=%E4%B8%AD%E6%96%87&tag=a%2Bb&empty=",
+            "header": [{"key": "X-Demo", "value": "reva"}]
+          }
+        },
+        {
+          "name": "POST JSON",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/echo/orders",
+            "body": {
+              "mode": "raw",
+              "options": {"raw": {"language": "json"}},
+              "raw": "{\"name\":\"测试\",\"enabled\":true,\"count\":2}"
+            }
+          }
+        },
+        {
+          "name": "PUT 表单",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/echo/orders",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [{"key": "tag", "value": "one"}, {"key": "tag", "value": "two"}]
+            }
+          }
+        },
+        {
+          "name": "PATCH XML",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/echo/orders",
+            "body": {
+              "mode": "raw",
+              "options": {"raw": {"language": "xml"}},
+              "raw": "<name>中文</name>"
+            }
+          }
+        },
+        {"name": "DELETE", "request": {"method": "DELETE", "url": "{{baseUrl}}/echo/orders"}},
+        {"name": "HEAD", "request": {"method": "HEAD", "url": "{{baseUrl}}/echo/orders"}},
+        {"name": "OPTIONS", "request": {"method": "OPTIONS", "url": "{{baseUrl}}/echo/orders"}}
+      ]
+    },
+    {
+      "name": "文件上传与下载",
+      "item": [
+        {
+          "name": "Multipart 上传",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/upload",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {"key": "note", "value": "上传测试", "type": "text"},
+                {"key": "file", "src": "./cmd/reva-test-service/README.md", "type": "file"}
+              ]
+            }
+          }
+        },
+        {
+          "name": "Binary 上传",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/upload/binary",
+            "body": {"mode": "file", "file": {"src": "./cmd/reva-test-service/README.md"}}
+          }
+        },
+        {"name": "下载附件", "request": {"method": "GET", "url": "{{baseUrl}}/download"}}
+      ]
+    },
+    {
+      "name": "响应格式",
+      "item": [
+        {"name": "JSON 响应", "request": {"method": "GET", "url": "{{baseUrl}}/formats/json"}},
+        {"name": "XML 响应", "request": {"method": "GET", "url": "{{baseUrl}}/formats/xml"}},
+        {"name": "HTML 响应", "request": {"method": "GET", "url": "{{baseUrl}}/formats/html"}},
+        {"name": "纯文本响应", "request": {"method": "GET", "url": "{{baseUrl}}/formats/text"}},
+        {"name": "CSV 响应", "request": {"method": "GET", "url": "{{baseUrl}}/formats/csv"}},
+        {"name": "Gzip JSON", "request": {"method": "GET", "url": "{{baseUrl}}/formats/gzip"}},
+        {"name": "SSE 事件流", "request": {"method": "GET", "url": "{{baseUrl}}/events"}}
+      ]
+    },
+    {
+      "name": "状态码、重定向与超时",
+      "item": [
+        {"name": "204 无内容", "request": {"method": "GET", "url": "{{baseUrl}}/status/204"}},
+        {"name": "400 请求错误", "request": {"method": "GET", "url": "{{baseUrl}}/status/400"}},
+        {"name": "404 未找到", "request": {"method": "GET", "url": "{{baseUrl}}/status/404"}},
+        {"name": "429 请求限流", "request": {"method": "GET", "url": "{{baseUrl}}/status/429"}},
+        {"name": "500 服务端错误", "request": {"method": "GET", "url": "{{baseUrl}}/status/500"}},
+        {"name": "302 重定向", "request": {"method": "GET", "url": "{{baseUrl}}/redirect"}},
+        {"name": "延迟响应", "request": {"method": "GET", "url": "{{baseUrl}}/delay?ms=1500"}}
+      ]
+    }
+  ]
+}

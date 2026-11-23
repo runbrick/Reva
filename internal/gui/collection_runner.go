@@ -19,7 +19,9 @@ import (
 type collectionRunnerState struct {
 	open, stopOnFailure, useCookieSession, cancelling bool
 	scopedEmpty                                       bool
+	folderUnavailable, environmentUnavailable         bool
 	collectionID, environmentID, folderID, dataFile   string
+	collectionName, collectionHeading                 string
 	environmentIDs                                    []string
 	environmentNames                                  map[string]string
 	folderIDs                                         []string
@@ -29,6 +31,7 @@ type collectionRunnerState struct {
 	effect                                            *ui.EffectState[runner.Report, *collectionRunJob]
 	report                                            runner.Report
 	list                                              ui.ListState
+	presets                                           collectionRunnerPresets
 }
 
 type collectionRunProblem uint8
@@ -36,8 +39,7 @@ type collectionRunProblem uint8
 const (
 	collectionRunReady collectionRunProblem = iota
 	collectionRunMissingCollection
-	collectionRunMissingEnvironment
-	collectionRunMissingFolder
+	collectionRunTargetChanged
 	collectionRunInvalidData
 	collectionRunIterationLimit
 )
@@ -89,9 +91,10 @@ func (a *App) openCollectionRunner(collectionID string) {
 	}
 	state.open, state.collectionID = true, collectionID
 	a.collectionRunnerChoices()
+	a.loadCollectionRunnerPresets()
 }
 
-func (a *App) collectionRunnerChoices() {
+func (a *App) collectionRunnerChoices() (model.Collection, model.Environment, bool) {
 	state := &a.collections.runner
 	state.environmentIDs = []string{""}
 	state.environmentNames = make(map[string]string)
@@ -99,15 +102,23 @@ func (a *App) collectionRunnerChoices() {
 	state.folderNames = make(map[string]string)
 	collection, ok := a.Svc.Collections.Get(state.collectionID)
 	if !ok {
-		return
+		state.collectionName, state.collectionHeading = "", ""
+		state.problem = collectionRunMissingCollection
+		return model.Collection{}, model.Environment{}, false
 	}
+	text := i18n.RunnerFor(a.S.Lang)
+	state.collectionName = collection.Name
+	state.collectionHeading = fmt.Sprintf(text.CollectionTarget, collection.Name)
+	var selected model.Environment
 	for _, environment := range a.visibleEnvironments(collection) {
 		if environment.ID != "" {
 			state.environmentIDs = append(state.environmentIDs, environment.ID)
 			state.environmentNames[environment.ID] = environment.Name
+			if environment.ID == state.environmentID {
+				selected = environment
+			}
 		}
 	}
-	text := i18n.RunnerFor(a.S.Lang)
 	var walk func([]model.Item, string)
 	walk = func(items []model.Item, parent string) {
 		for _, item := range items {
@@ -124,6 +135,10 @@ func (a *App) collectionRunnerChoices() {
 		}
 	}
 	walk(collection.Items, "")
+	_, folderFound := state.folderNames[state.folderID]
+	state.folderUnavailable = state.folderUnavailable || (state.folderID != "" && !folderFound)
+	state.environmentUnavailable = state.environmentUnavailable || (state.environmentID != "" && selected.ID == "")
+	return collection, selected, true
 }
 
 func (a *App) chooseCollectionRunData() {
@@ -146,32 +161,19 @@ func (a *App) chooseCollectionRunData() {
 
 func (a *App) startCollectionRun() {
 	state := &a.collections.runner
-	if !state.open || state.job != nil || state.report.Version != 0 {
+	if !state.open || state.job != nil || state.report.Version != 0 || state.presets.writing {
 		return
 	}
-	collection, ok := a.Svc.Collections.Get(state.collectionID)
-	if !ok {
-		state.problem = collectionRunMissingCollection
+	collection, environment, ready := a.validateCollectionRunTargets()
+	if !ready {
 		return
 	}
-	var values []model.KV
-	if state.environmentID != "" {
-		environment, ok := a.environmentFor(collection, state.environmentID)
-		if !ok {
-			state.problem = collectionRunMissingEnvironment
-			state.environmentID = ""
-			a.collectionRunnerChoices()
-			return
-		}
-		values = environment.Variables
-	}
-	input := runner.NewSnapshot(collection, a.Svc.Settings.Get(), values)
+	input := runner.NewSnapshot(collection, a.Svc.Settings.Get(), environment.Variables)
 	if state.folderID != "" {
 		var err error
 		input, err = input.WithFolder(state.folderID)
 		if err != nil {
-			state.problem = collectionRunMissingFolder
-			a.collectionRunnerChoices()
+			state.folderUnavailable = true
 			return
 		}
 	}
@@ -186,8 +188,26 @@ func (a *App) startCollectionRun() {
 	state.problem = collectionRunReady
 }
 
+func (a *App) validateCollectionRunTargets() (model.Collection, model.Environment, bool) {
+	state := &a.collections.runner
+	collectionName, collectionWasMissing := state.collectionName, state.problem == collectionRunMissingCollection
+	folderName, environmentName := state.folderNames[state.folderID], state.environmentNames[state.environmentID]
+	state.problem = collectionRunReady
+	collection, environment, ok := a.collectionRunnerChoices()
+	if !ok || state.folderUnavailable || state.environmentUnavailable {
+		return model.Collection{}, model.Environment{}, false
+	}
+	if collectionWasMissing || collectionName != state.collectionName ||
+		folderName != state.folderNames[state.folderID] || environmentName != state.environmentNames[state.environmentID] {
+		state.problem = collectionRunTargetChanged
+		return model.Collection{}, model.Environment{}, false
+	}
+	return collection, environment, true
+}
+
 func (a *App) declareCollectionRunner(c ui.C) {
 	state := &a.collections.runner
+	a.declareCollectionRunnerPresets(c)
 	if state.job == nil {
 		return
 	}
@@ -207,6 +227,10 @@ func (a *App) declareCollectionRunner(c ui.C) {
 
 func (a *App) dismissCollectionRunner() {
 	state := &a.collections.runner
+	if state.presets.writing {
+		state.open = true
+		return
+	}
 	if state.job != nil {
 		state.open, state.cancelling = true, true
 		state.job.stop()
@@ -224,8 +248,10 @@ func (a *App) collectionRunnerPage(c ui.C) {
 
 func (a *App) collectionRunnerDialog(c ui.C) {
 	state, text, theme := &a.collections.runner, a.S.Collections, c.Theme()
-	labels := i18n.RunnerFor(a.S.Lang)
-	spec := ui.ModalSpec{Width: 27 * Space6, Height: 17 * Space6, NoClose: state.job != nil}
+	spec := ui.ModalSpec{Width: 27 * Space6, Height: 17 * Space6, NoClose: state.job != nil || state.presets.writing}
+	if state.job == nil && state.report.Version == 0 {
+		spec.Height = 21 * Space6
+	}
 	dismissed := ui.ModalWith(c, &state.open, text.RunCollection, spec, func() {
 		ui.Column(c).Fill().Gap(Space3).Children(func() {
 			switch {
@@ -238,52 +264,7 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 				}
 				ui.Text(c, status).Bold().Color(theme.Primary)
 			default:
-				ui.Wrap(c, text.RunSetup).Muted()
-				ui.Row(c).FillWidth().Gap(Space3).Children(func() {
-					ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
-						ui.Text(c, labels.Scope).Bold()
-						ui.Select(c, &state.folderID, state.folderIDs, func(id string) string {
-							if id == "" {
-								return labels.WholeCollection
-							}
-							return state.folderNames[id]
-						}).FillWidth().Label(labels.Scope)
-					})
-					ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
-						ui.Text(c, text.RunEnvironment).Bold()
-						ui.Select(c, &state.environmentID, state.environmentIDs, func(id string) string {
-							if id == "" {
-								return text.RunNoEnvironment
-							}
-							return state.environmentNames[id]
-						}).FillWidth().Label(text.RunEnvironment)
-					})
-				})
-				ui.Row(c).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
-					if ui.Button(c, labels.BrowseData).Outline().Clicked() {
-						c.After(a.chooseCollectionRunData)
-					}
-					if state.dataFile != "" {
-						ui.Text(c, labels.DataSelected).Muted().Grow(1)
-						if ui.Button(c, labels.ClearData).Outline().Clicked() {
-							state.dataFile, state.problem = "", collectionRunReady
-						}
-					}
-				})
-				ui.Checkbox(c, &state.stopOnFailure, text.RunStopOnFailure)
-				ui.Checkbox(c, &state.useCookieSession, text.RunUseCookieSession)
-				switch state.problem {
-				case collectionRunMissingCollection:
-					ui.Wrap(c, text.RunMissingCollection).Color(theme.Danger)
-				case collectionRunMissingEnvironment:
-					ui.Wrap(c, text.RunMissingEnvironment).Color(theme.Danger)
-				case collectionRunMissingFolder:
-					ui.Wrap(c, labels.MissingFolder).Color(theme.Danger)
-				case collectionRunInvalidData:
-					ui.Wrap(c, labels.InvalidData).Color(theme.Danger)
-				case collectionRunIterationLimit:
-					ui.Wrap(c, labels.IterationLimit).Color(theme.Danger)
-				}
+				a.collectionRunnerSetup(c)
 			}
 		})
 	}, func() {
@@ -293,16 +274,87 @@ func (a *App) collectionRunnerDialog(c ui.C) {
 			}
 			return
 		}
-		if ui.Button(c, text.RunClose).Outline().Clicked() {
+		if ui.Button(c, text.RunClose).Outline().Disabled(state.presets.writing).Clicked() {
 			c.After(a.dismissCollectionRunner)
 		}
-		if state.report.Version == 0 && ui.Button(c, text.RunStart).Icon(icons.Play).Clicked() {
+		if state.report.Version == 0 && ui.Button(c, text.RunStart).Icon(icons.Play).Disabled(state.presets.writing).Clicked() {
 			c.After(a.startCollectionRun)
 		}
 	})
 	if dismissed {
 		c.After(a.dismissCollectionRunner)
 	}
+}
+
+func (a *App) collectionRunnerSetup(c ui.C) {
+	state, text, theme := &a.collections.runner, a.S.Collections, c.Theme()
+	labels := i18n.RunnerFor(a.S.Lang)
+	ui.Scroll(c).Fill().Scrollbars().Children(func() {
+		ui.Column(c).FillWidth().Gap(Space3).Children(func() {
+			if state.collectionHeading != "" {
+				ui.Wrap(c, state.collectionHeading).Bold()
+			}
+			ui.Wrap(c, text.RunSetup).Muted()
+			ui.Row(c).FillWidth().Gap(Space3).Children(func() {
+				ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
+					ui.Text(c, labels.Scope).Bold()
+					control := ui.Select(c, &state.folderID, state.folderIDs, func(id string) string {
+						if id == "" {
+							return labels.WholeCollection
+						}
+						return state.folderNames[id]
+					}).FillWidth().Label(labels.Scope).Placeholder(labels.UnavailableChoice)
+					if _, picked := control.Picked(); picked {
+						state.folderUnavailable = false
+					}
+				})
+				ui.Column(c).Basis(0).Grow(1).MinWidth(0).Gap(Space2).Children(func() {
+					ui.Text(c, text.RunEnvironment).Bold()
+					control := ui.Select(c, &state.environmentID, state.environmentIDs, func(id string) string {
+						if id == "" {
+							return text.RunNoEnvironment
+						}
+						return state.environmentNames[id]
+					}).FillWidth().Label(text.RunEnvironment).Placeholder(labels.UnavailableChoice)
+					if _, picked := control.Picked(); picked {
+						state.environmentUnavailable = false
+					}
+				})
+			})
+			if state.folderUnavailable {
+				ui.Wrap(c, labels.MissingFolder).Color(theme.Danger)
+			}
+			if state.environmentUnavailable {
+				ui.Wrap(c, text.RunMissingEnvironment).Color(theme.Danger)
+			}
+			ui.Row(c).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
+				if ui.Button(c, labels.BrowseData).Outline().Clicked() {
+					c.After(a.chooseCollectionRunData)
+				}
+				if state.dataFile != "" {
+					ui.Text(c, labels.DataSelected).Muted().Grow(1)
+					if ui.Button(c, labels.ClearData).Outline().Clicked() {
+						state.dataFile, state.problem = "", collectionRunReady
+					}
+				}
+			})
+			ui.Row(c).FillWidth().Gap(Space4).Items(ui.Center).Children(func() {
+				ui.Checkbox(c, &state.stopOnFailure, text.RunStopOnFailure)
+				ui.Checkbox(c, &state.useCookieSession, text.RunUseCookieSession)
+			})
+			switch state.problem {
+			case collectionRunMissingCollection:
+				ui.Wrap(c, text.RunMissingCollection).Color(theme.Danger)
+			case collectionRunTargetChanged:
+				ui.Wrap(c, labels.TargetChanged).Color(a.palette.Warning)
+			case collectionRunInvalidData:
+				ui.Wrap(c, labels.InvalidData).Color(theme.Danger)
+			case collectionRunIterationLimit:
+				ui.Wrap(c, labels.IterationLimit).Color(theme.Danger)
+			}
+			a.collectionRunnerPresetControls(c, labels)
+		})
+	})
 }
 
 func (a *App) collectionRunnerSummary(c ui.C, state *collectionRunnerState) {

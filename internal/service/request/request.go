@@ -143,13 +143,14 @@ func (s *Service) send(ctx context.Context, req model.Request, variables []model
 	if cookieSessionEnabled && !explicitCookie && !explicitHost {
 		client.Jar = session.jarFor(httpReq.URL)
 	}
-	protectRedirects(&client, req.Auth, cookieSessionEnabled)
-	start := time.Now()
-	trace := &sendTrace{base: client.Transport, start: start}
+	trace := &sendTrace{base: client.Transport}
+	protectRedirects(&client, req.Auth, cookieSessionEnabled, req.Options.FollowRedirects == model.ToggleOff, &trace.redirects)
 	client.Transport = trace
+	start := time.Now()
+	trace.start = start
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		return model.Response{}, fmt.Errorf("send request: %w", err)
+		return model.Response{Redirects: trace.redirects.hops}, fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 	downloadStart := time.Now()
@@ -187,6 +188,7 @@ func (s *Service) send(ctx context.Context, req model.Request, variables []model
 		URL:        resp.Request.URL.String(),
 		Cookies:    responseCookies(resp),
 		Timeline:   trace.timeline(downloadStart, end),
+		Redirects:  trace.redirects.hops,
 	}
 	if err != nil {
 		return result, fmt.Errorf("read response body: %w", err)
@@ -220,27 +222,33 @@ func setDefaultHeader(headers http.Header, key, value string) {
 // protectRedirects wraps policy on a per-send client copy. net/http copies
 // initial headers on every hop, so stripping only the first cross-origin hop
 // would leak credentials when a later redirect returns to the initial origin.
-func protectRedirects(client *http.Client, cfg model.Auth, cookieSessionEnabled bool) {
+func protectRedirects(client *http.Client, cfg model.Auth, cookieSessionEnabled, noRedirects bool, diagnostic *redirectTrace) {
 	previous := client.CheckRedirect
 	crossedOrigin := false
-	strip := func(req *http.Request) {
+	if cfg.Type == model.AuthAPIKey && cfg.In != model.APIKeyInQuery {
+		diagnostic.authKey = cfg.Key
+	}
+	strip := func(req *http.Request) bool {
 		// Client.send can synthesize Basic auth from URL userinfo after the
 		// redirect callback. Do not allow it to restore stripped Authorization.
+		removed := req.URL.User != nil
 		req.URL.User = nil
-		for key := range req.Header {
-			if strings.EqualFold(key, "Authorization") ||
-				cfg.Type == model.AuthAPIKey && cfg.In != model.APIKeyInQuery && strings.EqualFold(key, cfg.Key) {
+		for key, values := range req.Header {
+			if isRedirectAuthHeader(key, diagnostic.authKey) {
+				removed = removed || hasHeaderValue(values)
 				delete(req.Header, key)
 			}
 		}
+		return removed
 	}
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		removed := false
 		checkOrigin := func() {
 			if len(via) > 0 && !sameOrigin(via[len(via)-1].URL, req.URL) {
 				crossedOrigin = true
 			}
 			if crossedOrigin {
-				strip(req)
+				removed = strip(req) || removed
 				if cookieSessionEnabled {
 					client.Jar = nil
 					delete(req.Header, "Cookie")
@@ -251,12 +259,13 @@ func protectRedirects(client *http.Client, cfg model.Auth, cookieSessionEnabled 
 		var err error
 		if previous != nil {
 			err = previous(req, via)
-		} else if len(via) >= 10 {
-			err = fmt.Errorf("stopped after 10 redirects")
+		} else if len(via) >= redirectLimit {
+			err = errRedirectLimit
 		}
 		// Preserve custom redirect policy while ensuring it cannot reintroduce
 		// protected headers or change the destination across an origin boundary.
 		checkOrigin()
+		diagnostic.checkRedirect(req, err, noRedirects, removed || crossedOrigin && diagnostic.lastHadAuth)
 		return err
 	}
 }

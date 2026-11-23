@@ -207,6 +207,35 @@ type Response struct {
 	// Timeline is how Duration was spent, in order. Phases the transport
 	// skipped (a reused connection has no DNS, connect or TLS) are absent.
 	Timeline []Phase `json:"timeline,omitempty"`
+	// Redirects are redacted diagnostics for this send, held only in memory.
+	Redirects []RedirectHop `json:"-"`
+}
+
+// RedirectReason describes the observed outcome of a redirect response.
+type RedirectReason string
+
+const (
+	RedirectFollowed        RedirectReason = "followed"
+	RedirectDisabled        RedirectReason = "disabled"
+	RedirectLimit           RedirectReason = "limit"
+	RedirectPolicy          RedirectReason = "policy"
+	RedirectMissingTarget   RedirectReason = "missing_target"
+	RedirectMalformedTarget RedirectReason = "malformed_target"
+	RedirectNotSent         RedirectReason = "not_sent"
+	RedirectTransportError  RedirectReason = "transport_error"
+)
+
+// RedirectHop describes a received redirect response. Target is a redacted
+// origin. NextMethod is the candidate method, updated by the actual transport
+// attempt if made. Followed means a response was received on the next hop.
+type RedirectHop struct {
+	Method, NextMethod Method
+	StatusCode         int
+	Target             string
+	Duration           time.Duration
+	Followed           bool
+	Reason             RedirectReason
+	AuthRemoved        bool
 }
 
 // Cookie is one Set-Cookie of a response.

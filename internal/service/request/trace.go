@@ -11,13 +11,13 @@ import (
 	"github.com/runbrick/reva/internal/model"
 )
 
-// sendTrace measures the entire redirect chain, but retains only the final
-// hop's phases. Their Start offsets are relative to the entire send's start;
-// time spent in earlier hops is consequently a gap in the final timeline.
+// sendTrace records redirect responses and the final hop's detailed phases.
+// Phase offsets are relative to the entire send's start.
 type sendTrace struct {
-	base  http.RoundTripper
-	start time.Time
-	last  *hopTrace
+	base      http.RoundTripper
+	start     time.Time
+	last      *hopTrace
+	redirects redirectTrace
 }
 
 type interval struct {
@@ -91,7 +91,12 @@ func (s *sendTrace) RoundTrip(req *http.Request) (*http.Response, error) {
 			h.wait.end = h.firstByte
 		},
 	}
-	return s.base.RoundTrip(req.WithContext(httptrace.WithClientTrace(req.Context(), trace)))
+	method := diagnosticMethod(req.Method)
+	s.redirects.lastHadAuth = s.redirects.hasAuth(req.Header)
+	started := time.Now()
+	resp, err := s.base.RoundTrip(req.WithContext(httptrace.WithClientTrace(req.Context(), trace)))
+	s.redirects.observe(req, method, resp, err, time.Since(started))
+	return resp, err
 }
 
 func (s *sendTrace) timeline(downloadStart, end time.Time) []model.Phase {

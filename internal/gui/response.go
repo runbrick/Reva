@@ -614,12 +614,19 @@ func (a *App) responseEmpty(c ui.C, icon gfx.Icon, label string) {
 }
 
 func (a *App) responseTimelineChart(c ui.C, v *responseView) {
-	if len(v.source.Timeline) == 0 {
+	if len(v.source.Timeline) == 0 && len(v.source.Redirects) == 0 {
 		a.responseEmpty(c, icons.Activity, a.S.Response.NoTimeline)
 		return
 	}
 	ui.Scroll(c).FillWidth().Grow(1).Scrollbars().Children(func() {
 		ui.Column(c).FillWidth().Gap(Space3).Pad(Space2).Children(func() {
+			if len(v.source.Redirects) != 0 {
+				a.responseRedirects(c.Key("redirects"), v.source)
+				if len(v.source.Timeline) == 0 {
+					return
+				}
+				ui.Divider(c)
+			}
 			for i, phase := range v.source.Timeline {
 				ui.Row(c.KeyInt(i)).FillWidth().Gap(Space3).Items(ui.Center).Children(func() {
 					ui.Text(c, a.responsePhaseLabel(phase.Kind)).Width(Space6 * 6)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/runbrick/reva/internal/format"
 	"github.com/runbrick/reva/internal/gui/icons"
+	"github.com/runbrick/reva/internal/i18n"
 	"github.com/runbrick/reva/internal/model"
 	"github.com/vivaui/viva/app"
 	"github.com/vivaui/viva/components"
@@ -66,6 +67,7 @@ type responseView struct {
 	count, countPattern         string
 	countIndex, countTotal      int
 	findKey                     func(gfx.KeyEvent) gfx.EventResult
+	filter                      responseFilterState
 	previewText                 string
 	previewHTML                 bool
 	previewImage                gfx.Bitmap
@@ -88,6 +90,7 @@ func (v *responseView) prepare(r *model.Response) {
 		return
 	}
 	v.source = r
+	v.filter = responseFilterState{query: v.filter.query}
 	v.tools = responseToolsState{ignored: v.tools.ignored}
 	body := r.Body
 	v.rawLimited = len(body) > responseDisplayLimit
@@ -363,6 +366,7 @@ func (a *App) responseWorkbench(c ui.C, t *Tab, v *responseView) {
 		ui.Column(c).Grow(1).FillHeight().Children(func() { a.responseBodyView(c, t, v) })
 	})
 	a.responseToolsModal(c, t, &v.tools)
+	a.responseFilterModal(c.Key("json-filter"), v)
 }
 
 func (a *App) responseBodyView(c ui.C, t *Tab, v *responseView) {
@@ -407,6 +411,9 @@ func (a *App) responseBodyContent(c ui.C, t *Tab, v *responseView) {
 		ui.Spacer(c)
 		if t.sse == nil && ui.Button(c, a.S.Response.Tools.Title).Small().Outline().Clicked() {
 			c.After(func() { v.tools.show(t.Response) })
+		}
+		if ui.Button(c, i18n.ResponseFilterFor(a.S.Lang).Open).Small().Outline().Clicked() {
+			v.filter.open = true
 		}
 		if ui.Button(c, a.S.Response.Search).Icon(icons.Search).IconOnly().Ghost().Tooltip(a.S.Response.Search).Disabled(v.mode == responsePreview).Clicked() {
 			v.find = !v.find

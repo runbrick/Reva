@@ -106,6 +106,58 @@ func TestResponseTimelineWithoutRedirectsKeepsExistingView(t *testing.T) {
 	}
 }
 
+func TestFailedRedirectsShowCopyableDiagnosticsAndClearOnRetry(t *testing.T) {
+	labels := i18n.ResponseRedirectsFor(i18n.En)
+	for _, scenario := range []struct {
+		name, location, reason string
+	}{
+		{"limit", "/start?token=redirect-secret", labels.Limit},
+		{"malformed location", "/%zz?token=redirect-secret", labels.MalformedTarget},
+		{"transport error", "http://127.0.0.1:0/redirect-secret?token=redirect-secret", labels.TransportError},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			origin := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, incoming *http.Request) {
+				if incoming.URL.Path == "/ok" {
+					writer.WriteHeader(http.StatusNoContent)
+					return
+				}
+				writer.Header().Set("Location", scenario.location)
+				writer.WriteHeader(http.StatusFound)
+			}))
+			defer origin.Close()
+			services := fake.New()
+			services.Requests = request.New()
+			harness := newHarness(t, services)
+			harness.App.S = i18n.For(i18n.En)
+			tab := harness.App.Active()
+			tab.Request.URL = origin.URL + "/start"
+			responsePaint(harness)
+			harness.click(harness.App.S.Request.Send)
+			harness.waitFor("failed redirect", func() bool { return tab.Err != "" && !tab.Sending })
+			if tab.Response != nil || !harness.shows(labels.RequestFailed) || !harness.shows(labels.Title) {
+				t.Fatal("failed send should display diagnostics without a successful response")
+			}
+			harness.click(labels.Copy)
+			copied := harness.D.Clipboard()
+			entries := services.History.List()
+			if !strings.Contains(copied, scenario.reason) || strings.Contains(copied, "redirect-secret") || harness.shows("redirect-secret") {
+				t.Fatalf("missing reason or sensitive target exposed in diagnostics: %q", copied)
+			}
+			if len(entries) != 1 || entries[0].Error != labels.RequestFailed || entries[0].StatusCode != 0 {
+				t.Fatal("history should record a redacted failure without a response status")
+			}
+			tab.Request.URL = origin.URL + "/ok"
+			responsePaint(harness)
+			harness.click(harness.App.S.Request.Send)
+			harness.waitFor("successful retry", func() bool { return tab.Response != nil && !tab.Sending })
+			responseClickTab(harness, harness.App.S.Response.Timeline)
+			if harness.shows(labels.Title) || harness.shows(labels.Copy) {
+				t.Fatal("successful retry showed diagnostics from the earlier send")
+			}
+		})
+	}
+}
+
 func BenchmarkResponseRedirectTimelineRepaint(b *testing.B) {
 	application := New(fake.New())
 	response := &model.Response{

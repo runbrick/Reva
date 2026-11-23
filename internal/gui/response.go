@@ -225,8 +225,17 @@ func (a *App) responsePane(c ui.C, t *Tab) {
 				ui.Icon(c, icons.CircleX).Size(Space4, Space4).Color(c.Theme().Danger)
 				ui.Text(c, a.S.Response.ErrorTitle).Bold().Color(c.Theme().Danger)
 			})
-			ui.Scroll(c).FillWidth().Grow(1).Children(func() {
-				ui.Paragraph(c, t.Err, 0).Color(c.Theme().Danger)
+			ui.Scroll(c).FillWidth().Grow(1).Scrollbars().Children(func() {
+				ui.Column(c).FillWidth().Gap(Space3).Children(func() {
+					message := t.Err
+					if t.failedRedirects != nil {
+						message = i18n.ResponseRedirectsFor(a.S.Lang).RequestFailed
+					}
+					ui.Paragraph(c, message, 0).Color(c.Theme().Danger)
+					if t.failedRedirects != nil {
+						a.responseRedirects(c.Key("failed-redirects"), t.failedRedirects)
+					}
+				})
 			})
 		default:
 			ui.Column(c).Fill().Center().Gap(Space3).Children(func() {

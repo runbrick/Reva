@@ -4,7 +4,7 @@ package i18n
 type ResponseRedirects struct {
 	Title, Copy, CopyError, Hop, MethodChange, PlannedMethod, HiddenMethod, NoOrigin string
 	Outcome, AuthRemoved, AuthNotRemoved, Followed, Disabled, Limit, Policy          string
-	MissingTarget, MalformedTarget, NotSent, TransportError                          string
+	MissingTarget, MalformedTarget, NotSent, TransportError, RequestFailed           string
 }
 
 func ResponseRedirectsFor(lang Lang) ResponseRedirects {
@@ -22,6 +22,7 @@ var responseRedirectsZh = ResponseRedirects{
 	Disabled: "未跟随（已禁用重定向）", Limit: "未跟随（已达跳数上限）", Policy: "未跟随（重定向策略拒绝）",
 	MissingTarget: "未跟随（缺少 Location）", MalformedTarget: "未跟随（Location 格式无效）",
 	NotSent: "未跟随（下一跳未进入传输）", TransportError: "下一跳传输失败，未收到响应",
+	RequestFailed: "请求在重定向过程中失败。",
 }
 
 var responseRedirectsEn = ResponseRedirects{
@@ -32,4 +33,5 @@ var responseRedirectsEn = ResponseRedirects{
 	Disabled: "Not followed (redirects disabled)", Limit: "Not followed (hop limit reached)", Policy: "Not followed (redirect policy declined)",
 	MissingTarget: "Not followed (Location missing)", MalformedTarget: "Not followed (malformed Location)",
 	NotSent: "Not followed (next request did not reach transport)", TransportError: "Next hop failed without a response",
+	RequestFailed: "The request failed during redirection.",
 }

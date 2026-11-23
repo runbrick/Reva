@@ -42,7 +42,7 @@ func TestImportSmokeReviewGateAndEdit(t *testing.T) {
 			if warned {
 				input = smokeWarnedCollection
 			}
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, input)
 			reviewImportForTest(h)
 			if len(h.Svc.Collections.List()) != 0 || len(h.Svc.Environments.List()) != 0 || len(h.App.tabs) != 1 {
@@ -121,7 +121,7 @@ func TestImportSmokeNativeEnvironmentAndHAR(t *testing.T) {
 			}
 			h := newHarness(t, svc)
 			before := h.App.Active().Request.Clone()
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, tc.input)
 			reviewImportForTest(h)
 			if h.App.importer.preview == nil {
@@ -204,7 +204,7 @@ func TestImportSmokeSaveRetryAndCancel(t *testing.T) {
 			if environment {
 				input = `{"version":1,"name":"Retry","variables":[]}`
 			}
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, input)
 			reviewImportForTest(h)
 			preview := h.App.importer.preview
@@ -223,7 +223,7 @@ func TestImportSmokeSaveRetryAndCancel(t *testing.T) {
 			if environment && env.saves != 2 || !environment && cols.imports != 2 {
 				t.Fatal("unexpected number of writes")
 			}
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, input)
 			reviewImportForTest(h)
 			h.click(h.App.S.Import.Cancel)
@@ -246,7 +246,7 @@ func TestImportSmokeCancelLateParseAndReopen(t *testing.T) {
 				// Deliberately return a successful stale result after cancellation.
 				return importer.Parse(job.input)
 			})
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			importTypeInto(h, smokeWarnedCollection)
 			h.click(h.App.S.Import.Review)
 			h.waitFor("parse started", func() bool {
@@ -285,7 +285,7 @@ func TestImportSmokeCancelLateParseAndReopen(t *testing.T) {
 				t.Fatal("late result reopened or saved import")
 			}
 			h.App.importer.parse = ui.NewEffectKeyed(parseImport)
-			h.click(h.App.S.Import.Title)
+			openImportForTest(h)
 			reviewImportForTest(h)
 			if h.App.importer.preview == nil || h.App.importer.acknowledged || !importSmokeHit(t, h, h.App.S.Import.Submit).Disabled {
 				t.Fatal("reopen reused acceptance or stale work")
@@ -301,7 +301,7 @@ func TestImportSmokeSameFileAndSizeGuard(t *testing.T) {
 		if err := os.WriteFile(path, []byte(input), 0600); err != nil {
 			t.Fatal(err)
 		}
-		h.click(h.App.S.Import.Title)
+		openImportForTest(h)
 		if err := h.D.QueueOpenFiles([]string{path}, nil); err != nil {
 			t.Fatal(err)
 		}
@@ -313,7 +313,7 @@ func TestImportSmokeSameFileAndSizeGuard(t *testing.T) {
 		}
 		h.click(h.App.S.Import.Cancel)
 	}
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	// Exercise the guard without asking a native editor to shape 32 MiB of text.
 	h.App.importer.input = strings.Repeat(" ", importer.MaxInputBytes+1)
 	h.App.reviewImport()
@@ -349,7 +349,7 @@ func TestImportSmokeCancelLateFile(t *testing.T) {
 		defer close(finished)
 		return smokeWarnedCollection, nil
 	})
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	importTypeInto(h, "keep original input")
 	if err := h.D.QueueOpenFiles([]string{"unused.json"}, nil); err != nil {
 		t.Fatal(err)
@@ -375,7 +375,7 @@ func TestImportSmokeCancelLateFile(t *testing.T) {
 			return false
 		}
 	})
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	h.pump()
 	if h.App.importer.input != "keep original input" || h.App.importer.loading || h.App.importer.preview != nil || len(h.Svc.Collections.List()) != 0 {
 		t.Fatal("late file result changed reopened dialog")
@@ -403,7 +403,7 @@ func TestImportSmokeLanguagesThemesAndLayout(t *testing.T) {
 						items = append(items, fmt.Sprintf(`{"name":"Request %d","description":"omitted","request":{"method":"GET","url":"https://example.test"}}`, i))
 					}
 					input := `{"info":{"name":"Layout"},"item":[` + strings.Join(items, ",") + `]}`
-					h.click(h.App.S.Import.Title)
+					openImportForTest(h)
 					importSmokeLayout(t, h)
 					importTypeInto(h, input)
 					reviewImportForTest(h)

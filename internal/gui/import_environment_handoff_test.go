@@ -225,7 +225,7 @@ func TestImportEnvironmentHandoffDismissAndResumeOrdinaryImport(t *testing.T) {
 				t.Fatal("dismissing an environment review lost the collection or retained the handoff")
 			}
 			collection := svc.Collections.List()[0]
-			h.click(text.Title)
+			openImportForTest(h)
 			h.click(text.CurrentCollection)
 			importTypeInto(h, `{"info":{"name":"Appended"},"item":[]}`)
 			reviewImportForTest(h)

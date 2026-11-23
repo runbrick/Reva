@@ -57,10 +57,6 @@ func (a *App) titlebarStrip(c ui.C) {
 		if c.Bounds().Width >= Space6*52 {
 			ui.Row(c).Grow(1).MinWidth(Space4).FillHeight().MovesWindow()
 		}
-		label := a.S.Import.Title
-		if ui.Button(c, label).Icon(icons.Download).IconOnly().Outline().Tooltip(label).Clicked() {
-			c.After(a.openImportDialog)
-		}
 		ui.Row(c).Width(Space4).FillHeight().MovesWindow()
 		a.declareSettingsEffects(c)
 	})

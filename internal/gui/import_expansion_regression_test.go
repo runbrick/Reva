@@ -41,7 +41,7 @@ func importRegressionServices(t *testing.T) (service.Services, string) {
 
 func importRegressionReview(h *harness, input string) {
 	h.t.Helper()
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	importTypeInto(h, input)
 	reviewImportForTest(h)
 	if h.App.importer.preview == nil {
@@ -214,7 +214,7 @@ func TestImportCancelledOldParseCannotReplaceNewReview(t *testing.T) {
 		}
 		return importer.Parse(job.input)
 	})
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	importTypeInto(h, oldInput)
 	h.click(h.App.S.Import.Review)
 	h.waitFor("old parse start", func() bool {
@@ -226,7 +226,7 @@ func TestImportCancelledOldParseCannotReplaceNewReview(t *testing.T) {
 		}
 	})
 	h.click(h.App.S.Import.Cancel)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	// Replace retained input through the actual editor selection shortcut.
 	h.click(h.App.S.Import.Input)
 	if _, err := h.D.ShortcutChord(ui.Primary, 'a'); err != nil {
@@ -271,7 +271,7 @@ func TestImportSameFileRepairAfterBlockingError(t *testing.T) {
 		`{"info":{"name":"Repair"},"item":[{"name":"R","request":{"url":"https://example.test","auth":{"type":"noauth"}}}]}`,
 	}
 	before := importRegressionDisk(t, dir)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	for i, input := range inputs {
 		if err := os.WriteFile(path, []byte(input), 0600); err != nil {
 			t.Fatal(err)

@@ -265,8 +265,9 @@ headers remain available) are deferred.
 
 ## Import and migration
 
-Paste content or open a `.json`, `.har`, or other text file, then choose **Review
-import**. Review the detected format, destination, request/folder/variable counts,
+In the **APIs** sidebar, open **Add collection item (+) > Import**. Paste content
+or open a `.json`, `.har`, or other text file, then choose **Review import**.
+Review the detected format, destination, request/folder/variable counts,
 and compatibility notices before **Confirm import**. Every notice requires an
 explicit acknowledgement. Nothing is saved or opened during review. Errors keep
 the input available; save failures preserve the review for retry.

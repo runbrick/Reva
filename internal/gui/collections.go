@@ -308,6 +308,10 @@ func (a *App) collectionsPane(c ui.C) {
 						}
 					})
 				}
+				menu.Separator()
+				if menu.Item(a.S.Import.Title).Icon(icons.Download).Clicked() {
+					c.After(a.openImportDialog)
+				}
 			})
 		})
 		if s.workspaceID == "" {

@@ -19,7 +19,7 @@ func TestOpenAPIVendorExportReviewSaveAndReload(t *testing.T) {
 	if err := h.D.QueueOpenFiles([]string{file}, nil); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	text := h.App.S.Import
 	h.click(text.SwaggerSource)
 	h.click(text.AddHost)

@@ -35,7 +35,7 @@ func TestSwaggerFileReviewAppendAndPathOptions(t *testing.T) {
 	if err := h.D.QueueOpenFiles([]string{path}, nil); err != nil {
 		t.Fatal(err)
 	}
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	text := h.App.S.Import
 	h.click(text.SwaggerSource)
 	if importSmokeHit(t, h, text.AddHost).Disabled || importSmokeHit(t, h, text.AddBasePath).Disabled {
@@ -85,7 +85,7 @@ func TestSwaggerFileReviewAppendAndPathOptions(t *testing.T) {
 
 func TestSwaggerSourceValidationAndAutomaticDetection(t *testing.T) {
 	h := newHarness(t)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	text := h.App.S.Import
 	h.click(text.SwaggerSource)
 	importTypeInto(h, "curl https://example.test/mismatch")
@@ -128,7 +128,7 @@ func TestSwaggerURLFetchReviewRetryAndConfirm(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	h := newHarness(t)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	text := h.App.S.Import
 	h.click(text.SwaggerURLSource)
 	h.typeInto(text.SchemaURL, server.URL+"/redirect")
@@ -173,7 +173,7 @@ func TestSwaggerURLCancelStopsFetchAndAllowsRetry(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 	h := newHarness(t)
-	h.click(h.App.S.Import.Title)
+	openImportForTest(h)
 	text := h.App.S.Import
 	h.click(text.SwaggerURLSource)
 	h.typeInto(text.SchemaURL, server.URL+"/slow")
@@ -228,7 +228,7 @@ func TestSwaggerImportBilingualThemesAndLayout(t *testing.T) {
 					if err := h.D.Resize(size[0], size[1]); err != nil {
 						t.Fatal(err)
 					}
-					h.click(h.App.S.Import.Title)
+					openImportForTest(h)
 					text := h.App.S.Import
 					for _, label := range []string{text.SwaggerSource, text.SwaggerURLSource} {
 						if importSmokeHit(t, h, label).Disabled {

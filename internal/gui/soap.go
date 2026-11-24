@@ -56,7 +56,7 @@ func (a *App) initSOAPRequest(req *model.Request, version soapVersion) {
 	if version == soap12 {
 		name, mediaType, namespace = a.S.SOAP.New12Request, soap12MediaType, "http://www.w3.org/2003/05/soap-envelope"
 	} else {
-		req.Headers = append(req.Headers, model.KV{Key: soapActionHeader, Disabled: true})
+		req.Headers = append(req.Headers, model.KV{Key: soapActionHeader, Value: `""`})
 	}
 	req.Name, req.Method = name, model.MethodPost
 	req.Body = model.Body{
@@ -120,15 +120,17 @@ func (a *App) soapBodyControls(c ui.C, tab *Tab) {
 			}
 		}
 		if ui.TextField(c.Key("soap11-action"), &action, labels.Action, "").FillWidth().Changed() {
-			action = strings.TrimSpace(action)
-			header.Value, header.Disabled = "", action == ""
-			if !header.Disabled {
-				header.Value = strconv.Quote(action)
-			}
+			header.Value, header.Disabled = strconv.Quote(strings.TrimSpace(action)), false
 			tab.Dirty = true
 		}
 	case soap12:
 		ui.Text(c, "SOAP 1.2").Bold()
+		for _, header := range req.Headers {
+			if !header.Disabled && strings.EqualFold(header.Key, "Content-Type") {
+				ui.Wrap(c, labels.ActionOverridden).Color(a.palette.Warning)
+				return
+			}
+		}
 		action := params["action"]
 		if ui.TextField(c.Key("soap12-action"), &action, labels.Action, "").FillWidth().Changed() {
 			delete(params, "action")

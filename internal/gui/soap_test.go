@@ -88,7 +88,7 @@ func TestSOAPTemplatesSendXMLWithVersionSpecificAction(t *testing.T) {
 					if err != nil || mediaType != test.mediaType || params["charset"] != "utf-8" || call.method != http.MethodPost || call.body != wantBody {
 						t.Fatalf("SOAP HTTP request = %+v (media type error %v)", call, err)
 					}
-					if test.version == "SOAP 1.1" && wantAction != "" {
+					if test.version == "SOAP 1.1" {
 						if got := call.header.Values("SOAPAction"); len(got) != 1 || got[0] != `"`+wantAction+`"` || params["action"] != "" {
 							t.Fatalf("SOAP 1.1 action headers = %v", call.header)
 						}
@@ -201,5 +201,26 @@ func TestSOAPDoesNotChangeOrdinaryRawXML(t *testing.T) {
 	requestType(h, h.App.S.Request.BodyText, "<other/>", true)
 	if tab.Request.Body.Text != "<other/>" || tab.Request.Body.ContentType != "text/xml; charset=utf-8" {
 		t.Fatalf("ordinary raw XML request was modified: %+v", tab.Request.Body)
+	}
+}
+
+func TestSOAP12ShowsContentTypeOverride(t *testing.T) {
+	h := newHarness(t)
+	requestEnglish(h)
+	h.click(h.App.S.Collections.Add)
+	collectionsOption(h, "New SOAP 1.2 Request")
+	tab := h.App.Active()
+	requestType(h, "SOAP Action", "urn:body-action", true)
+	body := tab.Request.Body
+	tab.Request.Headers = []model.KV{{Key: "content-type", Value: `application/soap+xml; action="urn:header-action"`}}
+	requestRepaint(h)
+	const override = "SOAP Action is overridden by the Content-Type header."
+	if !h.shows(override) || slices.Contains(h.hitLabels(), "SOAP Action") {
+		t.Fatalf("override is not apparent in the SOAP editor: %q", h.hitLabels())
+	}
+	tab.Request.Headers[0].Disabled = true
+	requestRepaint(h)
+	if h.shows(override) || !slices.Contains(h.hitLabels(), "SOAP Action") || tab.Request.Body.ContentType != body.ContentType {
+		t.Fatalf("disabling the override did not restore the original action: %+v", tab.Request.Body)
 	}
 }

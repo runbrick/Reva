@@ -37,6 +37,7 @@ type Strings struct {
 	Search      Search
 	WebSocket   WebSocket
 	Toolbox     Toolbox
+	SOAP        SOAP
 }
 
 // For returns the string table for lang, falling back to Chinese.
@@ -64,6 +65,7 @@ var zh = Strings{
 	Search:      searchZh,
 	WebSocket:   websocketZh,
 	Toolbox:     toolboxZh,
+	SOAP:        soapZh,
 }
 
 var en = Strings{
@@ -83,4 +85,5 @@ var en = Strings{
 	Search:      searchEn,
 	WebSocket:   websocketEn,
 	Toolbox:     toolboxEn,
+	SOAP:        soapEn,
 }

@@ -632,8 +632,12 @@ func (a *App) requestSettingsSection(c ui.C, t *Tab, s *requestTabState) {
 		}
 	}
 	inherited := (model.RequestOptions{}).Resolve(a.Svc.Settings.Get())
+	placeholder := strconv.Itoa(inherited.TimeoutMs)
+	if inherited.TimeoutMs == model.NoTimeout {
+		placeholder = a.S.Settings.NoTimeout
+	}
 	ui.Text(c, labels.Timeout).Bold()
-	if ui.TextField(c, &s.timeout, labels.Timeout, strconv.Itoa(inherited.TimeoutMs)).FillWidth().Changed() {
+	if ui.TextField(c, &s.timeout, labels.Timeout, placeholder).FillWidth().Changed() {
 		text := strings.TrimSpace(s.timeout)
 		value, err := strconv.Atoi(text)
 		if text == "" || err == nil && value > 0 {

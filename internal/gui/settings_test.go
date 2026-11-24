@@ -242,6 +242,12 @@ func TestSettingsRequestDefaultsSaveImmediately(t *testing.T) {
 	h := newHarness(t, svc)
 	h.click(h.App.S.Settings.Title)
 	h.click(h.App.S.Settings.Requests)
+	timeoutLabel := func(seconds int) string {
+		if seconds == model.NoTimeout {
+			return h.App.S.Settings.NoTimeout
+		}
+		return strconv.Itoa(seconds)
+	}
 	assertSaved := func() {
 		t.Helper()
 		if got := svc.Settings.Get(); got != want {
@@ -249,13 +255,13 @@ func TestSettingsRequestDefaultsSaveImmediately(t *testing.T) {
 		}
 		h.App.ApplySettings(svc.Settings.Get())
 		settingsRepaint(t, h)
-		settingsAssertValue(t, h, h.App.S.Settings.Timeout, strconv.Itoa(want.RequestTimeoutSec))
+		settingsAssertValue(t, h, h.App.S.Settings.Timeout, timeoutLabel(want.RequestTimeoutSec))
 		settingsAssertChecked(t, h, h.App.S.Settings.FollowRedirects, !want.NoFollowRedirects)
 		settingsAssertChecked(t, h, h.App.S.Settings.VerifyTLS, !want.InsecureTLS)
 	}
-	for _, seconds := range []int{10, 30, 60, 120, 300} {
+	for _, seconds := range []int{10, 30, 60, 120, 300, model.NoTimeout} {
 		h.click(h.App.S.Settings.Timeout)
-		h.click(strconv.Itoa(seconds))
+		h.click(timeoutLabel(seconds))
 		want.RequestTimeoutSec = seconds
 		assertSaved()
 	}

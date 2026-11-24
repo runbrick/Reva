@@ -19,7 +19,10 @@ import (
 	"github.com/runbrick/reva/internal/model"
 )
 
-const MaxMessageBytes = 1 << 20
+const (
+	MaxMessageBytes               = 1 << 20
+	NoTimeout       time.Duration = -1
+)
 
 var (
 	ErrURL         = errors.New("invalid gRPC URL")
@@ -51,11 +54,14 @@ type Result struct {
 
 func Call(ctx context.Context, input Request) (Result, error) {
 	start := time.Now()
-	if input.Timeout <= 0 {
-		input.Timeout = 30 * time.Second
+	if input.Timeout != NoTimeout {
+		if input.Timeout <= 0 {
+			input.Timeout = 30 * time.Second
+		}
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, input.Timeout)
+		defer cancel()
 	}
-	ctx, cancel := context.WithTimeout(ctx, input.Timeout)
-	defer cancel()
 	result, err := call(ctx, input)
 	result.Duration = time.Since(start)
 	if ctx.Err() != nil {

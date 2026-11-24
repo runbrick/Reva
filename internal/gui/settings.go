@@ -56,7 +56,7 @@ func (a *App) ConfigureUpdates(quit func(), restartFailed bool) {
 
 var settingsThemes = []string{"light", "dark", "system"}
 var settingsHistoryLimits = []int{50, 100, 200, 500, 1000}
-var settingsTimeouts = []int{10, 30, 60, 120, 300}
+var settingsTimeouts = []int{10, 30, 60, 120, 300, model.NoTimeout}
 
 func (a *App) declareSettingsEffects(c ui.C) {
 	state := &a.settings
@@ -356,6 +356,8 @@ func (a *App) settingsTimeoutLabel(seconds int) string {
 		return "120"
 	case 300:
 		return "300"
+	case model.NoTimeout:
+		return a.S.Settings.NoTimeout
 	}
 	return ""
 }

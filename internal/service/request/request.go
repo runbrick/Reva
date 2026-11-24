@@ -55,8 +55,11 @@ func (s *Service) send(ctx context.Context, req model.Request, variables []model
 	if err := ctx.Err(); err != nil {
 		return model.Response{}, err
 	}
-	ctx, cancel := context.WithTimeout(ctx, s.timeout(req.Options))
-	defer cancel()
+	if timeout := s.timeout(req.Options); timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
+	}
 	req = vars.Apply(req, variables)
 	if err := auth.Validate(req.Auth); err != nil {
 		return model.Response{}, err

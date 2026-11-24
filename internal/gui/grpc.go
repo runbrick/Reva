@@ -94,9 +94,13 @@ func (a *App) invokeGRPC(tab *Tab, state *grpcTab) {
 	}
 	values := a.VarsFor(tab)
 	options := tab.Request.Options.Resolve(a.Svc.Settings.Get())
+	timeout := time.Duration(options.TimeoutMs) * time.Millisecond
+	if options.TimeoutMs == model.NoTimeout {
+		timeout = grpcclient.NoTimeout
+	}
 	state.job = &grpcclient.Request{
 		URL: vars.Expand(tab.Request.URL, values), Hex: vars.Expand(tab.Request.Body.Text, values),
-		Metadata: vars.ExpandKVs(tab.Request.Headers, values), Timeout: time.Duration(options.TimeoutMs) * time.Millisecond,
+		Metadata: vars.ExpandKVs(tab.Request.Headers, values), Timeout: timeout,
 		InsecureTLS: options.VerifyTLS == model.ToggleOff,
 	}
 	state.err, state.result, state.output = nil, nil, responseCodeView{}

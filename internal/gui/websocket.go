@@ -251,7 +251,11 @@ func (a *App) websocketConnect(t *Tab, s *websocketTab) {
 		}
 	}
 	options := t.Request.Options.Resolve(a.Svc.Settings.Get())
-	s.dialJob = &websocketDial{url: r.URL, headers: headers, timeout: time.Duration(options.TimeoutMs) * time.Millisecond, insecure: options.VerifyTLS == model.ToggleOff}
+	timeout := time.Duration(options.TimeoutMs) * time.Millisecond
+	if options.TimeoutMs == model.NoTimeout {
+		timeout = websocket.NoTimeout
+	}
+	s.dialJob = &websocketDial{url: r.URL, headers: headers, timeout: timeout, insecure: options.VerifyTLS == model.ToggleOff}
 	s.errorText, s.connecting = "", true
 }
 

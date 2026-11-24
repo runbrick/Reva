@@ -22,7 +22,7 @@ func defaults(settings model.Settings) model.Settings {
 	if settings.HistoryLimit <= 0 {
 		settings.HistoryLimit = d.HistoryLimit
 	}
-	if settings.RequestTimeoutSec <= 0 {
+	if settings.RequestTimeoutSec == 0 || (settings.RequestTimeoutSec < 0 && settings.RequestTimeoutSec != model.NoTimeout) {
 		settings.RequestTimeoutSec = d.RequestTimeoutSec
 	}
 	return settings

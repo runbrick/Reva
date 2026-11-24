@@ -305,3 +305,39 @@ func TestSendDescriptionNeverReachesWire(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestSendNoTimeoutDoesNotDeadlineAndRespectsCancel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/slow":
+			time.Sleep(80 * time.Millisecond)
+			io.WriteString(w, "completed")
+		case "/block":
+			<-r.Context().Done()
+		}
+	}))
+	defer server.Close()
+
+	svc := New()
+	svc.Timeout = 20 * time.Millisecond
+	resp, err := svc.Send(context.Background(), model.Request{
+		URL:     server.URL + "/slow",
+		Options: model.RequestOptions{TimeoutMs: model.NoTimeout},
+	}, nil)
+	if err != nil {
+		t.Fatalf("Send with NoTimeout failed: %v", err)
+	}
+	if string(resp.Body) != "completed" {
+		t.Fatalf("body = %q, want completed", string(resp.Body))
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	time.AfterFunc(40*time.Millisecond, cancel)
+	_, err = svc.Send(ctx, model.Request{
+		URL:     server.URL + "/block",
+		Options: model.RequestOptions{TimeoutMs: model.NoTimeout},
+	}, nil)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("error = %v, want context.Canceled", err)
+	}
+}

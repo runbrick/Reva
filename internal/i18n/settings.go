@@ -6,7 +6,7 @@ type Settings struct {
 	ThemePreview, PreviewTheme                                          string
 	Theme, ThemeDescription, Light, Dark, System                        string
 	Language, LanguageDescription, Chinese, English                     string
-	Timeout, TimeoutDescription                                         string
+	Timeout, TimeoutDescription, NoTimeout                              string
 	FollowRedirects, FollowRedirectsDescription                         string
 	VerifyTLS, VerifyTLSDescription, TLSWarning                         string
 	HistoryLimit, HistoryDescription                                    string
@@ -38,7 +38,7 @@ var settingsZh = Settings{
 	Title: "设置", Appearance: "外观", Requests: "请求", History: "历史记录", Data: "数据",
 	Theme: "主题", ThemeDescription: "选择应用外观，或跟随系统设置。", Light: "浅色", Dark: "深色", System: "跟随系统",
 	Language: "语言", LanguageDescription: "选择界面显示语言。", Chinese: "中文", English: "English",
-	Timeout: "默认超时（秒）", TimeoutDescription: "未单独设置时，请求等待响应的最长时间。",
+	Timeout: "默认超时（秒）", TimeoutDescription: "未单独设置时，请求等待响应的最长时间。", NoTimeout: "不超时",
 	FollowRedirects: "跟随重定向", FollowRedirectsDescription: "自动跟随服务器返回的重定向。",
 	VerifyTLS: "验证 TLS 证书", VerifyTLSDescription: "验证 HTTPS 服务器的证书。", TLSWarning: "证书验证已关闭，HTTPS 连接可能不安全。",
 	HistoryLimit: "历史记录上限", HistoryDescription: "保留的最近请求数量。",
@@ -78,7 +78,7 @@ var settingsEn = Settings{
 	Title: "Settings", Appearance: "Appearance", Requests: "Requests", History: "History", Data: "Data",
 	Theme: "Theme", ThemeDescription: "Choose an appearance or follow your system.", Light: "Light", Dark: "Dark", System: "Follow system",
 	Language: "Language", LanguageDescription: "Choose the interface language.", Chinese: "中文", English: "English",
-	Timeout: "Default timeout (seconds)", TimeoutDescription: "Maximum wait for requests without their own timeout.",
+	Timeout: "Default timeout (seconds)", TimeoutDescription: "Maximum wait for requests without their own timeout.", NoTimeout: "No timeout",
 	FollowRedirects: "Follow redirects", FollowRedirectsDescription: "Automatically follow server redirects.",
 	VerifyTLS: "Verify TLS certificates", VerifyTLSDescription: "Validate the HTTPS server certificate.", TLSWarning: "Certificate verification is off. HTTPS connections may be unsafe.",
 	HistoryLimit: "History limit", HistoryDescription: "Number of recent requests to keep.",

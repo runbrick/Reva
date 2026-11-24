@@ -14,6 +14,9 @@ type clientOptions struct {
 }
 
 func (s *Service) timeout(options model.RequestOptions) time.Duration {
+	if options.TimeoutMs == model.NoTimeout {
+		return 0
+	}
 	timeout := s.Timeout
 	if timeout <= 0 {
 		timeout = DefaultTimeout

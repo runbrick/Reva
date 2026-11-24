@@ -139,12 +139,17 @@ const (
 	ToggleOff     Toggle = "off" // force off
 )
 
+// NoTimeout disables the request timeout in Settings.RequestTimeoutSec and
+// RequestOptions.TimeoutMs. Zero continues to mean unset/inherit.
+const NoTimeout = -1
+
 // RequestOptions are a request's transport settings. Zero values inherit the
 // global Settings. The GUI resolves them (Resolve) before handing the request
-// to the RequestService, which then always sees TimeoutMs > 0 and explicit
-// toggles; a zero value reaching the service means the safe default.
+// to the RequestService, which then always sees TimeoutMs > 0 (or NoTimeout)
+// and explicit toggles; a zero value reaching the service means the safe default.
 type RequestOptions struct {
-	// TimeoutMs bounds the whole send; 0 inherits Settings.RequestTimeoutSec.
+	// TimeoutMs bounds the whole send; 0 inherits Settings.RequestTimeoutSec,
+	// and NoTimeout disables the timeout.
 	TimeoutMs       int    `json:"timeoutMs,omitempty"`
 	FollowRedirects Toggle `json:"followRedirects,omitempty"`
 	VerifyTLS       Toggle `json:"verifyTls,omitempty"`
@@ -152,12 +157,17 @@ type RequestOptions struct {
 
 // Resolve returns o with every inherited value replaced by the one s gives.
 func (o RequestOptions) Resolve(s Settings) RequestOptions {
-	if o.TimeoutMs <= 0 {
-		sec := s.RequestTimeoutSec
-		if sec <= 0 {
-			sec = 60
+	if o.TimeoutMs == 0 {
+		switch {
+		case s.RequestTimeoutSec == NoTimeout:
+			o.TimeoutMs = NoTimeout
+		case s.RequestTimeoutSec > 0:
+			o.TimeoutMs = s.RequestTimeoutSec * 1000
+		default:
+			o.TimeoutMs = 60 * 1000
 		}
-		o.TimeoutMs = sec * 1000
+	} else if o.TimeoutMs < 0 {
+		o.TimeoutMs = NoTimeout
 	}
 	if o.FollowRedirects == ToggleInherit {
 		o.FollowRedirects = ToggleOn
@@ -339,7 +349,7 @@ type Settings struct {
 	HistoryLimit int    `json:"historyLimit"`
 	// OnboardingCompleted stays false for new and pre-onboarding settings.
 	OnboardingCompleted bool `json:"onboardingCompleted,omitempty"`
-	// RequestTimeoutSec is the default send timeout; 0 means 60.
+	// RequestTimeoutSec is the default send timeout; 0 means 60, NoTimeout disables it.
 	RequestTimeoutSec int `json:"requestTimeoutSec,omitempty"`
 	// NoFollowRedirects and InsecureTLS are the global transport defaults;
 	// their zero values are the safe ones (follow redirects, verify TLS).

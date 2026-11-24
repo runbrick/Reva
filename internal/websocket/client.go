@@ -20,7 +20,10 @@ import (
 	"time"
 )
 
-const maxMessage = 8 << 20
+const (
+	maxMessage               = 8 << 20
+	NoTimeout  time.Duration = -1
+)
 
 type Conn struct {
 	net.Conn
@@ -36,11 +39,14 @@ func Dial(ctx context.Context, rawURL string, headers http.Header, timeout time.
 	if err != nil || u.Hostname() == "" || (u.Scheme != "ws" && u.Scheme != "wss") || u.Fragment != "" || u.User != nil {
 		return nil, errors.New("invalid WebSocket URL")
 	}
-	if timeout <= 0 {
-		timeout = 60 * time.Second
+	if timeout != NoTimeout {
+		if timeout <= 0 {
+			timeout = 60 * time.Second
+		}
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, timeout)
+		defer cancel()
 	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 	port := "80"
 	if u.Scheme == "wss" {
 		port = "443"

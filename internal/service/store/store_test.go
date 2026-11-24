@@ -550,3 +550,16 @@ func TestIDsCannotEscapeDataDirectory(t *testing.T) {
 		t.Fatalf("missing collection error = %v", err)
 	}
 }
+
+func TestSettingsNoTimeoutPersists(t *testing.T) {
+	dir := t.TempDir()
+	s := openStore(t, dir)
+	cfg := s.Settings().Get()
+	cfg.RequestTimeoutSec = model.NoTimeout
+	must(t, s.Settings().Save(cfg))
+
+	got := openStore(t, dir).Settings().Get()
+	if got.RequestTimeoutSec != model.NoTimeout {
+		t.Fatalf("reloaded RequestTimeoutSec = %d, want %d", got.RequestTimeoutSec, model.NoTimeout)
+	}
+}

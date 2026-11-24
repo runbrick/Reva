@@ -86,6 +86,9 @@ func (a *App) requestTab(t *Tab) *requestTabState {
 	// Only explicit URL/table edits synchronize the two representations.
 	if s == nil || s.requestID != t.Request.ID {
 		s = &requestTabState{url: t.Request.URL, requestID: t.Request.ID, timeoutValue: t.Request.Options.TimeoutMs}
+		if version, _ := soapBodyInfo(&t.Request); version != soapNone {
+			s.section = requestBody
+		}
 		if s.timeoutValue > 0 {
 			s.timeout = strconv.Itoa(s.timeoutValue)
 		}
@@ -241,6 +244,7 @@ func (a *App) requestBodySection(c ui.C, t *Tab, s *requestTabState) {
 			t.Dirty = true
 		}
 	case model.BodyRaw:
+		a.soapBodyControls(c, t)
 		if ui.TextField(c, &b.ContentType, a.S.Request.ContentType, "text/plain").FillWidth().Changed() {
 			t.Dirty = true
 		}

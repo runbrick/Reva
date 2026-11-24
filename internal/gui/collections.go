@@ -315,6 +315,7 @@ func (a *App) collectionsPane(c ui.C) {
 					}
 					c.After(func() { a.newSSERequest(n) })
 				}
+				a.soapMenuItems(c, menu, s.selected)
 				menu.Separator()
 				if menu.Item(a.S.Import.Title).Icon(icons.Download).Clicked() {
 					c.After(a.openImportDialog)
@@ -561,6 +562,7 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		if menu.Item(s.NewSSE).Icon(icons.Radio).Clicked() {
 			c.After(func() { a.newSSERequest(n) })
 		}
+		a.soapMenuItems(c, menu, n)
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {
 				c.After(func() { a.openCollectionSettings(n, collectionSettingsVariables) })

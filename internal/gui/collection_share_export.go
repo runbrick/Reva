@@ -66,7 +66,7 @@ func (a *App) buildCollectionShareExport(draft *collectionSettingsDraft, collect
 	state.preview = preview
 	state.summary = fmt.Sprintf(labels.ShareCounts, preview.Included, preview.Requests)
 	for _, notice := range preview.Notices {
-		line := shareIssueLabel(labels, notice.Issue)
+		line := shareIssueLabel(a.S, notice.Issue)
 		if notice.Request > 0 {
 			prefix := labels.ShareRequest
 			if notice.Skipped {
@@ -178,7 +178,8 @@ func shareFormatHelp(labels *i18n.Collections, format shareexport.Format) string
 	return [...]string{labels.ShareNativeHelp, labels.SharePostmanHelp, labels.ShareHurlHelp, labels.ShareK6Help}[format]
 }
 
-func shareIssueLabel(labels *i18n.Collections, issue shareexport.Issue) string {
+func shareIssueLabel(strings *i18n.Strings, issue shareexport.Issue) string {
+	labels := &strings.Collections
 	switch issue {
 	case shareexport.Variables:
 		return labels.ShareVariables
@@ -205,7 +206,7 @@ func shareIssueLabel(labels *i18n.Collections, issue shareexport.Issue) string {
 	case shareexport.Options:
 		return labels.ShareOptions
 	case shareexport.Protocol:
-		return labels.ShareProtocol
+		return strings.GRPC.ExportProtocol
 	case shareexport.BodyMode:
 		return labels.ShareBodyMode
 	case shareexport.Method:

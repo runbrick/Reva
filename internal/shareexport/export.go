@@ -297,7 +297,7 @@ func (build *builder) items(source []model.Item, parent model.Auth) []model.Item
 func (build *builder) request(source model.Request, id, name string, parent model.Auth) *model.Request {
 	portable := build.format >= Hurl
 	blocked := false
-	if build.format != Native && (source.Method == "WS" || unsupportedURLScheme(source.URL) || source.Body.ContentType == "application/graphql+json") {
+	if build.format != Native && (source.Method == "WS" || source.Method == model.MethodGRPC || unsupportedURLScheme(source.URL) || source.Body.ContentType == "application/graphql+json") {
 		build.notice(Protocol, true)
 		blocked = true
 	} else if !supportsMethod(build.format, source.Method) {

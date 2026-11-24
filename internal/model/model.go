@@ -14,7 +14,7 @@ import (
 // SchemaVersion is written into every file Reva persists.
 const SchemaVersion = 1
 
-// Method is an HTTP method.
+// Method identifies an HTTP method or a dedicated request protocol.
 type Method string
 
 const (
@@ -25,6 +25,7 @@ const (
 	MethodDelete  Method = "DELETE"
 	MethodHead    Method = "HEAD"
 	MethodOptions Method = "OPTIONS"
+	MethodGRPC    Method = "GRPC"
 )
 
 // Methods lists the methods offered in the method picker, in display order.

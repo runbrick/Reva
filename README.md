@@ -113,6 +113,22 @@ Reva starts with a `GET` request and an `Accept: text/event-stream` header.
 Enter an endpoint URL and send the request to see incoming events in **SSE
 events**. Use **Disconnect** to end the stream.
 
+## gRPC and SOAP
+
+In the **APIs** sidebar, open **Add collection item (+)** to create a gRPC
+or SOAP request. Both request types can be saved in a collection.
+
+- **gRPC** supports unary HTTP/2 calls. Enter the full RPC URL, for example
+  `http://localhost:50051/example.Echo/Send`, and paste the serialized
+  Protobuf message as hexadecimal bytes. Reva displays the response bytes,
+  gRPC status and elapsed time. Messages are limited to 1 MiB. Streaming,
+  compression, schema-based editing, server reflection, and the HTTP collection
+  runner are not supported for gRPC requests.
+- **SOAP** uses HTTP POST with an editable XML envelope. Choose **New SOAP
+  Request** for SOAP 1.1 or **New SOAP 1.2 Request** for SOAP 1.2. In the
+  **Body** tab, enter the optional SOAP action. The standard HTTP workbench
+  displays the response. WSDL import is not supported.
+
 ## Headless collection CLI
 
 Run an existing native collection without opening a window:

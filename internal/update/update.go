@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const Current = "0.3.0"
+const Current = "0.8.0"
 const Feed = "https://api.github.com/repos/runbrick/Reva/releases/latest"
 const releaseRoot = "https://github.com/runbrick/Reva/releases/"
 

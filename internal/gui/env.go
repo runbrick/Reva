@@ -111,7 +111,7 @@ func (a *App) UnresolvedVars() []string {
 			}
 		}
 	}
-	if cfg, _, err := a.effectiveAuth(a.Active()); err == nil && !isWebSocket(*req) {
+	if cfg, _, err := a.effectiveAuth(a.Active()); err == nil && !isWebSocket(*req) && req.Method != model.MethodGRPC {
 		var fields [2]string
 		switch cfg.Type {
 		case model.AuthBearer:

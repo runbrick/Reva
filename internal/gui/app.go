@@ -151,6 +151,7 @@ type App struct {
 	titlebar    titlebarState
 	search      searchState
 	websocket   websocketState
+	grpc        grpcState
 	toolbox     toolboxState
 
 	collectionWorkspace collectionWorkspaceState
@@ -241,6 +242,10 @@ func (a *App) Send(t *Tab) {
 	if t == nil || t.Kind != requestTabKind {
 		return
 	}
+	if t.Request.Method == model.MethodGRPC {
+		a.invokeGRPC(t, a.grpcTab(t))
+		return
+	}
 	col, _ := a.Svc.Collections.Get(t.CollectionID)
 	plan, err := execution.New(execution.Input{
 		Request: t.Request, Collection: col, Variables: a.VarsFor(t), Settings: a.Svc.Settings.Get(),
@@ -270,6 +275,13 @@ func (a *App) Send(t *Tab) {
 
 // Cancel stops t's request in flight.
 func (a *App) Cancel(t *Tab) {
+	if t.Request.Method == model.MethodGRPC {
+		if state := a.grpc.tabs[t.ID]; state != nil && state.job != nil {
+			state.job = nil
+			state.err = context.Canceled
+		}
+		return
+	}
 	if t.Sending {
 		if t.sse != nil {
 			t.sse.release()
@@ -368,6 +380,7 @@ func (a *App) Page(c ui.C) {
 	}
 	a.declareSends(c)
 	a.declareWebSockets(c)
+	a.declareGRPC(c.Key("grpc"))
 	a.declareCollectionRunner(c)
 	a.declareToolbox(c)
 	if a.collections.runner.open {
@@ -459,6 +472,10 @@ func (a *App) workbench(c ui.C) {
 		}
 		if isWebSocket(t.Request) {
 			a.websocketPane(c.KeyInt(t.ID), t)
+			return
+		}
+		if t.Request.Method == model.MethodGRPC {
+			a.grpcPane(c.KeyInt(t.ID), t)
 			return
 		}
 		ui.Row(c).FillWidth().Grow(1).MinHeight(0).Children(func() {

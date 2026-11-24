@@ -15,7 +15,7 @@ import (
 func (a *App) requestPreviewOpen() bool {
 	active := a.Active()
 	for id, state := range a.request.tabs {
-		if id != active.ID || active.Kind != requestTabKind || isWebSocket(active.Request) || a.Main != PageWorkbench || a.Section == SectionEnvironments {
+		if id != active.ID || active.Kind != requestTabKind || isWebSocket(active.Request) || active.Request.Method == model.MethodGRPC || a.Main != PageWorkbench || a.Section == SectionEnvironments {
 			state.previewOpen = false
 		}
 	}
@@ -43,7 +43,7 @@ func (a *App) requestPreviewEnvironmentName(candidate model.Environment) string 
 // The preview is rebuilt on every declaration; no resolved credential values
 // are retained in editor state. Its only state is requestTabState.previewOpen.
 func (a *App) requestPreview(c ui.C, t *Tab, state *requestTabState) {
-	if t.Kind != requestTabKind || isWebSocket(t.Request) {
+	if t.Kind != requestTabKind || isWebSocket(t.Request) || t.Request.Method == model.MethodGRPC {
 		state.previewOpen = false
 		return
 	}

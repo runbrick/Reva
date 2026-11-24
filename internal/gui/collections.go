@@ -138,8 +138,8 @@ func (s *collectionsState) appendItems(colID, parentID string, items []model.Ite
 	for _, item := range items {
 		n := collectionNode{collectionID: colID, id: item.ID, parentID: parentID, name: item.Name, depth: depth, branch: item.Type == model.ItemFolder}
 		if n.branch {
-			h, w := collectionRequestCounts(item.Items)
-			n.requests = h + w
+			http, ws, grpc := collectionRequestCounts(item.Items)
+			n.requests = http + ws + grpc
 		}
 		if item.Request != nil {
 			n.method = item.Request.Method
@@ -205,8 +205,8 @@ func (a *App) refreshCollections() {
 	for _, col := range cols {
 		s.collectionIDs = append(s.collectionIDs, col.ID)
 		s.collectionNames[col.ID] = col.Name
-		h, w := collectionRequestCounts(col.Items)
-		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true, requests: h + w})
+		http, ws, grpc := collectionRequestCounts(col.Items)
+		s.appendNode(collectionNode{collectionID: col.ID, name: col.Name, branch: true, requests: http + ws + grpc})
 		s.appendItems(col.ID, "", col.Items, 1)
 	}
 	// Duplicate display names still need distinct gear controls for accessibility.
@@ -314,6 +314,13 @@ func (a *App) collectionsPane(c ui.C) {
 						n.id = n.parentID
 					}
 					c.After(func() { a.newSSERequest(n) })
+				}
+				if menu.Item(a.S.GRPC.NewRequest).Icon(icons.Binary).Clicked() {
+					n := s.selected
+					if !n.branch {
+						n.id = n.parentID
+					}
+					c.After(func() { a.newGRPCRequest(n) })
 				}
 				menu.Separator()
 				if menu.Item(a.S.Import.Title).Icon(icons.Download).Clicked() {
@@ -560,6 +567,9 @@ func (a *App) collectionMenu(c ui.C, menu *ui.MenuItems, n collectionNode) {
 		}
 		if menu.Item(s.NewSSE).Icon(icons.Radio).Clicked() {
 			c.After(func() { a.newSSERequest(n) })
+		}
+		if menu.Item(a.S.GRPC.NewRequest).Icon(icons.Binary).Clicked() {
+			c.After(func() { a.newGRPCRequest(n) })
 		}
 		if n.id == "" {
 			if menu.Item(s.Variables).Clicked() {

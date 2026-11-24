@@ -221,6 +221,14 @@ func mergeCaptures(existing, incoming []model.KV) ([]model.KV, bool) {
 func (s Snapshot) execute(ctx context.Context, sender service.RequestService, item *model.Item, request RequestResult, variables []model.KV) RequestResult {
 	req := *item.Request
 	req.ID = item.ID
+	if ctx.Err() != nil {
+		request.Outcome, request.Code = Skipped, CodeSkippedCancellation
+		return request
+	}
+	if req.Method == model.MethodGRPC {
+		request.Outcome, request.Code, request.Stage, request.Err = Failed, CodeUnsupportedProtocol, execution.StageValidation, errUnsupportedProtocol
+		return request
+	}
 	plan, err := execution.New(execution.Input{Request: req, Collection: s.collection, Settings: s.settings, Variables: variables})
 	if ctx.Err() != nil {
 		request.Outcome, request.Code = Skipped, CodeSkippedCancellation
@@ -281,6 +289,8 @@ func (s *checkedSender) Send(ctx context.Context, req model.Request, values []mo
 		return model.Response{}, err
 	}
 	switch req.Method {
+	case model.MethodGRPC:
+		return model.Response{}, errUnsupportedProtocol
 	case model.MethodGet, model.MethodPost, model.MethodPut, model.MethodPatch, model.MethodDelete, model.MethodHead, model.MethodOptions:
 	default:
 		return model.Response{}, errUnsupportedMethod

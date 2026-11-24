@@ -84,6 +84,43 @@ func mustNotice(t *testing.T, preview Preview, want Notice) {
 	}
 }
 
+func TestGRPCShareAndNativeRoundTrip(t *testing.T) {
+	const endpoint = "https://localhost:50051/example.Service/Call"
+	request := model.NewRequest("grpc")
+	request.Name, request.Method, request.URL = "Unary", model.MethodGRPC, endpoint
+	request.Body = model.Body{Mode: model.BodyRaw, Text: "082a"}
+	request.Headers = []model.KV{{Key: "x-test", Value: "fixture-value"}}
+	collection := model.Collection{ID: "collection", Name: "Services", Version: model.SchemaVersion, Items: []model.Item{
+		{ID: request.ID, Name: request.Name, Type: model.ItemRequest, Request: &request},
+	}}
+	data, err := json.Marshal(collection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := importer.Parse(string(data))
+	if err != nil || result.Collection == nil {
+		t.Fatalf("native import: %v", err)
+	}
+	restored := result.Collection.Items[0].Request
+	if restored.Method != model.MethodGRPC || restored.Body.Mode != model.BodyRaw || restored.Body.Text != "082a" || restored.URL != endpoint || !slices.Equal(restored.Headers, request.Headers) {
+		t.Fatalf("native import lost gRPC fields: %+v", restored)
+	}
+	for _, format := range []Format{Native, Postman, Hurl, K6} {
+		preview, err := Build(collection, format)
+		if err != nil || preview.Requests != 1 {
+			t.Fatalf("format %v: %+v, %v", format, preview, err)
+		}
+		if format != Native {
+			if preview.Included != 0 {
+				t.Fatalf("format %v exported gRPC", format)
+			}
+			mustNotice(t, preview, Notice{Issue: Protocol, Request: 1, Skipped: true})
+		} else if preview.Included != 1 || strings.Contains(string(preview.Data), endpoint) || strings.Contains(string(preview.Data), "fixture-value") || strings.Contains(string(preview.Data), "082a") {
+			t.Fatalf("native share did not preserve the request or redact its values: %+v", preview)
+		}
+	}
+}
+
 func TestShareJSONRoundTripWithRevaImporter(t *testing.T) {
 	col, _ := fixture(t)
 	for _, format := range []Format{Native, Postman} {

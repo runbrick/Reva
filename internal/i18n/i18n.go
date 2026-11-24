@@ -36,6 +36,7 @@ type Strings struct {
 	Titlebar    Titlebar
 	Search      Search
 	WebSocket   WebSocket
+	GRPC        GRPC
 	Toolbox     Toolbox
 }
 
@@ -63,6 +64,7 @@ var zh = Strings{
 	Titlebar:    titlebarZh,
 	Search:      searchZh,
 	WebSocket:   websocketZh,
+	GRPC:        grpcZh,
 	Toolbox:     toolboxZh,
 }
 
@@ -82,5 +84,6 @@ var en = Strings{
 	Titlebar:    titlebarEn,
 	Search:      searchEn,
 	WebSocket:   websocketEn,
+	GRPC:        grpcEn,
 	Toolbox:     toolboxEn,
 }

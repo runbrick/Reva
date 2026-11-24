@@ -188,6 +188,10 @@ func TestFailureCategoriesAndPostScriptCapabilityChecks(t *testing.T) {
 	}{
 		{"auth", func(r *model.Request) { r.Auth = model.Auth{Type: model.AuthBearer, Token: "invalid\r\nheader"} }, runner.CodeAuth, false},
 		{"method", func(r *model.Request) { r.Method = "WS" }, runner.CodeUnsupportedMethod, false},
+		{"grpc", func(r *model.Request) {
+			r.Method = model.MethodGRPC
+			r.PreScript = `throw new Error("gRPC must not run HTTP scripts");`
+		}, runner.CodeUnsupportedProtocol, false},
 		{"protocol", func(r *model.Request) { r.URL = "ws://localhost/socket" }, runner.CodeUnsupportedProtocol, false},
 		{"script-method", func(r *model.Request) { r.PreScript = `pm.request.method = "TRACE";` }, runner.CodeUnsupportedMethod, false},
 		{"script-protocol", func(r *model.Request) { r.PreScript = `pm.request.url = "ftp://localhost/data";` }, runner.CodeUnsupportedProtocol, false},

@@ -263,17 +263,20 @@ func (a *App) collectionSettingsPane(c ui.C, t *Tab) {
 
 // Count saved request nodes, including HTTP GraphQL bodies, but never folders.
 // The overview and tree use the same definition and never include editor drafts.
-func collectionRequestCounts(items []model.Item) (http, websocket int) {
+func collectionRequestCounts(items []model.Item) (http, websocket, grpc int) {
 	for _, item := range items {
 		if item.Type == model.ItemRequest && item.Request != nil {
-			if isWebSocket(*item.Request) {
+			switch {
+			case isWebSocket(*item.Request):
 				websocket++
-			} else {
+			case item.Request.Method == model.MethodGRPC:
+				grpc++
+			default:
 				http++
 			}
 		}
-		h, w := collectionRequestCounts(item.Items)
-		http, websocket = http+h, websocket+w
+		httpCount, wsCount, grpcCount := collectionRequestCounts(item.Items)
+		http, websocket, grpc = http+httpCount, websocket+wsCount, grpc+grpcCount
 	}
 	return
 }
@@ -307,7 +310,7 @@ func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, it
 	if item != nil {
 		items = item.Items
 	}
-	http, ws := collectionRequestCounts(items)
+	http, ws, grpc := collectionRequestCounts(items)
 	n := collectionNode{collectionID: t.CollectionID, id: t.TargetID, branch: true}
 	ui.Column(c).FillWidth().Gap(Space2).PadBottom(Space4).Children(func() {
 		ui.Text(c, s.APISection).Muted().FontSize(theme.Metrics.FontSizeS)
@@ -315,11 +318,14 @@ func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, it
 		if t.TargetID == "" && ui.Button(c, s.RunCollection).Small().Outline().Icon(icons.Play).Self(ui.Start).Disabled(!exists).Clicked() {
 			c.After(func() { a.openCollectionRunner(t.CollectionID) })
 		}
-		for i, count := range []int{http, ws} {
+		for i, count := range []int{http, ws, grpc} {
 			ui.Row(c.KeyInt(i)).FillWidth().PadY(Space2).Gap(Space3).Items(ui.Center).Children(func() {
 				icon, protocol, action := icons.Send, "HTTP", s.NewRequest
-				if i == 1 {
+				switch i {
+				case 1:
 					icon, protocol, action = icons.Activity, "WebSocket", s.NewWebSocket
+				case 2:
+					icon, protocol, action = icons.Binary, "gRPC", a.S.GRPC.NewRequest
 				}
 				ui.Icon(c, icon).Size(Space6, Space6).Color(theme.MutedForeground)
 				ui.Column(c).Grow(1).MinWidth(0).Gap(Space1).Children(func() {
@@ -328,9 +334,12 @@ func (a *App) collectionOverviewActions(c ui.C, t *Tab, col model.Collection, it
 				})
 				if ui.Button(c, action).Icon(icons.Plus).IconOnly().Ghost().Disabled(!exists).Clicked() {
 					c.After(func() {
-						if i == 1 {
+						switch i {
+						case 1:
 							a.newWebSocket(n)
-						} else {
+						case 2:
+							a.newGRPCRequest(n)
+						default:
 							a.newCollectionRequest(n)
 						}
 					})
